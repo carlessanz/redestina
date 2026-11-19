@@ -42,6 +42,8 @@ import { refrescaComptadors } from '../../lib/pendentsEquip'
 import type { Albaran, AlbaranLinea, DocumentoExterno } from '../../types'
 import DialegMotiu from '../../components/DialegMotiu'
 import Desplegable from '../../components/Desplegable'
+import SelectorEntitat from '../../components/SelectorEntitat'
+import { opcionsProducte } from '../../lib/opcionsSelector'
 import { useConfirma } from '../../components/DialegConfirma'
 import { useConfirmaEnviament } from '../../components/DialegEnviament'
 import AccionsSignatura from '../../components/AccionsSignatura'
@@ -907,12 +909,14 @@ export default function AlbaraDetall() {
                 <div key={i} className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label htmlFor={`ln-prod-${i}`}>{t('alb.ln_product')}</Label>
-                    <Desplegable
+                    <SelectorEntitat
                       id={`ln-prod-${i}`}
-                      value={l.producto}
+                      valor={l.producto}
                       onChange={(v) => actualitza(i, 'producto', v)}
                       buit={t('c.none')}
-                      opcions={productes.map((p) => ({ valor: p, text: p }))}
+                      placeholder={t('po.product_search')}
+                      // Un producto fuera del catálogo (texto libre de la oferta) se conserva.
+                      opcions={opcionsProducte(productes, l.producto)}
                     />
                   </div>
                   <div className="space-y-1.5">

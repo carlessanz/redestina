@@ -2586,3 +2586,43 @@ Filas 3.1.2 y 3.7 del Excel de la Fundació. Modelo en `context/04`; RPC en `con
 - **Plan 1 sobre la ficha** (detalle en `context/06ter`): «Nova entitat» (1B, `cerca_entitats` → `crear_entitat`),
   «Dona-li accés» (1D, `fitxa/AccesEntitat`), «Gestió interna» (1F + 1.5, `fitxa/NotesInternes`) y, sin que la
   entidad entre, convenio por correo (`fitxa/ConveniFitxa`), RGPD, albarán por correo y correos con consentimiento.
+
+### Buscadores predictivos y nombre de la maquila (19-11-2026, fase 1 de los puntos 4-6)
+
+- **Selectores con sugerencias** (`SelectorEntitat` sobre `CercadorOpcions`; opciones de `lib/opcionsSelector.ts`: nombre,
+  municipio como detalle, NIF y razón social como claves ocultas). Sustituyen al `Desplegable` en: interés asistido
+  (`FormulariInteresAssistit`), distribución del ciclo guiado (`fases/Distribucio`), Espigolades (productora, lote y
+  entidad), `DialegEspigolada`, líneas de un albarán (`AlbaraDetall`), Plans (organización), certificado de donación
+  (oferta, buscable por `E-…`) y «Afegeix un producte» de la Operativa (también lo ve el productor). Se quedan como
+  desplegable las listas cortas: lugares de un productor, tipos de caja, tipos de documento externo, nivel del plan,
+  ejercicios, y las cuentas del equipo (traspaso y auditoría). E2E: `triaCercador()` y `suggerimentsDe()` de `tests/e2e/ajuda.ts`.
+- **`BarraFiltres`**: una dimensión con **más de 12 opciones** pasa sola a autocompletar (y se queda así mientras la barra
+  esté montada); `cercador?: boolean` en `DesplegableFiltre` lo fuerza. «Tots» es la primera sugerencia.
+- **Buscador de texto** (`useCerca` + `filtraCerca`) en Aprovacions (`#appr-cerca`, filtra las cinco colas; el recuento del
+  título sigue siendo el total), Tancament (`#tan-cerca`) y Plans (`#plans-cerca`).
+- **Maquila**: en toda la interfaz se llama «Transformació en obrador (maquila)» / «Transformación en obrador (maquila)»
+  (reunión del 18-11-2026: «maquila» a secas no se reconoce). En la base sigue `maquila`. Cambian `od.mod_maquila`,
+  `imp.mod_maquila`, `cdon.mot_maquila`, `org.mi_maquila` y los textos que la nombran; también `_shared/modalitats.ts`
+  (texto de la oferta) y `_shared/excedentsLlegible.ts` (diagnóstico). El importador entiende el nombre nuevo y el antiguo
+  (`modalitatsDeText`). **Se quedan con «Maquila»**: los títulos de la lista del bot (límite de caracteres de WhatsApp;
+  el panel ya usaba `titulo_panel`), el título del convenio antiguo «compravenda i maquila», la columna «via» del PDF de
+  cierre (`pdf/render/cierre.ts`, ancho de columna) y el valor guardado «Maquila» de la ficha (`lib/campsFitxa.ts`, dato).
+
+### Listado de ofertas del equipo: Històric y paso del proceso (19-11-2026, fase 1 de los puntos 4-6)
+
+- **Orden por defecto «Més recents»** (`created_at desc`); el selector conserva «per disponibilitat».
+- **Pestañas** (`lib/llistatOfertes.ts`): Per validar · Actives · Esborranys · Històric; «Totes» y «Tancades» desaparecen.
+  Actives = `borrador, pendent_validacio, publicada, parcial, bloqueada, no_colocada` (una no colocada aún necesita el
+  destino). `?tab=` se lee y se escribe con `replace` (`validar`, `esborranys`, `historic`; `tancades` es alias; Actives
+  quita el parámetro).
+- **Històric** = `cerrada` + `cancelada`, **paginado en servidor** (25 por página, `count: 'exact'` y `.range()`; se retira
+  el tope de 200). Orden `tancada_at desc nulls last` y luego `created_at desc` (`tancada_at` solo lo tiene la cerrada).
+  Buscador en servidor con 300 ms de espera (`.or()` sobre `id_excedente`, `producto`, `variedad`, con el texto entre
+  comillas y `\ % _` escapados). Filtros con `BarraFiltres` (`id="off-hist"`): estado final, producto, productora y rango
+  de fechas de cierre (con rango, las canceladas no salen). Las opciones salen de una consulta ligera del histórico (≤1.000).
+- **Paso del proceso** bajo el badge, en Actives: `pasDeLaFila()` arma los `FetsOferta` (kilos, respuestas, recogidas por
+  `estatValidacio()`, REC) y llama a `puntOferta(…, 'equip')`; en `text-aviso` si le toca al equipo. Las canalizaciones
+  **anuladas no suman** kilos ni recogidas (antes sí). Límite: las consultas de respuestas y canalizaciones pueden toparse
+  con las 1.000 filas de PostgREST con muchos envíos activos.
+- **Canalització** (`/equip/canalitzacio`) filtra las `cerrada` en cliente y enlaza a Ofertes › Històric; la RPC
+  `canalitzacions_actives` no cambia (se tocará en la fase 2).

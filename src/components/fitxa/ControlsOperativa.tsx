@@ -17,7 +17,7 @@ import { useT } from '../../lib/i18n'
 import { carregaCataleg, type ProducteCataleg } from '../../lib/fotosProducte'
 import { podaOperativa, type CampFitxa } from '../../lib/campsFitxa'
 import XipsTria from '../XipsTria'
-import Desplegable from '../Desplegable'
+import SelectorEntitat from '../SelectorEntitat'
 import { Input } from '@/components/ui/input'
 
 /** Recomendación de la fila 2.2 («recomanació ≤5»): una ayuda, no un tope. */
@@ -69,10 +69,12 @@ export default function ControlOperativa({
   }
 
   const triats = useMemo(() => llista(v), [v])
+  // Para el buscador de «Afegeix un producte» (19-11-2026): por nombre, con la familia de
+  // detalle (se ve a la derecha y también se busca en ella).
   const opcionsAfegir = useMemo(() => cataleg
     .filter((p) => !triats.includes(p.nombre))
-    .sort((a, b) => (a.familia ?? '').localeCompare(b.familia ?? '', 'ca') || a.nombre.localeCompare(b.nombre, 'ca'))
-    .map((p) => ({ valor: p.nombre, text: p.nombre, grup: p.familia ?? undefined })), [cataleg, triats])
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'ca'))
+    .map((p) => ({ valor: p.nombre, text: p.nombre, ...(p.familia ? { detall: p.familia } : {}) })), [cataleg, triats])
 
   if (camp.tipus === 'xips') {
     return (
@@ -83,9 +85,9 @@ export default function ControlOperativa({
   }
 
   if (camp.tipus === 'productes') {
-    // Los marcados (un clic los quita) y, debajo, un desplegable por familia para añadir. Un
-    // valor que no es del catálogo (texto libre de un import antiguo) sale igual: se conserva
-    // mientras no se quite.
+    // Los marcados (un clic los quita) y, debajo, un buscador para añadir (se escribe un trozo
+    // y se toca la sugerencia; el campo se vacía para el siguiente). Un valor que no es del
+    // catálogo (texto libre de un import antiguo) sale igual: se conserva mientras no se quite.
     return (
       <div className="space-y-2">
         {triats.length === 0
@@ -94,9 +96,11 @@ export default function ControlOperativa({
               opcions={triats.map((p) => ({ valor: p, text: p }))} triats={triats}
               onChange={(nv) => canvia(nv.length ? nv : null)} />}
         {!disabled && (
-          <Desplegable id={id} aria-label={t('op.afegeix_producte')} value="" placeholder={t('op.afegeix_producte')}
-            className="max-w-sm" opcions={opcionsAfegir}
-            onChange={(nom) => { if (nom) canvia([...triats, nom]) }} />
+          <div className="max-w-sm">
+            <SelectorEntitat id={id} aria-label={t('op.afegeix_producte')} valor="" placeholder={t('op.afegeix_producte')}
+              opcions={opcionsAfegir} buidaEnTriar
+              onChange={(nom) => { if (nom) canvia([...triats, nom]) }} />
+          </div>
         )}
       </div>
     )

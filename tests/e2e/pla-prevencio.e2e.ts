@@ -7,7 +7,7 @@
 // número de la serie PLA del clon).
 
 import { expect, test } from '@playwright/test'
-import { entra, motiuSaltClon, productorDe, sql, sqlCom, tria } from './ajuda'
+import { entra, motiuSaltClon, productorDe, sql, sqlCom, tria, triaCercador } from './ajuda'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -33,7 +33,7 @@ test('el equipo abre el expediente, lo llena por pestañas y exporta el PDF', as
 
   await entra(page, 'superadmin')
   await page.goto('/equip/plans')
-  await tria(page.locator('#plans-org'), { text: nom })
+  await triaCercador(page.locator('#plans-org'), nom, prod)
   await page.getByRole('button', { name: /Obre l’expedient|Abre el expediente/ }).click()
   await expect(page).toHaveURL(/\/equip\/plans\/[0-9a-f-]{36}$/)
   const id = page.url().split('/').pop()!

@@ -29,7 +29,8 @@ import { interesAssistit } from '../../lib/canalitzacio'
 import type { Excedente, Modalitat } from '../../types'
 import SelectorModalitat from '../SelectorModalitat'
 import CampsRecollida from '../CampsRecollida'
-import Desplegable from '../Desplegable'
+import SelectorEntitat from '../SelectorEntitat'
+import { opcioFitxa } from '../../lib/opcionsSelector'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -40,6 +41,10 @@ export type OfertaInteres = Pick<Excedente, 'id' | 'modalitat' | 'kg_total' | 'p
 interface EntitatTria {
   id: string
   nombre: string
+  /** Para el buscador: municipio de detalle, NIF y razón social como claves (`opcioFitxa`). */
+  poblacion: string | null
+  nif: string | null
+  razon_social: string | null
   tipo_receptor: string | null
   /** A5: la naturalesa de su organización; solo confirmada restringe (P8). */
   organizaciones: { naturalesa: string | null; naturalesa_origen: string | null } | null
@@ -79,7 +84,7 @@ export default function FormulariInteresAssistit({ oferta, idPrefix, entitatInic
     void (async () => {
       const [ents, mat, nat] = await Promise.all([
         // Solo las activas (1A): `comprova_interes()` rechaza una inactiva con `entitat_inactiva`.
-        supabase.from('entidades').select('id, nombre, tipo_receptor, organizaciones(naturalesa, naturalesa_origen)')
+        supabase.from('entidades').select('id, nombre, poblacion, nif, razon_social, tipo_receptor, organizaciones(naturalesa, naturalesa_origen)')
           .eq('activo', true).order('nombre').limit(500),
         supabase.from('modalitat_receptor_compat').select('modalitat, tipo_receptor'),
         supabase.from('modalitat_naturalesa_compat').select('modalitat, naturalesa'),
@@ -93,6 +98,11 @@ export default function FormulariInteresAssistit({ oferta, idPrefix, entitatInic
   }, [])
 
   const triadaEnt = entitats.find((e) => e.id === entitat) ?? null
+  // El buscador de entidades (19-11-2026): por nombre, municipio, NIF o razón social.
+  const opcionsEnt = useMemo(
+    () => entitats.map((e) => opcioFitxa({ id: e.id, nom: e.nombre, poblacio: e.poblacion, nif: e.nif, rao: e.razon_social })),
+    [entitats],
+  )
   // Lo mismo que puede pedir esa entidad desde el Mercat (sin el filtro de convenio: si le
   // falta, la base lo dice con `sense_conveni` y la fase 4 enseña cómo resolverlo).
   // A5: y, con la naturalesa confirmada, solo lo que admite P8 (el mismo cruce que `comprova_interes()`).
@@ -156,13 +166,13 @@ export default function FormulariInteresAssistit({ oferta, idPrefix, entitatInic
           <Label htmlFor={`${idPrefix}-entitat`} className="mb-1.5 block text-xs text-muted-foreground">
             {t('canalz.interes_entitat')}
           </Label>
-          <Desplegable
+          <SelectorEntitat
             id={`${idPrefix}-entitat`}
-            name="entitat"
-            value={entitat}
+            valor={entitat}
             onChange={canviaEntitat}
-            buit="—"
-            opcions={entitats.map((e) => ({ valor: e.id, text: e.nombre }))}
+            buit={t('c.none')}
+            placeholder={t('sel.entitat')}
+            opcions={opcionsEnt}
           />
         </div>
         <div>

@@ -6,6 +6,16 @@
 // Los desplegables son `Desplegable` (el Select de shadcn con los tokens, 03-11-2026): el
 // `<select>` nativo se pintaba con el borde azul y la flecha del sistema y no casaba con nada.
 // Compactos (`mida="sm"`): la barra es una herramienta, no un formulario.
+//
+// AUTOCOMPLETAR (19-11-2026, buscadores predictivos). Una dimensión con muchas opciones
+// —municipio, entidad, producto— se recorre mal en un desplegable: pasa a un buscador
+// (`CercadorOpcions`) en el que se escribe un trozo y se toca la sugerencia. Se decide SOLO,
+// por número de opciones (más de `LLINDAR_CERCADOR`), para no tocar las pantallas que usan la
+// barra; `cercador: true|false` en la dimensión lo fuerza. Y una vez buscador, se queda buscador
+// mientras la barra viva: las opciones se recortan al poner otros filtros y el control no
+// debe cambiar de forma bajo el dedo. Con buscador sigue estando «Tots» (la primera
+// sugerencia, sin teclear) y el placeholder lo dice cuando no hay nada elegido; mide 32 px en
+// escritorio (`md:h-7`, como las fechas) y 16 px de texto en móvil (`Input`).
 
 import { useState } from 'react'
 import { Filter, X } from 'lucide-react'
@@ -15,6 +25,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Desplegable from './Desplegable'
+import CercadorOpcions from './CercadorOpcions'
+
+/** Más opciones que esto y la dimensión pasa a autocompletar (salvo `cercador: false`). */
+const LLINDAR_CERCADOR = 12
 
 export interface DesplegableFiltre {
   clau: string
@@ -23,6 +37,11 @@ export interface DesplegableFiltre {
   opcions: string[]
   /** Cómo se lee un valor: una clave i18n compuesta, un nombre… Por defecto, tal cual. */
   text?: (v: string) => string
+  /**
+   * Autocompletar en vez de desplegable. Sin él se decide solo: más de `LLINDAR_CERCADOR`
+   * opciones (y una vez decidido, se mantiene).
+   */
+  cercador?: boolean
 }
 
 interface Props {
@@ -42,6 +61,15 @@ interface Props {
 export default function BarraFiltres({ id, desplegables, valors, onValors, rang, mostrant, total, extra }: Props) {
   const { t } = useT()
   const [obert, setObert] = useState(false)
+  // Las dimensiones que ya han pasado a buscador: no vuelven a desplegable al recortarse sus
+  // opciones (patrón «guardar lo de renders anteriores»: el `set` en el render es legítimo).
+  const [ambCercador, setAmbCercador] = useState<readonly string[]>([])
+  const nous = desplegables
+    .filter((d) => d.cercador === undefined && d.opcions.length > LLINDAR_CERCADOR && !ambCercador.includes(d.clau))
+    .map((d) => d.clau)
+  if (nous.length > 0) setAmbCercador([...ambCercador, ...nous])
+  const usaCercador = (d: DesplegableFiltre) =>
+    d.cercador ?? (ambCercador.includes(d.clau) || d.opcions.length > LLINDAR_CERCADOR)
   const n = filtresActius(valors, rang)
   const neteja = () => {
     onValors({})
@@ -59,9 +87,16 @@ export default function BarraFiltres({ id, desplegables, valors, onValors, rang,
         {desplegables.filter((d) => d.opcions.length > 0 || valors[d.clau]).map((d) => (
           <div key={d.clau} className="min-w-0 space-y-1 md:w-40">
             <Label htmlFor={`${id}-${d.clau}`} className="text-xs font-normal text-muted-foreground">{t(d.etiquetaKey)}</Label>
-            <Desplegable id={`${id}-${d.clau}`} mida="sm" value={valors[d.clau] ?? ''} buit={t('fl.tots')}
-              onChange={(v) => onValors({ ...valors, [d.clau]: v })}
-              opcions={d.opcions.map((o) => ({ valor: o, text: d.text ? d.text(o) : o }))} />
+            {usaCercador(d) ? (
+              <CercadorOpcions id={`${id}-${d.clau}`} className="md:h-7" valor={valors[d.clau] ?? ''}
+                buit={t('fl.tots')} placeholder={t('fl.tots')} detallSota={false}
+                onChange={(v) => onValors({ ...valors, [d.clau]: v })}
+                opcions={d.opcions.map((o) => ({ valor: o, text: d.text ? d.text(o) : o }))} />
+            ) : (
+              <Desplegable id={`${id}-${d.clau}`} mida="sm" value={valors[d.clau] ?? ''} buit={t('fl.tots')}
+                onChange={(v) => onValors({ ...valors, [d.clau]: v })}
+                opcions={d.opcions.map((o) => ({ valor: o, text: d.text ? d.text(o) : o }))} />
+            )}
           </div>
         ))}
         {rang && (

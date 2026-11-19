@@ -9,6 +9,9 @@
 // Los de prueba se pueden abrir tantas veces como haga falta —uno por ensayo— y se
 // reinician enteros desde el detalle. Los kilos y los euros que enseña esta pantalla salen
 // de `cierres_donante`, o sea del cálculo ya hecho: aquí no se suma nada en el cliente.
+//
+// 19-11-2026: la lista se filtra con el buscador común (`useCerca` + `filtraCerca`) por
+// ejercicio, modo, estado o notas.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
@@ -19,6 +22,8 @@ import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
 import { useConfirma } from '../../components/DialegConfirma'
 import { useAppContext } from '../../hooks/useAppContext'
+import { useCerca } from '../../hooks/useCerca'
+import { filtraCerca } from '../../lib/cerca'
 import BotoIcona from '../../components/BotoIcona'
 import { FilaClicable } from '../../components/FilaClicable'
 import {
@@ -85,6 +90,12 @@ export default function Tancament() {
   const [totals, setTotals] = useState<Record<string, Totals>>({})
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const { cerca, setCerca, q } = useCerca()
+  // Modo y estado como se leen, para que «prova» o «tancat» encuentren sus filas.
+  const visibles = useMemo(() => filtraCerca(files, q, (f) => [
+    String(f.ejercicio), t(f.modo === 'real' ? 'tan.mode_real' : 'tan.mode_test'), t(`tan.st_${f.estado}`), f.notas,
+  ]), [files, q, t])
 
   const anyActual = new Date().getFullYear()
   const [exercici, setExercici] = useState(String(anyActual))
@@ -182,6 +193,14 @@ export default function Tancament() {
           )}
 
           {files.length > 0 && (
+            <Input id="tan-cerca" type="search" placeholder={t('tan.search')} aria-label={t('c.search')}
+              value={cerca} onChange={(e) => setCerca(e.target.value)} />
+          )}
+          {files.length > 0 && visibles.length === 0 && (
+            <p className="text-sm text-muted-foreground">{t('od.no_match_ent')}</p>
+          )}
+
+          {visibles.length > 0 && (
             // Criterio de las tablas (§2): en móvil, ejercicio (con modo, estado y fecha
             // debajo), valor (con quilos, donantes y certificados debajo) y la acción. Las
             // columnas aparecen por ancho; lo escondido sigue debajo del dato principal.
@@ -200,7 +219,7 @@ export default function Tancament() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {files.map((f) => {
+                {visibles.map((f) => {
                   const s = totals[f.id]
                   return (
                     <FilaClicable key={f.id} to={`/equip/tancament/${f.id}`}>

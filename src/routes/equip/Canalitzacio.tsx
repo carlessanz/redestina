@@ -128,8 +128,11 @@ export default function Canalitzacio() {
 
   useEffect(() => { void carrega() }, [carrega])
 
+  // Las cerradas fuera (puntos 4-6, fase 1, 19-11-2026): `canalitzacions_actives` también las
+  // devuelve, pero aquí ya no hay nada que hacer con ellas y viven en Ofertes › Històric. El
+  // filtro va en el cliente para no tocar la RPC (sin migración).
   const visibles = useMemo(() => {
-    return filtraCerca(files, q, (f) => [f.id_excedente, f.productor])
+    return filtraCerca(files.filter((f) => f.estado !== 'cerrada'), q, (f) => [f.id_excedente, f.productor])
   }, [files, q])
 
   return (
@@ -138,6 +141,12 @@ export default function Canalitzacio() {
         <div>
           <h1 className="text-2xl font-bold">{t('canalz.title')}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{t('canalz.intro')}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t('canalz.historic_hint')}{' '}
+            <Link to="/equip/ofertes?tab=historic" className="text-primary underline-offset-4 hover:underline">
+              {t('canalz.historic_link')}
+            </Link>
+          </p>
         </div>
         {/* Empezar un lote, que es lo que faltaba: hasta ahora solo se podían continuar los
             que ya existían, porque el alta asistida vivía DENTRO del ciclo. */}

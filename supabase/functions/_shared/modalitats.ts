@@ -24,7 +24,8 @@ export const TOTES = "totes";
 const ETIQUETA: Record<Modalitat, string> = {
   donacio: "Donació",
   venda: "Venda",
-  maquila: "Maquila",
+  // «Maquila» a secas no se reconoce (reunión del 18-11-2026): el nombre acordado, con la palabra entre paréntesis.
+  maquila: "Transformació en obrador (maquila)",
 };
 
 export function esModalitat(v: unknown): v is Modalitat {
@@ -56,7 +57,7 @@ export function principal(ms: readonly Modalitat[]): Modalitat | null {
   return MODALITATS_IDS.find((m) => ms.includes(m)) ?? null;
 }
 
-/** «Donació», «Donació o venda», «Donació, venda o maquila». Vacío si no hay ninguna. */
+/** «Donació», «Donació o venda», «Donació, venda o transformació en obrador (maquila)». Vacío si no hay ninguna. */
 export function etiquetaModalitats(ms: readonly Modalitat[]): string {
   const ordenades = MODALITATS_IDS.filter((m) => ms.includes(m));
   const noms = ordenades.map((m, i) => (i === 0 ? ETIQUETA[m] : ETIQUETA[m].toLowerCase()));

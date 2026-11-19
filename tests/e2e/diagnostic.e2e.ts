@@ -106,7 +106,7 @@ test('el equipo registra excedentes por producto y causa, con una acción por de
   await xipsSub.getByRole('button', { name: subs[0][1], exact: true }).click()
   await omple(causa, 'estacional', '300', [/^Donació$/, /^Residu$/], [/^Donació$/, /^Venda$/],
     { donacio: 'E2E: conveni amb un banc d’aliments', venda: 'E2E: venda de segona al mercat' })
-  await omple(altra[0], 'puntual', '120', [/^Venda alternativa$/], [/^Maquila$/], { maquila: 'E2E: maquila de conserves' })
+  await omple(altra[0], 'puntual', '120', [/^Venda alternativa$/], [/\(maquila\)$/], { maquila: 'E2E: maquila de conserves' })
   // Segundo principal: «Sense excedent».
   await page.getByTestId(`bloc-exc-${segon}`).getByRole('checkbox', { name: /Sense excedent|Sin excedente/ }).check()
   await expect(page.getByTestId('diag-falten')).toHaveCount(0)
@@ -154,7 +154,7 @@ test('el equipo registra excedentes por producto y causa, con una acción por de
   await expect(page.getByTestId('exc-conservats').getByTestId(`bloc-exc-${producte}`)).toBeVisible()
 
   // Quitar un destino con acción guardada pide confirmación; cancelar no borra nada.
-  await page.getByTestId('exc-conservats').locator(`[aria-labelledby$="-${altra[0]}-destins-l"]`).getByRole('button', { name: /^Maquila$/ }).click()
+  await page.getByTestId('exc-conservats').locator(`[aria-labelledby$="-${altra[0]}-destins-l"]`).getByRole('button', { name: /\(maquila\)$/ }).click()
   await desa.click()
   const dialeg = page.getByRole('dialog')
   await expect(dialeg).toContainText(/Es perdrà 1 acció|Se perderá 1 acción/)

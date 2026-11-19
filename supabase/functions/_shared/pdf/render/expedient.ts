@@ -301,8 +301,9 @@ export async function renderExpedient(
       taula([
         { titulo: t.producte, ancho: 15 },
         { titulo: tEx("dexc.causa"), ancho: 17 },
-        { titulo: tEx("dexc.desti"), ancho: 12 },
-        { titulo: tEx("dexc.accio"), ancho: 42 },
+        // Destí más ancho desde el 19-11-2026: «Transformació en obrador (maquila)» no cabía en 12.
+        { titulo: tEx("dexc.desti"), ancho: 20 },
+        { titulo: tEx("dexc.accio"), ancho: 34 },
         { titulo: tEx("dexc.estat"), ancho: 14 },
       ], accions.map((f) => [f.producte, f.causa, f.desti, celaAccio(f, tEx), f.estat]));
     }

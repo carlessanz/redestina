@@ -31,6 +31,8 @@ import type { LiniaEntrada } from '../../lib/albarans'
 import { motiuConversio } from '../../lib/conversioEspigolada'
 import type { Excedente } from '../../types'
 import Desplegable from '../Desplegable'
+import SelectorEntitat from '../SelectorEntitat'
+import { opcionsProducte } from '../../lib/opcionsSelector'
 import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -177,10 +179,6 @@ export default function DialegEspigolada(
     onCreada(r.data.espigolada_id)
   }
 
-  // Un producto que ya no está en el catálogo (o que se escribió a mano en el intake) no
-  // puede desaparecer del desplegable: sería cambiar el producto del lote sin decirlo.
-  const opcions = producte && !productes.includes(producte) ? [producte, ...productes] : productes
-
   return (
     <Dialog open={obert} onOpenChange={(v) => { if (!v) onTancar() }}>
       <DialogContent
@@ -241,10 +239,12 @@ export default function DialegEspigolada(
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="ce-prod">{t('alb.ln_product')}</Label>
-                <Desplegable
-                  id="ce-prod" value={producte} onChange={setProducte}
-                  buit={t('c.none')}
-                  opcions={opcions.map((p) => ({ valor: p, text: p }))}
+                <SelectorEntitat
+                  id="ce-prod" valor={producte} onChange={setProducte}
+                  buit={t('c.none')} placeholder={t('po.product_search')}
+                  // Un producto que ya no está en el catálogo (o que se escribió a mano en el
+                  // intake) no puede desaparecer: `opcionsProducte` lo pone el primero.
+                  opcions={opcionsProducte(productes, producte)}
                 />
               </div>
               <div className="space-y-1.5">

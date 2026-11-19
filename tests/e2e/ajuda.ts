@@ -157,6 +157,41 @@ export async function tria(
   await llista.waitFor({ state: 'hidden' })
 }
 
+/**
+ * Elige una sugerencia de un buscador predictivo (`CercadorOpcions`/`SelectorEntitat`, 19-11-2026):
+ * no es un `Desplegable`, así que `tria()` no sirve. Escribe `escriu` en el campo y pulsa la
+ * sugerencia con ese `valor` (su `data-valor`, p. ej. el id de la ficha) o, sin él, la primera.
+ */
+export async function triaCercador(control: Locator, escriu: string, valor?: string): Promise<void> {
+  await control.click()
+  await control.fill(escriu)
+  const id = await control.getAttribute('id')
+  const llista = control.page().locator(`[id="${id}-llista"]`)
+  const op = valor !== undefined ? llista.locator(`[data-valor="${valor}"]`) : llista.getByRole('option').first()
+  await op.click()
+  await llista.waitFor({ state: 'hidden' })
+}
+
+/**
+ * Los textos de las sugerencias de un buscador predictivo (nombre y detalle juntos), tras
+ * escribir `escriu` (vacío = la lista sin filtrar, hasta el máximo del componente).
+ */
+export async function suggerimentsDe(control: Locator, escriu = ''): Promise<string[]> {
+  // Sin foco previo: tras un «Escape» el campo lo conserva y un clic ya no reabre la lista.
+  await control.blur()
+  await control.click()
+  await control.fill(escriu)
+  // Con el campo vacío, la flecha abajo abre la lista aunque `fill('')` no haya cambiado nada.
+  if (!escriu) await control.press('ArrowDown')
+  const id = await control.getAttribute('id')
+  const opcions = control.page().locator(`[id="${id}-llista"] [role="option"]`)
+  await opcions.first().waitFor({ timeout: 2_000 }).catch(() => { /* sin sugerencias */ })
+  const textos = await opcions.allTextContents()
+  await control.page().keyboard.press('Escape')
+  await control.blur()
+  return textos
+}
+
 /** Los textos de las opciones de un `Desplegable` (abre la lista y la vuelve a cerrar). */
 export async function opcionsDe(control: Locator): Promise<string[]> {
   await control.click()

@@ -37,6 +37,10 @@
 //    el de recepción con número legal, los envía y los concilia: no se deshace, y el diálogo
 //    lo dice antes de pulsar.
 //
+// BUSCADOR (19-11-2026): un solo campo arriba filtra las cinco colas a la vez —por organización,
+// producto, entidad, referencia de oferta, número…— con la regla común de los listados
+// (`useCerca` + `filtraCerca`). El recuento del título sigue siendo el total de la cola.
+//
 // ⚠️ Las cuatro colas son independientes a propósito: si una migración todavía no está
 //    aplicada, su consulta falla por tabla o columna inexistente y esa sección se queda
 //    vacía, pero las otras siguen funcionando igual.
@@ -49,6 +53,8 @@ import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
 import { useAppContext } from '../../hooks/useAppContext'
+import { useCerca } from '../../hooks/useCerca'
+import { filtraCerca } from '../../lib/cerca'
 import { contrafirmarConveni, nomOrganitzacio, retornarConveni } from '../../lib/convenis'
 import { kgPerOferta } from '../../lib/ofertes'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
@@ -286,6 +292,7 @@ export default function Aprovacions() {
   // Sin contexto, no: los permisos se conceden explícitamente o no se conceden (fail-cerrado,
   // 07-10-2026). La RPC revalida de todas formas y devuelve 42501.
   const potAprovar = ctx?.potAprovar ?? false
+  const { cerca, setCerca, q } = useCerca()
 
   const carrega = useCallback(async () => {
     // ⚠️ La lista de columnas, en UN literal (§7, deuda 46): estaba partida en dos cadenas
@@ -635,8 +642,40 @@ export default function Aprovacions() {
     void refrescaComptadors()
   }
 
+  // Lo que se enseña de cada cola con el buscador puesto (sin consulta, la misma lista).
+  const registresVisibles = filtraCerca(registres, q, (r) => {
+    const perfil = perfils[r.user_id]
+    return [
+      r.productores?.empresa, r.productores?.name, r.productores?.poblacion, r.productores?.email, r.productores?.phone,
+      r.entidades?.nombre, r.entidades?.poblacion, r.entidades?.email, r.entidades?.telefono,
+      perfil?.nombre, perfil?.email, perfil?.telefono,
+    ]
+  })
+  const convenisVisibles = filtraCerca(convenis, q, (c) => [
+    nomOrganitzacio(c.datos_org, c.tipo_org === 'productor'
+      ? (c.productores?.empresa || c.productores?.name || null)
+      : (c.entidades?.nombre || null)),
+    c.numero_completo,
+    typeof c.datos_org?.nif === 'string' ? c.datos_org.nif : null,
+    c.productores?.poblacion, c.entidades?.poblacion, c.firmante?.nombre,
+  ])
+  const filesVisibles = filtraCerca(files, q, (f) => [
+    f.entidades?.nombre, f.entidades?.poblacion, f.excedentes?.producto, f.excedentes?.id_excedente,
+  ])
+  const recollidesVisibles = filtraCerca(recollides, q, (r) => [
+    r.excedentes?.producto, r.excedentes?.id_excedente,
+    r.excedentes?.productores?.empresa, r.excedentes?.productores?.name, r.entidades?.nombre,
+  ])
+  /** «Sense coincidències» cuando la cola tiene filas pero el buscador las esconde todas. */
+  const senseCoincidencies = (total: number, visibles: number) => total > 0 && visibles === 0 && (
+    <p className="text-sm text-muted-foreground">{t('od.no_match_ent')}</p>
+  )
+
   return (
     <div className="space-y-6">
+      <Input id="appr-cerca" type="search" placeholder={t('appr.search')} aria-label={t('c.search')}
+        value={cerca} onChange={(e) => setCerca(e.target.value)} />
+
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-start justify-between gap-2">
@@ -652,7 +691,8 @@ export default function Aprovacions() {
           {!carregantReg && !errCarrega.reg && registres.length === 0 && (
             <p className="text-sm text-muted-foreground">{t('appr.reg_empty')}</p>
           )}
-          {registres.map((r) => {
+          {senseCoincidencies(registres.length, registresVisibles.length)}
+          {registresVisibles.map((r) => {
             const esProductor = r.tipo === 'productor'
             const fitxa = esProductor ? r.productores : r.entidades
             const perfil = perfils[r.user_id]
@@ -782,7 +822,8 @@ export default function Aprovacions() {
           {!carregantConv && !errCarrega.conv && convenis.length === 0 && (
             <p className="text-sm text-muted-foreground">{t('appr.conv_empty')}</p>
           )}
-          {convenis.map((c) => {
+          {senseCoincidencies(convenis.length, convenisVisibles.length)}
+          {convenisVisibles.map((c) => {
             const fitxa = c.tipo_org === 'productor'
               ? (c.productores?.empresa || c.productores?.name || null)
               : (c.entidades?.nombre || null)
@@ -852,7 +893,8 @@ export default function Aprovacions() {
           {!carregant && !errCarrega.resp && files.length === 0 && (
             <p className="text-sm text-muted-foreground">{t('appr.empty')}</p>
           )}
-          {files.map((f) => {
+          {senseCoincidencies(files.length, filesVisibles.length)}
+          {filesVisibles.map((f) => {
             const total = Number(f.excedentes?.kg_total ?? 0)
             return (
               <div key={f.id} className="rounded-lg border p-3">
@@ -930,7 +972,8 @@ export default function Aprovacions() {
           {!carregantRec && !errCarrega.rec && recollides.length === 0 && (
             <p className="text-sm text-muted-foreground">{t('vrec.empty')}</p>
           )}
-          {recollides.map((r) => {
+          {senseCoincidencies(recollides.length, recollidesVisibles.length)}
+          {recollidesVisibles.map((r) => {
             const assignats = r.kg_confirmados != null ? Number(r.kg_confirmados) : null
             const declarats = kgDeclarats(r)
             const dif = declarats != null && assignats != null ? Math.round((declarats - assignats) * 100) / 100 : null
@@ -996,7 +1039,7 @@ export default function Aprovacions() {
 
       {/* ── 5. Signatures per tancar (05-11-2026): lo que una organización firmó fuera y subió.
              Componente propio: lee su vista, decide el super_admin y se ancla en `#signatures`. */}
-      <CuaSignatures />
+      <CuaSignatures q={q} />
 
       <DialegValidacio
         estat={validant}

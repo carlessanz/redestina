@@ -113,6 +113,9 @@ src/
                                reexporta, así que ningún import cambia, y es probable desde Vitest
     esborranyOferta.ts         PURO: el borrador de la oferta (sessionStorage, 24 h) y la conversión de fechas
                                dd/mm/aaaa ↔ ISO de `FormulariNovaOferta`; un borrador sin `desat` se descarta
+    llistatOfertes.ts          PURO (19-11-2026): pestañas del listado de ofertas del equipo, sus estados, el paso del
+                               proceso de cada fila (`pasDeLaFila` → `puntOferta`), paginación y escape del buscador
+                               del Històric. `tests/llistatOfertes.test.ts`
     cerca.ts                   PURO: el buscador de los listados (`consultaCerca`, `casaCerca`,
                                `filtraCerca`; minúsculas, SIN quitar acentos a propósito —`senseAccents()`
                                existe y activarlo es una línea, pero cambiaría lo que encuentra cada
@@ -213,6 +216,11 @@ src/
                                alta, lo que contesta el bot, RECOLLIDA CONFIRMADA), con su correo y
                                si salió. `tests/missatgesOferta.test.ts`
   components/
+    CercadorOpcions.tsx        El combobox con sugerencias (sin acentos) para listas largas; `buit` («Tots»/
+                               «Cap») y `buidaEnTriar` (modo «añadir») desde el 19-11-2026
+    SelectorEntitat.tsx        Envoltorio de `CercadorOpcions` con la API de `Desplegable` (19-11-2026,
+                               buscadores predictivos del equipo); opciones de `lib/opcionsSelector.ts`
+                               (puro: `opcioFitxa`, `opcionsProducte`; `tests/opcionsSelector.test.ts`)
     preus/                     Precios de referencia (D1): PestanyaPreus (el mes), PestanyaCarregues (las
                                fuentes y las cargas), DialegNouProducte, PreusProducte (la ficha). Datos en
                                `lib/preus.ts` (tipos, piezas puras y RPC; `tests/preus.test.ts`)

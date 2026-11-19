@@ -160,7 +160,7 @@ describe('textos y filas', () => {
     expect(textFrequencia('cada_lluna', t)).toBe('cada_lluna')
     expect(textFrequencia(null, t)).toBe('')
     expect(textGestio(['venda_alternativa', 'altres_aprofitaments', 'x'], t)).toBe('Venda alternativa, Altres aprofitaments, x')
-    expect(textDestins(['donacio', 'venda', 'maquila'], t)).toBe('Donació, Venda, Maquila')
+    expect(textDestins(['donacio', 'venda', 'maquila'], t)).toBe('Donació, Venda, Transformació en obrador (maquila)')
     expect(textEstatAccio('en_curs', t)).toBe('En curs')
     expect(textVolum(1250.5, 'ca')).toBe('1.250,5')
     expect(textVolum(null, 'ca')).toBe('')
@@ -183,14 +183,14 @@ describe('textos y filas', () => {
     const files = filesCausa(blocs[0], t, 'ca')
     expect(files[0]).toEqual({
       codi: 'CE', causa: 'Criteris Estètics', subcausas: '', detall: 'Calibre petit', frequencia: 'Setmanal', volum: '1.250,5',
-      gestio: 'Donació, Residu', destins: 'Donació, Maquila',
+      gestio: 'Donació, Residu', destins: 'Donació, Transformació en obrador (maquila)',
     })
     expect(celaCausa(files[0], t)).toBe('Criteris Estètics\nDetall: Calibre petit')
     expect(celaCausa(filaCausa(blocs[0].causes[1], t, 'ca'), t)).toBe('Excedent')
     const accions = filesAccions(blocs[0], t, 'ca')
     expect(accions.map((a) => [a.causa, a.desti, a.estat])).toEqual([
       ['Criteris Estètics', 'Donació', 'En curs'],
-      ['Criteris Estètics', 'Maquila', 'Pendent'],
+      ['Criteris Estètics', 'Transformació en obrador (maquila)', 'Pendent'],
       ['Excedent', 'Venda', 'Feta'],
     ])
     expect(celaAccio(accions[0], t)).toBe('Banc d’aliments — Seguiment: Dijous')

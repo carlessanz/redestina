@@ -44,6 +44,7 @@ import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { useConfirma } from '../DialegConfirma'
 import BotoAmbMotiu from '../proces/BotoAmbMotiu'
 import Desplegable from '../Desplegable'
+import SelectorEntitat from '../SelectorEntitat'
 import { FilaCasella } from '../Casella'
 import Bloquejos from './Bloquejos'
 import AccionsCertificat from './AccionsCertificat'
@@ -336,14 +337,16 @@ export default function DialegCertificatDonacio({
           : !rangPossible(rang) ? t('cdon.why_rang_impossible')
             : !dataOk ? t('cdon.why_data') : undefined)
 
-  const opcionsOferta = useMemo(() => ofertes.map((o) => ({
-    valor: o.id,
-    text: [
-      [o.producto, o.variedad].filter(Boolean).join(' · ') || '—',
-      o.data ? dataCurta(o.data) : null,
-      o.id_excedente,
-    ].filter(Boolean).join(' · '),
-  })), [ofertes])
+  // El buscador de ofertas (19-11-2026): producto y variedad de texto; la fecha y el `E-…` de
+  // detalle, donde también se busca (por eso el identificador basta para encontrarla).
+  const opcionsOferta = useMemo(() => ofertes.map((o) => {
+    const detall = [o.data ? dataCurta(o.data) : null, o.id_excedente].filter(Boolean).join(' · ')
+    return {
+      valor: o.id,
+      text: [o.producto, o.variedad].filter(Boolean).join(' · ') || '—',
+      ...(detall ? { detall } : {}),
+    }
+  }), [ofertes])
 
   const opcionsAnual = useMemo(() => anuals.map((a) => ({
     valor: a.id,
@@ -381,8 +384,8 @@ export default function DialegCertificatDonacio({
                 {opcionsOferta.length === 0
                   ? <p className="text-sm text-muted-foreground">{t('cdon.f_oferta_buit')}</p>
                   : (
-                    <Desplegable
-                      id="cdon-oferta" value={excedente} opcions={opcionsOferta}
+                    <SelectorEntitat
+                      id="cdon-oferta" valor={excedente} opcions={opcionsOferta}
                       placeholder={t('cdon.f_oferta_tria')}
                       onChange={(v) => { setExcedente(v); invalida() }}
                       data-testid="cdon-oferta"

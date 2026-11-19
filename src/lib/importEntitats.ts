@@ -482,7 +482,8 @@ export function modalitatsDeText(text: string | null): string[] {
     if (/^(totes|todas|totes les modalitats|todas las modalidades)$/.test(t)) { out.push(...MODALITATS_IDS); continue }
     if (/^donaci/.test(t)) codi = 'donacio'
     else if (/^(venda|venta)/.test(t)) codi = 'venda'
-    else if (/^maquila/.test(t)) codi = 'maquila'
+    // «Transformació en obrador (maquila)» es el nombre que exporta desde el 19-11-2026; «Maquila» a secas sigue valiendo.
+    else if (/^maquila|^transformaci\S* en obrador|\(maquila\)/.test(t)) codi = 'maquila'
     out.push(codi ?? tros.toLowerCase())
   }
   return [...new Set(out)]

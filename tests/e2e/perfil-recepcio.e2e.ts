@@ -101,7 +101,7 @@ test('confirmada «empresa»: sin donación en el Mercat ni en el interés, y pe
   await expect(page.getByTestId('naturalesa-perfil')).toContainText(/Empresa \(confirmada\)/)
   const pref = page.getByTestId('preferencies-recepcio')
   await expect(pref.getByRole('button', { name: /^Compra$/ })).toBeVisible()
-  await expect(pref.getByRole('button', { name: /^Maquila/ })).toBeVisible()
+  await expect(pref.getByRole('button', { name: /\(maquila\)$/ })).toBeVisible()
   await expect(pref.getByRole('button', { name: /^Donació$|^Donación$/ })).toHaveCount(0)
   await expect(page.getByText(/^Quantitat per comanda|^Cantidad por pedido/).first()).toBeVisible()
   await expect(page.getByText(/^Persones ateses|^Personas atendidas/)).toHaveCount(0)

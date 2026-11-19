@@ -7,7 +7,7 @@
 // ⚠️ La priorización se pide al ABRIR la fase (el contenido de un desplegable no se monta
 //    cerrado): es una Edge Function de ~1 s y no hace falta en cada visita al ciclo.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -19,7 +19,8 @@ import type { EntidadPuntuada } from '../../../lib/redestina'
 import { supabase } from '../../../lib/supabase'
 import MissatgesDelPunt from '../../MissatgesDelPunt'
 import BotoCopiar from '../../BotoCopiar'
-import Desplegable from '../../Desplegable'
+import SelectorEntitat from '../../SelectorEntitat'
+import { opcioFitxa } from '../../../lib/opcionsSelector'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -28,12 +29,21 @@ import type { ContextFase } from './tipus'
 /** Cuántas entidades del ranking se enseñan aquí: las demás, en el detalle de la oferta. */
 const PRIMERES = 10
 
+/** Una entidad para el buscador de «Una altra entitat» (`opcioFitxa`). */
+interface EntitatTria {
+  id: string
+  nombre: string
+  poblacion: string | null
+  nif: string | null
+  razon_social: string | null
+}
+
 export default function FaseDistribucio({ c }: { c: ContextFase }) {
   const { t } = useT()
   const { fets, extra, oferta } = c
   const [ranking, setRanking] = useState<EntidadPuntuada[] | null>(null)
   const [errorRanking, setErrorRanking] = useState(false)
-  const [entitats, setEntitats] = useState<{ id: string; nombre: string }[]>([])
+  const [entitats, setEntitats] = useState<EntitatTria[]>([])
   const [entitatManual, setEntitatManual] = useState('')
   const [ocupat, setOcupat] = useState(false)
 
@@ -46,15 +56,20 @@ export default function FaseDistribucio({ c }: { c: ContextFase }) {
         // Para mandarla a una entidad que la priorización no propone (la ha pedido por
         // teléfono, o está fuera de las diez primeras).
         // Solo las activas (1A): una inactiva no puede mostrar interés.
-        supabase.from('entidades').select('id, nombre').eq('activo', true).order('nombre').limit(500),
+        supabase.from('entidades').select('id, nombre, poblacion, nif, razon_social').eq('activo', true).order('nombre').limit(500),
       ])
       if (!viu) return
       if (r.ok) setRanking(r.ranking)
       else { setRanking([]); setErrorRanking(true) }
-      setEntitats((e.data as { id: string; nombre: string }[] | null) ?? [])
+      setEntitats((e.data as EntitatTria[] | null) ?? [])
     })()
     return () => { viu = false }
   }, [id])
+
+  const opcionsEnt = useMemo(
+    () => entitats.map((e) => opcioFitxa({ id: e.id, nom: e.nombre, poblacio: e.poblacion, nif: e.nif, rao: e.razon_social })),
+    [entitats],
+  )
 
   const disponible = ['publicada', 'parcial'].includes(fets.oferta.estado)
   const resposta = (entitat: string) => extra.respostes.find((r) => r.entidad_id === entitat)
@@ -153,12 +168,13 @@ export default function FaseDistribucio({ c }: { c: ContextFase }) {
             <Label htmlFor="cd-manual-entitat" className="mb-1.5 block text-xs text-muted-foreground">
               {t('cfase.altra_entitat')}
             </Label>
-            <Desplegable
+            <SelectorEntitat
               id="cd-manual-entitat"
-              value={entitatManual}
+              valor={entitatManual}
               onChange={setEntitatManual}
-              buit="—"
-              opcions={entitats.map((e) => ({ valor: e.id, text: e.nombre }))}
+              buit={t('c.none')}
+              placeholder={t('sel.entitat')}
+              opcions={opcionsEnt}
             />
           </div>
           <BotoCopiar

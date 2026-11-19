@@ -20,6 +20,7 @@ import { carregaBandejaSignatures, rebutjarSignatura, tancarSignatura } from '..
 import { refrescaComptadors } from '../../lib/pendentsEquip'
 import { clauVia, megues } from '../../lib/signatures'
 import { dataCurta } from '../../lib/format'
+import { filtraCerca } from '../../lib/cerca'
 import type { SignaturaBandeja } from '../../types'
 import { obreFitxerFirma, textErrorSignatura } from '../AccionsSignatura'
 import DialegMotiu from '../DialegMotiu'
@@ -34,7 +35,11 @@ export function rutaSignatura(f: Pick<SignaturaBandeja, 'objeto_tipo' | 'objeto_
   return f.organizacion_id ? `/equip/entitats/${f.organizacion_id}?pestanya=documentacio` : null
 }
 
-export default function CuaSignatures() {
+/**
+ * `q`: la consulta del buscador de Aprovacions (19-11-2026), ya normalizada con `consultaCerca`;
+ * filtra por número, organización, quien firma y tipo. Vacía, la cola entera.
+ */
+export default function CuaSignatures({ q = '' }: { q?: string }) {
   const { t } = useT()
   const navigate = useNavigate()
   const location = useLocation()
@@ -80,6 +85,7 @@ export default function CuaSignatures() {
 
   const motiu = esSuperAdmin ? undefined : t('sgn.need_super')
   const classe = 'h-11 w-full whitespace-normal sm:w-auto md:h-8'
+  const visibles = filtraCerca(files, q, (f) => [f.numero_completo, f.org_nom, f.signant_nom, t(`doc.tipus_${f.tipo}`)])
 
   return (
     <Card id="signatures" className="scroll-mt-20" data-testid="cua-signatures">
@@ -94,7 +100,10 @@ export default function CuaSignatures() {
         {!carregant && !error && files.length === 0 && (
           <p className="text-sm text-muted-foreground">{t('appr.sgn_empty')}</p>
         )}
-        {files.map((f) => {
+        {files.length > 0 && visibles.length === 0 && (
+          <p className="text-sm text-muted-foreground">{t('od.no_match_ent')}</p>
+        )}
+        {visibles.map((f) => {
           const ruta = rutaSignatura(f)
           const bloquejat = !esSuperAdmin || ocupat === f.documento_id
           return (

@@ -37,7 +37,7 @@ describe('modalitats · servidor', () => {
   it('etiqueta legible', () => {
     expect(srv.etiquetaModalitats(['donacio'])).toBe('Donació')
     expect(srv.etiquetaModalitats(['venda', 'donacio'])).toBe('Donació o venda')
-    expect(srv.etiquetaModalitats(['donacio', 'venda', 'maquila'])).toBe('Donació, venda o maquila')
+    expect(srv.etiquetaModalitats(['donacio', 'venda', 'maquila'])).toBe('Donació, venda o transformació en obrador (maquila)')
   })
   // Fase A del punto 3 (17-11-2026): el precio es el de venta; la maquila no lleva importes.
   it('precio solo si hay venta', () => {
@@ -55,7 +55,7 @@ describe('modalitats · servidor', () => {
 })
 
 describe('modalitats · navegador', () => {
-  const t = (k: string) => ({ 'od.mod_donacio': 'Donació', 'od.mod_venda': 'Venda', 'od.mod_maquila': 'Maquila', 'mod.o': 'o' } as Record<string, string>)[k] ?? k
+  const t = (k: string) => ({ 'od.mod_donacio': 'Donació', 'od.mod_venda': 'Venda', 'od.mod_maquila': 'Transformació en obrador (maquila)', 'mod.o': 'o' } as Record<string, string>)[k] ?? k
   it('modalitatsOferta prefiere la lista y cae a la única', () => {
     expect(web.modalitatsOferta({ modalitat: 'venda', modalitats: ['donacio', 'venda'] })).toEqual(['donacio', 'venda'])
     expect(web.modalitatsOferta({ modalitat: 'venda', modalitats: null })).toEqual(['venda'])
@@ -63,7 +63,7 @@ describe('modalitats · navegador', () => {
     expect(web.modalitatsOferta({ modalitat: null })).toEqual([])
   })
   it('textModalitats', () => {
-    expect(web.textModalitats(['donacio', 'venda', 'maquila'], t)).toBe('Donació, venda o maquila')
+    expect(web.textModalitats(['donacio', 'venda', 'maquila'], t)).toBe('Donació, venda o transformació en obrador (maquila)')
     expect(web.textModalitats(['venda'], t)).toBe('Venda')
     expect(web.textModalitats([], t)).toBe('')
   })

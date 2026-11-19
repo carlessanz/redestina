@@ -353,28 +353,27 @@ Lo que manda hoy, en una línea cada uno:
 - **Importa des d'Excel** (`ImportaEntitats`, §6). **Convenio único de col·laboració** por papel. Filtros comunes
   (`lib/filtres.ts`, `lib/territori.ts`). **Diagnòstic operatiu**: lo contesta el equipo en `/equip/diagnostics/productor/:id`
   (Operativa · Excedents · Accions); ficha y «El meu diagnòstic» lo leen y bajan en PDF (`diagnostic-pdf`); Pla = **expediente**.
-- **Alta de oferta por bloques** (17-11-2026): `FormulariNovaOferta`, cada bloque se abre al completar el anterior;
-  `CercadorOpcions`, `TriaSiNo`; el lugar trae municipio, Maps, días y franja; disponible = hoy + 2; **causa por su
-  subcausa** en un `Desplegable` agrupado (`lib/causes.ts`; también en «Edita l’oferta» y, varias, en el Diagnòstic).
-- **Productes** (D1): pestañas Catàleg · Preus de referència · Càrregues (`?pestanya=`), «Nou producte» con las
-  coincidencias de `_shared/preusFonts.ts`; la ficha del producto, `PreusProducte` (equivalencias confirmadas; rejilla año × mes). «Què cal fer» en
-  Càrregues y el motivo de «Sense preu» (`pasCarrega`, `motiuSensePreu`).
-  **D2**: Preus `?mes=` avisa de lo que espera; `ValorCanalitzacio` (valor, fuente, mes, «Provisional»); el bloqueo
-  `preus_provisionals` enlaza al mes.
+- **Alta de oferta por bloques** (`FormulariNovaOferta`): cada bloque se abre al completar el anterior; el lugar trae
+  municipio, Maps, días y franja; disponible = hoy + 2; **causa por su subcausa** (`lib/causes.ts`, también al editar).
+- **Productes** (D1-D2): pestañas Catàleg · Preus de referència · Càrregues (`?pestanya=`; Preus `?mes=`); `PreusProducte`,
+  `ValorCanalitzacio` («Provisional»), `pasCarrega`/`motiuSensePreu` (detalle en `context/06ter`).
+- **Ofertes del equipo** (`context/06ter`): «Més recents» por defecto; pestañas Per validar · Actives (con
+  `no_colocada`) · Esborranys · **Històric** (`cerrada`+`cancelada`, paginado en servidor; `?tab=` en la URL); el paso del
+  proceso bajo el badge (`lib/llistatOfertes.ts`). Canalització, sin las cerradas. **Selectores predictivos**
+  (`SelectorEntitat`; `BarraFiltres` >12 opciones) y buscador en Aprovacions, Tancament y Plans. **«Transformació en obrador
+  (maquila)»** en la interfaz (en base, `maquila`).
 - **Gestión autónoma del super_admin**: convenio **declarado**, interés asistido con hora, recogida asistida, mensajes
   para copiar (`MissatgesDelPunt`); **Ciclo guiado** `/equip/canalitzacio/:id` (17 pasos, 6 fases, RPC reales).
 - Otros: doble rol = todos los paneles, el activo por la URL (`useOrganitzacio(tipus)`); el
   ofertante no ve el `E-…`.
-- **Ficha única «Entitat» (1C)**: `lib/campsFitxa.ts` es **la única definición de campos** (paridad con
-  el SQL en `tests/campsFitxa.test.ts`); `EntitatDetall` en seis pestañas (`?pestanya=`), guarda solo lo
-  que cambia; `PerfilOrganitzacio`, los mismos bloques por sus RPC.
-- **Estado CRM (B1)**: «Estat i papers» (`BlocRols`): selector por papel (`fixar_estat_crm`) y badge
-  (`lib/estatCrm.ts`); «Entitats» filtra por estado (con `?rol=`, el del papel) y abre con `actiu`.
+- **Ficha única «Entitat» (1C)**: `lib/campsFitxa.ts`, **única definición de campos** (paridad SQL en su test);
+  `EntitatDetall` en seis pestañas (`?pestanya=`), guarda solo lo que cambia; `PerfilOrganitzacio`, por sus RPC.
+- **Estado CRM (B1)**: «Estat i papers» (`BlocRols`, `fixar_estat_crm`, `lib/estatCrm.ts`); «Entitats» filtra por
+  estado (`?rol=`) y abre con `actiu`.
 - **Plan 1 sobre la ficha** (`context/06ter`): «Nova entitat» (1B), «Dona-li accés» (1D), «Gestió interna» (1F + 1.5)
   y, sin que la entidad entre, convenio, RGPD, albarán y correos con consentimiento.
-- **Naturalesa (A5)**: `fitxa/SelectorNaturalesa` en «Dades de l'entitat», «Nova entitat» y «La meva organització»
-  (el titular, una vez); `PerfilRecepcio` y «Diagnòstic i perfil» pintan por la confirmada (`campsPerfil`); el
-  interés asistido filtra por P8 (`modalitatsDeLaNaturalesa`).
+- **Naturalesa (A5)**: `fitxa/SelectorNaturalesa` (equipo; el titular, una vez); perfil por la confirmada (`campsPerfil`);
+  el interés asistido filtra por P8 (`modalitatsDeLaNaturalesa`).
 
 ## 6quater. Parte pública y accesos (detalle en `context/06quater-…md`)
 
@@ -548,7 +547,7 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones; 13 a qué causa nueva van FC y GD.
 
-**Deuda abierta (84 vivas; siguiente: 189; los números no se reutilizan)**. Casi todas, decisiones con precio o a la espera (§12bis). Defectos o trabajo pendiente: **5** (filtros en cliente) · **126**
+**Deuda abierta (85 vivas; siguiente: 190; los números no se reutilizan)**. Casi todas, decisiones con precio o a la espera (§12bis). Defectos o trabajo pendiente: **5** (filtros en cliente) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el resumen aún ofrece la factura) · **135** (D3 residual en snapshots y `v_albaranes_bandeja`) · **136** (sin code
 splitting) · **138** (CR sin rectificar ni «enviat») · **143**
 (entrantes con WhatsApp apagado: nadie los ve) · **146** (`organizacion_contactos` sin uso) · **149**
@@ -556,7 +555,7 @@ splitting) · **138** (CR sin rectificar ni «enviat») · **143**
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
 · **153** (el ARA no crea ubicaciones) · **154** (código muerto del CT) · **155**
 (rectificar reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **180** (maquila aún mira `preu_minim`) · **181** (el texto no sigue al lugar) · **182** (fotos huérfanas al cancelar) · **183** (Mercabarna: un día sin job se pierde) · **184-187** (flecos de D2: `context/12`) · **188** (envases: columnas sin uso).
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **180** (maquila aún mira `preu_minim`) · **181** (el texto no sigue al lugar) · **182** (fotos huérfanas al cancelar) · **183** (Mercabarna: un día sin job se pierde) · **184-187** (flecos de D2: `context/12`) · **188** (envases: columnas sin uso) · **189** (E2E de precios provisionales).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -568,7 +567,7 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.118 de Vitest (96 ficheros, 1 saltada) + 60 de Deno.**
+   **Referencia: 2.150 de Vitest (98 ficheros, 1 saltada) + 60 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
    **Referencia: clon 2.874/2.874 y 44 sin datos; producción 2.883/2.883 y 35 (18-11-2026).** Cifra

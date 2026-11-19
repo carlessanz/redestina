@@ -243,8 +243,9 @@ export async function renderDiagnostic(
           m.parrafo(tEx("dexc.accions"), { fuente: m.fuentes.titulo, color: COLORES.verde, tamano: 9.5, antes: 2, despues: 3 });
           taula([
             { titulo: tEx("dexc.causa"), ancho: 20 },
-            { titulo: tEx("dexc.desti"), ancho: 14 },
-            { titulo: tEx("dexc.accio"), ancho: 50 },
+            // Destí más ancho desde el 19-11-2026: «Transformació en obrador (maquila)» no cabía en 14.
+            { titulo: tEx("dexc.desti"), ancho: 22 },
+            { titulo: tEx("dexc.accio"), ancho: 42 },
             { titulo: tEx("dexc.estat"), ancho: 16 },
           ], accions.map((f) => [f.causa, f.desti, celaAccio(f, tEx), f.estat]));
         }

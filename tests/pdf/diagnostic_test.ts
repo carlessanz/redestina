@@ -236,7 +236,7 @@ Deno.test("A3 en catalán: Excedents por producto, causas, acciones, sense exced
   assertStringIncludes(t, "Setmanal");
   assertStringIncludes(t, "1.250,5");
   assertStringIncludes(t, "Donació, Residu");
-  assertStringIncludes(t, "Donació, Maquila");
+  assertStringIncludes(t, "Donació, Transformació en obrador (maquila)");
   assertStringIncludes(t, "Excedent");
   assertStringIncludes(t, "Diverses vegades per setmana");
   assertStringIncludes(t, "500");

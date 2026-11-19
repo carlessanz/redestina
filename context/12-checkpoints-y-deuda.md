@@ -142,6 +142,8 @@ apuntarían a la nada. Un número retirado no se reutiliza jamás.
 ⚠️ **17-11-2026 (`20270601100000`, fase D2 del punto 3): se cierra la 128 y se abren de la 184 a la 187** (flecos del precio del mes del albarán): **83 vivas** y la siguiente entrada nueva es la 188.
 
 ⚠️ **19-11-2026 (`20270605100000`, fase 0 de los puntos 4-6): se abre la 188** (columnas de envases sin uso): **84 vivas** y la siguiente es la 189.
+
+⚠️ **19-11-2026 (fase 1 de los puntos 4-6): se abre la 189** (E2E de precios provisionales): **85 vivas** y la siguiente es la 190.
 ⚠️ **17-11-2026 (`20270528100000`, fase A del punto 3): se abre la 180** (el interés en maquila y `preu_minim`): **77 vivas** y la siguiente entrada nueva es la 181.
 ⚠️ **16-11-2026 (`20270527100000`): se abre la 179** (la facturación, solo por rango): **76 vivas** y la siguiente entrada nueva es la 180.
 ⚠️ **11-11-2026 (sin código): se cierran la 115 y la 116**, que hablaban del cuestionario y del plan básico retirados en `20270524100000`: **75 vivas** y la siguiente entrada nueva sigue siendo la 179.
@@ -947,3 +949,6 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      `excedentes.retorn_envasos_detall` ni `retorn_envasos_quantitat`. Se conservan por compatibilidad (lo guardado se
      sigue imprimiendo en el texto de la oferta). Arreglo: `drop` de las dos columnas y de su rama en `textoEnvasos`
      cuando se confirme que no vuelven.
+189. **El E2E `preus-provisionals.e2e.ts` falla en el clon** (visto el 19-11-2026, también sin los cambios de ese día):
+     el primer paso espera `coste_kg = 0,50` (M-2 validado) y obtiene 0,80 (el manual vigente). Depende del mes en curso
+     y de los precios que dejan otras pasadas en el clon. Arreglo: que el `beforeAll` limpie o fije M-1 y la propuesta.

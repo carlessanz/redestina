@@ -197,7 +197,7 @@ Deno.test("A3: el expediente imprime «Excedents del diagnòstic» y «Accions d
   assertStringIncludes(t, "Setmanal");
   assertStringIncludes(t, "1.200");
   assertStringIncludes(t, "Donació, Residu");
-  assertStringIncludes(t, "Donació, Maquila");
+  assertStringIncludes(t, "Donació, Transformació en obrador (maquila)");
   assertStringIncludes(t, "Excedent");
   assertStringIncludes(t, "Altres aprofitaments");
   assertStringIncludes(t, "Acord amb el banc d'aliments — Seguiment: Primera recollida el dijous");

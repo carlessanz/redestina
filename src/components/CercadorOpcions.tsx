@@ -13,6 +13,13 @@
 //
 // Accesible como combobox: `role="combobox"` en el campo, `listbox`/`option` en la lista y la
 // opción activa en `aria-activedescendant`. Texto a 16 px en móvil (`Input` ya lo trae).
+//
+// 19-11-2026 (buscadores predictivos del panel del equipo, `SelectorEntitat` y `BarraFiltres`):
+//   · `buit` añade arriba de la lista una opción que vacía la elección («Tots», «—»); solo
+//     sale sin teclear, para que Intro tras escribir elija la primera coincidencia;
+//   · `buidaEnTriar` deja el campo en blanco tras elegir (modo «añadir»: la lista de
+//     productos habituales, donde lo elegido se pinta aparte como chip);
+//   · `className` llega al campo (p. ej. `md:h-7` en la barra de filtros).
 
 import { useEffect, useMemo, useState } from 'react'
 import { Input } from '@/components/ui/input'
@@ -48,13 +55,19 @@ export interface PropsCercadorOpcions {
   cercaDetall?: boolean
   /** Enseña el `detall` de la opción elegida debajo del campo. Por defecto, sí. */
   detallSota?: boolean
+  /** Texto de una opción que vacía la elección (`onChange('')`): «Tots», «—». Sin él, no la hay. */
+  buit?: string
+  /** Tras elegir, el campo se queda en blanco (para listas en las que se va añadiendo). */
+  buidaEnTriar?: boolean
+  /** Clases extra del campo de texto. */
+  className?: string
   'aria-label'?: string
   'data-testid'?: string
 }
 
 export default function CercadorOpcions({
   id, name, opcions, valor, onChange, invalid, placeholder, disabled,
-  minLletres = 0, maxim = 50, cercaDetall = true, detallSota = true, ...aria
+  minLletres = 0, maxim = 50, cercaDetall = true, detallSota = true, buit, buidaEnTriar = false, className, ...aria
 }: PropsCercadorOpcions) {
   const triada = useMemo(
     () => (valor ? opcions.find((o) => o.valor === valor) ?? null : null),
@@ -76,15 +89,18 @@ export default function CercadorOpcions({
     if (q.length < minLletres) return []
     const casa = (o: OpcioCercador) => [o.text, ...(cercaDetall && o.detall ? [o.detall] : []), ...(o.claus ?? [])]
       .some((c) => senseAccents(c).includes(q))
-    return (q ? opcions.filter(casa) : opcions).slice(0, maxim)
-  }, [opcions, text, escrit, minLletres, maxim, cercaDetall])
+    const trobades = (q ? opcions.filter(casa) : opcions).slice(0, maxim)
+    // La opción vacía, solo sin consulta: con algo escrito, Intro elige la primera coincidencia.
+    return buit !== undefined && !q ? [{ valor: '', text: buit }, ...trobades] : trobades
+  }, [opcions, text, escrit, minLletres, maxim, cercaDetall, buit])
 
   const llista = `${id}-llista`
   const visible = obert && !disabled && suggeriments.length > 0
 
   function tria(o: OpcioCercador) {
     onChange(o.valor, o)
-    setText(o.text)
+    // La opción vacía deja el campo en blanco (se lee el `placeholder`), igual que el modo «añadir».
+    setText(o.valor === '' || buidaEnTriar ? '' : o.text)
     setObert(false)
     setEscrit(false)
   }
@@ -104,6 +120,7 @@ export default function CercadorOpcions({
         aria-label={aria['aria-label']}
         data-testid={aria['data-testid']}
         disabled={disabled}
+        className={className}
         value={text}
         placeholder={placeholder}
         onChange={(e) => { setText(e.target.value); setEscrit(true); setObert(true); setActiu(0) }}
@@ -130,14 +147,14 @@ export default function CercadorOpcions({
           className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border bg-popover p-1 shadow-md"
         >
           {suggeriments.map((o, i) => (
-            <li key={o.valor} id={`${id}-op-${i}`} role="option" aria-selected={o.valor === valor}
+            <li key={o.valor} id={`${id}-op-${i}`} role="option" aria-selected={o.valor === (valor ?? '')}
               data-valor={o.valor}>
               <button
                 type="button"
                 tabIndex={-1}
                 className={cn(
                   'flex w-full min-w-0 items-baseline justify-between gap-2 rounded px-2 py-2 text-left text-base hover:bg-accent md:text-sm',
-                  (o.valor === valor || i === actiu) && 'bg-accent',
+                  (o.valor === (valor ?? '') || i === actiu) && 'bg-accent',
                 )}
                 onMouseDown={(e) => e.preventDefault()}
                 onMouseEnter={() => setActiu(i)}

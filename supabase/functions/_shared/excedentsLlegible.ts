@@ -362,7 +362,7 @@ export const ETIQUETES_EXCEDENTS: Record<LlenguaExcedents, Record<string, string
     "dexc.gestio_residu": "Residu", "dexc.gestio_altres": "Altres",
     "dexc.estat_pendent": "Pendent", "dexc.estat_en_curs": "En curs", "dexc.estat_feta": "Feta",
     "dexc.estat_descartada": "Descartada",
-    "od.mod_donacio": "Donació", "od.mod_venda": "Venda", "od.mod_maquila": "Maquila",
+    "od.mod_donacio": "Donació", "od.mod_venda": "Venda", "od.mod_maquila": "Transformació en obrador (maquila)",
   },
   es: {
     "dexc.titol": "Excedentes",
@@ -390,7 +390,7 @@ export const ETIQUETES_EXCEDENTS: Record<LlenguaExcedents, Record<string, string
     "dexc.gestio_residu": "Residuo", "dexc.gestio_altres": "Otros",
     "dexc.estat_pendent": "Pendiente", "dexc.estat_en_curs": "En curso", "dexc.estat_feta": "Hecha",
     "dexc.estat_descartada": "Descartada",
-    "od.mod_donacio": "Donación", "od.mod_venda": "Venta", "od.mod_maquila": "Maquila",
+    "od.mod_donacio": "Donación", "od.mod_venda": "Venta", "od.mod_maquila": "Transformación en obrador (maquila)",
   },
 };
 

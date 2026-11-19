@@ -1,5 +1,7 @@
 // `/equip/plans` — los expedientes de prevención (fase 11 de la revisión del 08-10-2026).
 // La lista y, para quien puede aprobar, abrir uno nuevo para una entidad productora.
+// 19-11-2026: la productora se elige con un buscador (`SelectorEntitat`) y la lista se filtra
+// con el buscador común de los listados (`useCerca` + `filtraCerca`).
 
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
@@ -13,10 +15,15 @@ import { useAppContext } from '../../hooks/useAppContext'
 import BotoIcona from '../../components/BotoIcona'
 import { FilaClicable } from '../../components/FilaClicable'
 import Desplegable from '../../components/Desplegable'
+import SelectorEntitat from '../../components/SelectorEntitat'
+import { opcioFitxa, type OpcioSelector } from '../../lib/opcionsSelector'
+import { filtraCerca } from '../../lib/cerca'
+import { useCerca } from '../../hooks/useCerca'
 import { llistaExpedients, obrirExpedient, type Expedient } from '../../lib/expedientApi'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
@@ -28,7 +35,9 @@ export default function Plans() {
   const [files, setFiles] = useState<Expedient[]>([])
   const [error, setError] = useState<string | null>(null)
   const [carregant, setCarregant] = useState(true)
-  const [productors, setProductors] = useState<{ id: string; nom: string }[]>([])
+  /** Las productoras, ya como opciones del buscador (`opcioFitxa`). */
+  const [productors, setProductors] = useState<OpcioSelector[]>([])
+  const { cerca, setCerca, q } = useCerca()
   const [tria, setTria] = useState('')
   const [nivell, setNivell] = useState<'basic' | 'personalitzat'>('basic')
   const [obrint, setObrint] = useState(false)
@@ -41,10 +50,12 @@ export default function Plans() {
       else setFiles(r.data)
       setCarregant(false)
     })
-    void supabase.from('productores').select('id, name, empresa').order('empresa').then(({ data }) => {
+    void supabase.from('productores').select('id, name, empresa, poblacion, nif, razon_social').order('empresa').then(({ data }) => {
       if (!viu) return
-      setProductors(((data ?? []) as { id: string; name: string | null; empresa: string | null }[])
-        .map((p) => ({ id: p.id, nom: p.empresa || p.name || '—' })))
+      setProductors(((data ?? []) as {
+        id: string; name: string | null; empresa: string | null; poblacion: string | null; nif: string | null; razon_social: string | null
+      }[])
+        .map((p) => opcioFitxa({ id: p.id, nom: p.empresa || p.name, poblacio: p.poblacion, nif: p.nif, rao: p.razon_social })))
     })
     return () => { viu = false }
   }, [])
@@ -52,8 +63,14 @@ export default function Plans() {
   // Solo se ofrecen las que no tienen ya un expediente abierto (la base lo impide igual).
   const disponibles = useMemo(() => {
     const amb = new Set(files.filter((f) => f.estat !== 'tancat').map((f) => f.productor_id))
-    return productors.filter((p) => !amb.has(p.id))
+    return productors.filter((p) => !amb.has(p.valor))
   }, [files, productors])
+
+  // Lo que se lista: por organización, número, estado o nivel (los dos últimos, como se leen).
+  const visibles = useMemo(() => filtraCerca(files, q, (f) => [
+    f.productores?.empresa, f.productores?.name, f.numero_completo,
+    t(`exp.estat_${f.estat}`), t(f.nivell === 'personalitzat' ? 'exp.nivell_personalitzat' : 'exp.nivell_basic'),
+  ]), [files, q, t])
 
   async function obre() {
     if (!tria) return
@@ -76,8 +93,8 @@ export default function Plans() {
             <div className="grid grid-cols-1 gap-3 rounded-lg border border-border p-3 sm:grid-cols-[1fr_12rem_auto] sm:items-end">
               <div className="space-y-1">
                 <Label htmlFor="plans-org" className="text-xs text-muted-foreground">{t('exp.f_organitzacio')}</Label>
-                <Desplegable id="plans-org" value={tria} onChange={setTria} buit="—"
-                  opcions={disponibles.map((p) => ({ valor: p.id, text: p.nom }))} />
+                <SelectorEntitat id="plans-org" valor={tria} onChange={setTria} buit={t('c.none')}
+                  placeholder={t('canalz.nova_cerca')} opcions={disponibles} />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="plans-nivell" className="text-xs text-muted-foreground">{t('exp.f_nivell')}</Label>
@@ -91,9 +108,17 @@ export default function Plans() {
             </div>
           )}
 
+          {files.length > 0 && (
+            <Input id="plans-cerca" type="search" placeholder={t('exp.search')} aria-label={t('c.search')}
+              value={cerca} onChange={(e) => setCerca(e.target.value)} />
+          )}
+
           {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
           {error && <p className="text-sm text-destructive">{textError(t, error)}</p>}
-          {!carregant && !error && (files.length === 0 ? <p className="text-sm text-muted-foreground">{t('exp.cap_expedient')}</p> : (
+          {!carregant && !error && files.length > 0 && visibles.length === 0 && (
+            <p className="text-sm text-muted-foreground">{t('od.no_match_ent')}</p>
+          )}
+          {!carregant && !error && (files.length === 0 ? <p className="text-sm text-muted-foreground">{t('exp.cap_expedient')}</p> : visibles.length > 0 && (
             // El criterio de las tablas (03-11-2026, AGENTS.md §2): sin scroll horizontal a 360 px.
             // En móvil, organización (enlazada, con nivel, número y fecha debajo mientras no tienen
             // columna), estado y la acción; el nivel desde `md`, número y fecha desde `lg`.
@@ -111,7 +136,7 @@ export default function Plans() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {files.map((f) => {
+                {visibles.map((f) => {
                   const nivell = t(f.nivell === 'personalitzat' ? 'exp.nivell_personalitzat' : 'exp.nivell_basic')
                   return (
                     <FilaClicable key={f.id} to={`/equip/plans/${f.id}`}>

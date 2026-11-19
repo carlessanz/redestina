@@ -36,6 +36,8 @@ import type { Espigolada } from '../../types'
 import BotoIcona from '../../components/BotoIcona'
 import { FilaClicable } from '../../components/FilaClicable'
 import Desplegable from '../../components/Desplegable'
+import SelectorEntitat from '../../components/SelectorEntitat'
+import { opcioFitxa, opcionsProducte, type OpcioSelector } from '../../lib/opcionsSelector'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -262,7 +264,8 @@ export function NovaEspigolada() {
   const { t } = useT()
   const navigate = useNavigate()
 
-  const [productors, setProductors] = useState<{ id: string; nom: string }[]>([])
+  /** Las productoras activas, ya como opciones del buscador (`opcioFitxa`). */
+  const [productors, setProductors] = useState<OpcioSelector[]>([])
   const [ubicacions, setUbicacions] = useState<{ id: string; alias: string | null; municipio: string | null }[]>([])
   const [productes, setProductes] = useState<string[]>([])
   const [caixes, setCaixes] = useState<{ codigo: string; nombre: string }[]>([])
@@ -281,13 +284,15 @@ export function NovaEspigolada() {
     void (async () => {
       // ⚠️ Cada lista de columnas en UN literal (§7, deuda 46).
       const [p, pr, c] = await Promise.all([
-        supabase.from('productores').select('id, name, empresa').eq('activo', true).order('name'),
+        supabase.from('productores').select('id, name, empresa, poblacion, nif, razon_social').eq('activo', true).order('name'),
         supabase.from('productos').select('nombre').order('nombre'),
         supabase.from('tipos_caja').select('codigo, nombre').eq('activo', true).order('orden'),
       ])
       if (!viu) return
-      setProductors(((p.data as { id: string; name: string | null; empresa: string | null }[] | null) ?? [])
-        .map((x) => ({ id: x.id, nom: x.empresa || x.name || '—' })))
+      setProductors(((p.data as {
+        id: string; name: string | null; empresa: string | null; poblacion: string | null; nif: string | null; razon_social: string | null
+      }[] | null) ?? [])
+        .map((x) => opcioFitxa({ id: x.id, nom: x.empresa || x.name, poblacio: x.poblacion, nif: x.nif, rao: x.razon_social })))
       setProductes(((pr.data as { nombre: string }[] | null) ?? []).map((x) => x.nombre))
       setCaixes((c.data as { codigo: string; nombre: string }[] | null) ?? [])
     })()
@@ -368,9 +373,8 @@ export function NovaEspigolada() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="esp-prod">{t('esp.producer')}</Label>
-            <Desplegable id="esp-prod" value={productor} onChange={setProductor}
-              placeholder={t('esp.pick_producer')}
-              opcions={productors.map((p) => ({ valor: p.id, text: p.nom }))} />
+            <SelectorEntitat id="esp-prod" valor={productor} onChange={setProductor}
+              placeholder={t('esp.pick_producer')} opcions={productors} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="esp-ubi">{t('esp.location')}</Label>
@@ -405,9 +409,9 @@ export function NovaEspigolada() {
             <div key={i} className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor={`el-prod-${i}`}>{t('alb.ln_product')}</Label>
-                <Desplegable id={`el-prod-${i}`} value={l.producto}
+                <SelectorEntitat id={`el-prod-${i}`} valor={l.producto}
                   onChange={(v) => actualitza(i, 'producto', v)} buit={t('c.none')}
-                  opcions={productes.map((p) => ({ valor: p, text: p }))} />
+                  placeholder={t('po.product_search')} opcions={opcionsProducte(productes, l.producto)} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor={`el-var-${i}`}>{t('alb.ln_variety')}</Label>
@@ -485,6 +489,15 @@ interface AlbaraFila {
   canalizacion_id: string | null
 }
 
+/** Una entidad receptora para el buscador de los lotes (`opcioFitxa`). */
+interface EntitatLot {
+  id: string
+  nombre: string
+  poblacion: string | null
+  nif: string | null
+  razon_social: string | null
+}
+
 interface LotForm {
   excedente_id: string
   entidad_id: string
@@ -506,7 +519,7 @@ export function EspigoladaDetall() {
   const [lliurats, setLliurats] = useState<Record<string, { entidad_id: string | null; kg: number }>>({})
   // Quién y dónde: la ficha no decía ni la productora ni la finca de la jornada.
   const [origen, setOrigen] = useState<{ productor: string | null; lloc: string | null }>({ productor: null, lloc: null })
-  const [entitats, setEntitats] = useState<{ id: string; nombre: string }[]>([])
+  const [entitats, setEntitats] = useState<EntitatLot[]>([])
   const [lots, setLots] = useState<LotForm[]>([])
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -571,11 +584,17 @@ export function EspigoladaDetall() {
   useEffect(() => {
     let viu = true
     // Solo las activas (1A), como los demás selectores de entidad del equipo.
-    void supabase.from('entidades').select('id, nombre').eq('activo', true).order('nombre').then(({ data }) => {
-      if (viu) setEntitats((data as { id: string; nombre: string }[] | null) ?? [])
+    void supabase.from('entidades').select('id, nombre, poblacion, nif, razon_social').eq('activo', true).order('nombre').then(({ data }) => {
+      if (viu) setEntitats((data as EntitatLot[] | null) ?? [])
     })
     return () => { viu = false }
   }, [])
+
+  // El buscador de entidad de cada lote (19-11-2026): nombre, municipio, NIF o razón social.
+  const opcionsEnt = useMemo(
+    () => entitats.map((e) => opcioFitxa({ id: e.id, nom: e.nombre, poblacio: e.poblacion, nif: e.nif, rao: e.razon_social })),
+    [entitats],
+  )
 
   function afegeixLot(excedenteId: string) {
     setLots((p) => [...p, { excedente_id: excedenteId, entidad_id: '', kg: '', nota: '', codigo_lote: '' }])
@@ -717,10 +736,9 @@ export function EspigoladaDetall() {
                       <div key={`${r.id}-${i}`} className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-2">
                         <div className="space-y-1.5">
                           <Label htmlFor={`lot-ent-${idx}`}>{t('esp.entity')}</Label>
-                          <Desplegable id={`lot-ent-${idx}`} value={l.entidad_id}
+                          <SelectorEntitat id={`lot-ent-${idx}`} valor={l.entidad_id}
                             onChange={(v) => setLots((p) => p.map((x, j) => j === idx ? { ...x, entidad_id: v } : x))}
-                            placeholder={t('esp.pick_entity')}
-                            opcions={entitats.map((en) => ({ valor: en.id, text: en.nombre }))} />
+                            placeholder={t('esp.pick_entity')} opcions={opcionsEnt} />
                         </div>
                         <div className="space-y-1.5">
                           <Label htmlFor={`lot-kg-${idx}`}>{t('esp.lot_kg')}</Label>
