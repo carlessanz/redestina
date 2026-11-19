@@ -696,6 +696,8 @@ tablas: **nivel 1**, el equipo asigna en un acto; **nivel 2**, la entidad muestr
   (`ja_registrada` si ya está conciliada); la foto puede ser un externo de la canalización (si no, `foto_aliena`).
 - `operacio_detall`: REC propio o heredado; `pot_registrar` también en venta/maquila sin albarán.
 - `pendents_equip()`: **19 colas** (nueva `recollides_equip`: ventas y maquilas sin albarán pendientes).
+  Desde `20270609100000` (fase 4), `ofertes_sense_enviar` da **0 con las notificaciones apagadas** (`email_activo()`
+  y `whatsapp_activo()` falsos): sin envío automático no hay nada que esperar; el equipo copia el mensaje a mano.
 - `anular_albaran` sobre un REC propio → `22023 anula_la_canalitzacio` (se anula la asignación).
 - `canalitzacions_de_les_meves_orgs(p_user)` (puente de la política de externos; otra persona → `42501`).
 

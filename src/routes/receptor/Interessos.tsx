@@ -10,6 +10,11 @@
 // contradicción. Ahora los dos ejes —más el albarán de entrega, que es quien cuenta el
 // final— los resuelve `puntInteres()` en UNA etapa, y debajo va qué toca hacer. La
 // traducción de estados a frases vive en `procesOferta.ts` y la comparten los tres paneles.
+//
+// 🔗 ENLACE DIRECTO A UNA OPERACIÓN (fase 4 de los puntos 4-6, Excel 5.4):
+// `?operacio=<canalizacion_id>&accio=recollida` abre su ficha con «Registra la recollida»
+// desplegado. Es el enlace del mensaje RECOLLIDA CONFIRMADA (`lib/enllacosDirectes.ts`). Si la
+// operación no es de esta entidad (o ya no la ve), se dice arriba.
 
 import BarraFiltres from '../../components/BarraFiltres'
 import { useTerritori } from '../../hooks/useTerritori'
@@ -19,11 +24,12 @@ import { filtraLlistat, opcionsDisponibles, type Dimensio } from '../../lib/filt
 import { carregaContraparts, marcaLlegits } from '../../lib/avisos'
 import type { Contrapart } from '../../lib/avisos'
 import { modalitatsOferta, textModalitats } from '../../lib/modalitats'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { cn } from '../../lib/utils'
 import { useT } from '../../lib/i18n'
 import { useOrganitzacio } from '../../hooks/useAppContext'
+import { useDialegPerUrl } from '../../hooks/useDialegPerUrl'
 import { estatSimpleInteres, llegendaSimpleInteres, puntInteres } from '../../lib/procesOferta'
 import type { FetsInteres, PuntProces } from '../../lib/procesOferta'
 import { dataCurta, diaMes, kg, preu } from '../../lib/format'
@@ -127,9 +133,16 @@ export function Interessos() {
   const [carregant, setCarregant] = useState(true)
   const [errorCarrega, setErrorCarrega] = useState(false)
   const [obert, setObert] = useState<AmbOferta | null>(null)
+  /** La ficha se abre con «Registra la recollida» ya desplegado (enlace `accio=recollida`). */
+  const [registraObert, setRegistraObert] = useState(false)
   const [pestanya, setPestanya] = useState<'interessos' | 'per_a_tu'>('interessos')
   const [declinant, setDeclinant] = useState(false)
   const entidadId = organitzacio?.id ?? null
+  const dialeg = useDialegPerUrl(['operacio', 'accio'] as const)
+  const operacioUrl = dialeg.valors.operacio
+  const accioUrl = dialeg.valors.accio
+  /** La operación de la URL que ya se ha abierto: los refrescos de la lista no la reabren. */
+  const aplicada = useRef<string | null>(null)
 
   const carrega = useCallback(async () => {
     if (!entidadId) { setCarregant(false); return }
@@ -180,6 +193,28 @@ export function Interessos() {
     setFiles(resp.data ?? [])
     setCarregant(false)
   }, [entidadId])
+
+  // La URL abre la operación una vez, cuando la lista ya ha llegado. Solo las asignadas tienen
+  // operación (`canalizacion_id`); lo demás cae en el aviso de «no disponible».
+  useEffect(() => {
+    if (!operacioUrl) { aplicada.current = null; return }
+    if (carregant || aplicada.current === operacioUrl) return
+    const f = files.find((x) => x.canalizacion_id === operacioUrl && x.aprovacio === 'aprovada' && x.excedentes)
+    if (!f) return
+    aplicada.current = operacioUrl
+    setObert(f)
+    setRegistraObert(accioUrl === 'recollida')
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al cambiar la operación de la URL o al llegar la lista
+  }, [operacioUrl, carregant, files])
+  const operacioNoDisponible = operacioUrl != null && !carregant && !errorCarrega
+    && !files.some((x) => x.canalizacion_id === operacioUrl && x.aprovacio === 'aprovada' && x.excedentes)
+
+  /** Cierra la ficha y, si la abrió un enlace, lo quita de la URL. */
+  const tancaFitxa = () => {
+    setObert(null)
+    setRegistraObert(false)
+    if (operacioUrl) dialeg.tanca()
+  }
 
   // Abrir la pantalla da por leídos los avisos de intereses (05-10-2026): el badge del
   // menú baja al entrar, que es donde se mira lo que dicen.
@@ -234,7 +269,7 @@ export function Interessos() {
     setDeclinant(false)
     if (!r.ok) { toast.error(t('int.err_declina')); return }
     toast.success(t('int.declinada'))
-    setObert(null)
+    tancaFitxa()
     await carrega()
   }
 
@@ -290,6 +325,15 @@ export function Interessos() {
         )}
         {carregant && <CarregantSeccio files={3} ambCapcalera={false} />}
         {!carregant && errorCarrega && <p className="text-sm text-destructive">{t('c.error')}</p>}
+        {operacioNoDisponible && (
+          <div role="status" data-testid="enllac-no-disponible"
+            className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md bg-aviso-fondo p-3 text-sm text-aviso">
+            <p className="min-w-0 flex-1">{t('int.enllac_no_disponible')}</p>
+            <Button variant="outline" className="h-11 whitespace-normal md:h-8" onClick={dialeg.tanca}>
+              {t('c.ok')}
+            </Button>
+          </div>
+        )}
         {!carregant && !errorCarrega && visibles.length === 0 && (
           <p className="text-sm text-muted-foreground">{t(pestanya === 'per_a_tu' ? 'int.per_a_tu_empty' : 'int.empty')}</p>
         )}
@@ -371,7 +415,7 @@ export function Interessos() {
         })}
       </CardContent>
 
-      <Dialog open={obert != null} onOpenChange={(v) => !v && setObert(null)}>
+      <Dialog open={obert != null} onOpenChange={(v) => { if (!v) tancaFitxa() }}>
         {obert?.excedentes && (() => {
           const punt = puntInteres({
             estado: obert.estado,
@@ -399,7 +443,8 @@ export function Interessos() {
               </DialogHeader>
               {obert.aprovacio === 'aprovada' && obert.canalizacion_id ? (
                 <>
-                  <FitxaOperacio canalizacionId={obert.canalizacion_id} onCanvi={() => void carrega()} />
+                  <FitxaOperacio canalizacionId={obert.canalizacion_id} onCanvi={() => void carrega()}
+                    registraObert={registraObert} />
                   <details className="rounded-md border p-3">
                     <summary className="cursor-pointer text-sm text-muted-foreground">{t('op.oferta_original')}</summary>
                     <div className="mt-3"><DetallOfertaReceptor oferta={obert.excedentes} foto={foto(obert.excedentes, true)} /></div>

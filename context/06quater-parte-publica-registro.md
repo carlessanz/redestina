@@ -246,3 +246,13 @@ el enlace del correo («Inclou l'enllaç per signar en línia», 30 días) y la 
 token; al volver a abrir un enlace ya usado responde «ja signat». Aprovacions pasa a **cinco colas**:
 la quinta es «Signatures per tancar».
 
+
+### El destino pedido sobrevive al login (19-11-2026, fase 4 de los puntos 4-6)
+
+`lib/destiLogin.ts` (puro, con test): `RequireSessio` guarda la ruta pedida en `sessionStorage` (`redestina-desti`,
+caduca en 1 h) además de `state.from`; solo rutas internas (una sola `/` inicial, sin `\` ni control, mismo origen) y
+nunca las puertas (`/`, `/login`, `/admin`, `/restablir`, `/panell`, `/sense-acces`, `/registre`); se revalida al leer.
+`NavegaAlDesti` lo consume (y lo borra) en `ArrelPerRol`, `/login`, `/admin` y `Landing`; `RestablirClau`, al fijar la
+contraseña. No se guarda justo después de cerrar sesión (`haSortit` de `useSessio`), para que otra cuenta no herede la
+pantalla. `RoleGuard`: si la cuenta tiene algún panel pero no el pedido, aviso `acces.altre_panell` y a su panel.
+**Límite**: `sessionStorage` es de la pestaña; un enlace de correo abierto en otra pestaña no lo trae.

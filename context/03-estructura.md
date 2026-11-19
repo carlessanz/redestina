@@ -54,7 +54,8 @@ src/
   hooks/useComptadorsEquip.ts  Los badges del equipo, derivados del store de pendentsEquip.ts
   hooks/useMissatgesOferta.ts  Los mensajes de una oferta (`missatgesOferta.ts` + `avisos_de_oferta()`); con
                                `perspectiva` productor/entidad solo pide los avisos (§6ter, gestión autónoma)
-  routes/Comuns.tsx            ArrelApp, RequireSessio, raíz por rol, RoleGuard y «sense accés»
+  hooks/useDialegPerUrl.ts     Abrir y cerrar un diálogo desde la URL (`replace`), fase 4 de los puntos 4-6
+  routes/Comuns.tsx            ArrelApp, RequireSessio, raíz por rol, RoleGuard y «sense accés» (+ NavegaAlDesti)
   routes/public/               Landing, LoginUsuaris (/login), LoginEquip (/admin),
                                Registre (/registre), RestablirClau (/restablir),
                                Privacitat (/privacitat, 27-10-2026) y
@@ -210,6 +211,8 @@ src/
     conveniDeclarat.ts         PURO: los rechazos de `declarar_conveni()` por su código, con prueba
     copiar.ts                  Copiar al portapapeles como text/plain + text/html (un <div> por
                                línea, que es lo que WhatsApp conserva al pegar). Salió de OfferDetail
+    destiLogin.ts              PURO, con test: la ruta pedida antes del login (sessionStorage, solo internas)
+    enllacosDirectes.ts        PURO, con test: rutas de los enlaces directos y `textOfertaPerCopiar` (de _shared)
     missatgesOferta.ts         PURO: los mensajes del ciclo de una oferta para avisar a mano
                                (27-10-2026): el WhatsApp EXACTO de cada aviso —con `textAvis` y
                                `formatWhatsappAvis` del servidor— y los compuestos (la oferta, el

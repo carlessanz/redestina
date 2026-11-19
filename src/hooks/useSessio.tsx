@@ -23,6 +23,12 @@ interface ValorSessio {
   /** Se ha entrado por un enlace de recuperación y falta poner la contraseña nueva. */
   esRecovery: boolean
   netejaRecovery: () => void
+  /**
+   * Se ha cerrado la sesión en esta pestaña (SIGNED_OUT). `RequireSessio` lo mira para no
+   * guardar como «destino tras entrar» la pantalla de la que se acaba de salir: la siguiente
+   * cuenta que entre en esta pestaña puede ser otra (fase 4 de los puntos 4-6).
+   */
+  haSortit: boolean
 }
 
 const Ctx = createContext<ValorSessio | null>(null)
@@ -31,6 +37,7 @@ export function SessioProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [carregant, setCarregant] = useState(true)
   const [esRecovery, setEsRecovery] = useState(false)
+  const [haSortit, setHaSortit] = useState(false)
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
@@ -39,6 +46,8 @@ export function SessioProvider({ children }: { children: ReactNode }) {
     })
     const { data: sub } = supabase.auth.onAuthStateChange((evento, nova) => {
       if (evento === 'PASSWORD_RECOVERY') setEsRecovery(true)
+      if (evento === 'SIGNED_OUT') setHaSortit(true)
+      else if (evento === 'SIGNED_IN') setHaSortit(false)
       // Se conserva el objeto anterior cuando la sesión es LA MISMA. supabase-js emite
       // varios eventos por token (INITIAL_SESSION, SIGNED_IN al volver a la pestaña,
       // TOKEN_REFRESHED) y cada uno trae un objeto nuevo: guardarlo tal cual cambiaba la
@@ -56,8 +65,8 @@ export function SessioProvider({ children }: { children: ReactNode }) {
   const netejaRecovery = useCallback(() => setEsRecovery(false), [])
 
   const valor = useMemo<ValorSessio>(
-    () => ({ session, carregant, esRecovery, netejaRecovery }),
-    [session, carregant, esRecovery, netejaRecovery],
+    () => ({ session, carregant, esRecovery, netejaRecovery, haSortit }),
+    [session, carregant, esRecovery, netejaRecovery, haSortit],
   )
 
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>

@@ -347,26 +347,27 @@ Lo que manda hoy, en una línea cada uno:
   concilia el ENT y el REC de esa recogida (venta/maquila: sin albarán, documentos propios); el job solo avisa.
 - **Destino final de los kilos** (`excedente_destins`, `DestiFinal`): `cerrada` = todo con
   destino; `no_colocada` = falta decir qué pasó; `cancelada` = error o incidencia con motivo.
-- **Ficha de la operación** (`operacio_detall`), ofertas «per a tu», «No m'interessa».
+- **Ficha de la operación** (`operacio_detall`), ofertas «per a tu», «No m'interessa». **Enlaces directos** (fase 4,
+  `context/06ter`): la URL abre el diálogo (`useDialegPerUrl`); «Copia amb/sense enllaç»; en el ranking, enlace si `te_compte`.
 - **Certificat de donació, firma y Configuració › Equip** (05-11 y 09-11; detalle en `context/06ter`):
   `DialegCertificatDonacio`, `DialegSignaDocument`/`AccionsSignatura` (**`accionsSignatura()` decide el botón**), `SeccioEquip`.
 - **Importa des d'Excel** (`ImportaEntitats`, §6). **Convenio único de col·laboració** por papel. Filtros comunes
-  (`lib/filtres.ts`, `lib/territori.ts`). **Diagnòstic operatiu**: lo contesta el equipo en `/equip/diagnostics/productor/:id`
-  (Operativa · Excedents · Accions); ficha y «El meu diagnòstic» lo leen y bajan en PDF (`diagnostic-pdf`); Pla = **expediente**.
-- **Alta de oferta por bloques** (`FormulariNovaOferta`): cada bloque se abre al completar el anterior; el lugar trae
-  municipio, Maps, días y franja; disponible = hoy + 2; **causa por su subcausa** (`lib/causes.ts`, también al editar).
+  (`lib/filtres.ts`, `lib/territori.ts`). **Diagnòstic**: lo contesta el equipo; la ficha y «El meu diagnòstic» lo leen (PDF);
+  Pla = **expediente**.
+- **Alta de oferta por bloques** (`FormulariNovaOferta`): el lugar trae municipio, Maps, días y franja;
+  disponible = hoy + 2; **causa por su subcausa** (`lib/causes.ts`).
 - **Productes** (D1-D2, `context/06ter`): Catàleg · Preus de referència · Càrregues (`?pestanya=`, `?mes=`).
 - **Ofertes del equipo** (`context/06ter`): «Més recents» por defecto; pestañas Per validar · Actives (con
   `no_colocada`) · Esborranys · **Històric** (`cerrada`+`cancelada`, paginado en servidor; `?tab=` en la URL); el paso del
   proceso bajo el badge (`lib/llistatOfertes.ts`). Canalització, sin las cerradas. **Selectores predictivos**
-  (`SelectorEntitat`; `BarraFiltres` >12 opciones) y buscador en Aprovacions, Tancament y Plans. **«Transformació en obrador
+  (`SelectorEntitat`) y buscador en Aprovacions, Tancament y Plans. **«Transformació en obrador
   (maquila)»** en la interfaz (en base, `maquila`).
 - **Gestión autónoma del super_admin**: convenio **declarado**, **asignación en un acto** («Registrar i confirmar
   recollida»; el técnico solo registra interés), Modifica/Anul·la en la ficha, recogida asistida, mensajes para copiar
   (`MissatgesDelPunt`); **Ciclo guiado** `/equip/canalitzacio/:id` (17 pasos, 6 fases, RPC reales).
 - Doble rol = todos los paneles, el activo por la URL (`useOrganitzacio`); el ofertante no ve el `E-…`.
 - **Ficha única «Entitat» (1C)**: `lib/campsFitxa.ts`, **única definición de campos** (paridad SQL en su test);
-  `EntitatDetall` en seis pestañas (`?pestanya=`), guarda solo lo que cambia; `PerfilOrganitzacio`, por sus RPC.
+  `EntitatDetall` en seis pestañas (`?pestanya=`); `PerfilOrganitzacio`, por sus RPC.
 - **Estado CRM (B1)**: «Estat i papers» (`BlocRols`, `fixar_estat_crm`, `lib/estatCrm.ts`); «Entitats» filtra por
   estado (`?rol=`) y abre con `actiu`.
 - **Plan 1 sobre la ficha** (`context/06ter`): «Nova entitat» (1B), «Dona-li accés» (1D), «Gestió interna» (1F + 1.5)
@@ -381,7 +382,7 @@ Lo que manda hoy, en una línea cada uno:
 Rutas: `/` · `/login` (accesos de prueba tras `VITE_ACCESSOS_TEST`) · `/admin` (equipo) · `/registre`
 · `/restablir` · `/privacitat` · `/confirmar/:token` · `/signar/:token` · `/signar-document/:token`
 (firma de CD/CR/REC/ENT) · `/factura/:token` · `/consentiment/:token` · `/verificar/:codi` · `/panell`
-(raíz por rol) · `/sense-acces`. `RoleGuard` redirige a `/panell`. Aprovacions: seis colas
+(raíz por rol) · `/sense-acces`. `RoleGuard` avisa y lleva a `/panell`; la ruta pedida sobrevive al login (`lib/destiLogin.ts`). Aprovacions: seis colas
 (registros, convenios, intereses, recogidas por validar y por registrar, firmas); aprobar
 un alta manda el acceso por correo (`enviar-acceso`).
 
@@ -411,7 +412,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270608100400`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270609100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -563,7 +564,7 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.185 de Vitest (100 ficheros, 1 saltada) + 60 de Deno.**
+   **Referencia: 2.204 de Vitest (102 ficheros, 1 saltada) + 60 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
    **Referencia: clon 2.966/2.966 y 49 sin datos; producción 2.975/2.975 y 40 (19-11-2026).** Cifra

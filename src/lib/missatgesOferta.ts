@@ -23,6 +23,7 @@ import {
 } from '../../supabase/functions/_shared/textOfertaRegistrada.ts'
 import { TEXT_REBUIG, textGracies } from '../../supabase/functions/_shared/textRespostes.ts'
 import { textoRecollidaConfirmada } from './textos'
+import { enllacInteresOferta, enllacRegistreRecollida } from './enllacosDirectes'
 
 /** Las fases del ciclo guiado (`FASES_EQUIP` de `procesOferta.ts`). */
 export type FaseMissatge = 'conveni' | 'entrada' | 'distribucio' | 'aprovacio' | 'lliurament' | 'tancament'
@@ -169,12 +170,16 @@ export function missatgeDAvis(
 /**
  * RECOLLIDA CONFIRMADA para el grupo, desde las entregas vivas de la oferta: quién, cuándo,
  * cuántos kilos asignados y cuántos faltan. La fecha, en hora de Madrid como los avisos.
+ *
+ * Con `appUrl`, acaba con el enlace para registrar los kilos reales (fase 4 de los puntos 4-6):
+ * a la operación si solo hay una entrega viva; a «Els meus interessos» si hay varias.
  */
 export function textRecollidaGrup(
   canalitzacions: NonNullable<FetsMissatges['canalitzacions']>,
   kgTotal: number,
   nomEntitat: (id: string | null) => string,
   idioma: 'ca' | 'es',
+  appUrl?: string | null,
 ): string {
   const vives = canalitzacions.filter((c) => c.estado !== 'anulada')
   const kg = vives.reduce((s, c) => s + Number(c.kg_confirmados ?? 0), 0)
@@ -184,6 +189,7 @@ export function textRecollidaGrup(
     kgRecollits: String(kg),
     kgFalten: String(Math.max(0, kgTotal - kg)),
     comentaris: vives.map((c) => c.comentarios?.trim()).filter(Boolean).join(' · '),
+    enllac: appUrl && vives.length > 0 ? enllacRegistreRecollida(appUrl, vives.map((c) => c.id)) : null,
   })
 }
 
@@ -222,7 +228,8 @@ export function missatgesDeLOferta(f: FetsMissatges, o: OpcionsMissatges): Missa
       whatsapp: oferta.texto_oferta,
       correu: {
         assumpte: o.t('od.email_subject', { producto }),
-        text: `${oferta.texto_oferta}\n\n${o.t('od.email_note')}\n\n${o.appUrl}/receptor/mercat`,
+        // Directo a ESTA oferta con el formulario de interés abierto (fase 4 de los puntos 4-6).
+        text: `${oferta.texto_oferta}\n\n${o.t('od.email_note')}\n\n${enllacInteresOferta(o.appUrl, oferta.id)}`,
       },
       estat: 'compost', canalEnviat: null, enviatAt: null, motiuNoEnviat: null,
       at: oferta.validada_at ?? oferta.created_at ?? null, origen: 'compost',
@@ -258,7 +265,7 @@ export function missatgesDeLOferta(f: FetsMissatges, o: OpcionsMissatges): Missa
     out.push({
       id: 'recollida_grup', clau: 'recollida_grup', fase: 'lliurament',
       destinatari: 'grup', destinatariNom: null,
-      whatsapp: textRecollidaGrup(vives, Number(oferta.kg_total ?? 0), nomEntitat, o.idioma),
+      whatsapp: textRecollidaGrup(vives, Number(oferta.kg_total ?? 0), nomEntitat, o.idioma, o.appUrl),
       correu: null,
       estat: 'compost', canalEnviat: null, enviatAt: null, motiuNoEnviat: null,
       at: vives.map((c) => c.created_at ?? '').sort().at(-1) || null, origen: 'compost',

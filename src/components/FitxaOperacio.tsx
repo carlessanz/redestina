@@ -33,7 +33,12 @@ const CLASSE: Record<string, string> = {
 }
 
 export default function FitxaOperacio(
-  { canalizacionId, onCanvi }: { canalizacionId: string; onCanvi?: () => void },
+  { canalizacionId, onCanvi, registraObert = false }: {
+    canalizacionId: string
+    onCanvi?: () => void
+    /** «Registra la recollida» ya desplegado (el enlace directo `accio=recollida`, fase 4 de los puntos 4-6). */
+    registraObert?: boolean
+  },
 ) {
   const { t } = useT()
   const [op, setOp] = useState<Operacio | null | undefined>(undefined)
@@ -135,7 +140,9 @@ export default function FitxaOperacio(
           </p>
         </div>
       )}
-      {op.pot_registrar && validacio !== 'pendent_validacio' && <RegistraRecollida op={op} onFet={recarrega} />}
+      {op.pot_registrar && validacio !== 'pendent_validacio' && (
+        <RegistraRecollida op={op} onFet={recarrega} desplegat={registraObert} />
+      )}
       {/* Registrada y esperando al equipo: todavía no hay albaranes. Neutro: no es de quien mira. */}
       {validacio === 'pendent_validacio' && (
         <div className="space-y-1 rounded-lg bg-secondary p-3 text-sm text-secondary-foreground" data-testid="recollida-pendent-validacio">

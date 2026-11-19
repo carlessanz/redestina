@@ -4,6 +4,7 @@
 import { expect, test } from '@playwright/test'
 import type { BrowserContext, Page } from '@playwright/test'
 import { CLON, entidadDe, entra, motiuSaltClon, productorDe, sql, sqlCom } from './ajuda'
+import { textOfertaPerCopiar } from '../../supabase/functions/_shared/textOferta.ts'
 
 test.beforeEach(({}, info) => {
   const m = motiuSaltClon('super_admin')
@@ -14,13 +15,19 @@ test.beforeEach(({}, info) => {
 test('el texto de la oferta se copia entero, con sus saltos de línea', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   const id = sql(`select id from excedentes where texto_oferta is not null
-    and estado in ('publicada','parcial','bloqueada') order by created_at desc limit 1`)
+    and estado in ('publicada','parcial') order by created_at desc limit 1`)
   test.skip(!id, 'el clon no tiene ninguna oferta viva con texto')
   const text = sql(`select texto_oferta from excedentes where id = '${id}'`)
   await entra(page, 'super_admin')
   await page.goto(`/equip/ofertes/${id}`)
-  await page.getByRole('button', { name: /Copiar per al grup|Copiar para el grupo/ }).click()
-  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(text)
+  // Fase 4 de los puntos 4-6: dos botones, y el cierre del bot cambiado por uno que se puede
+  // cumplir fuera de su conversación (`textOfertaPerCopiar`).
+  await page.getByRole('button', { name: /Copia sense enllaç|Copiar sin enlace/ }).click()
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(textOfertaPerCopiar(text, null))
+  await page.getByRole('button', { name: /Copia amb enllaç|Copiar con enlace/ }).click()
+  const origen = new URL(page.url()).origin
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(textOfertaPerCopiar(text, `${origen}/receptor/mercat?oferta=${id}&accio=interes`))
 })
 
 // ── Con las notificaciones apagadas (fase 4 del plan) ────────────────────────────────────

@@ -2671,3 +2671,29 @@ Dos flujos sobre las mismas RPC (`context/04bis`, «Asignación en un acto»):
   `alb.next_*`, `proc.e_assignada_coberta_*`). Los del modelo heredado (`vrec.fet_esperant`) siguen para esas ofertas.
 - E2E: `tests/e2e/recollida-un-acte.e2e.ts` (donación desde la ficha: ENT y REC conciliados y PDF; dos recogidas, dos
   REC; venta conciliada sin albarán; 360 px sin desbordes).
+
+### Enlaces directos y mensajes con enlace (19-11-2026, fase 4 de los puntos 4-6, `20270609100000`)
+
+Excel 4.2, 4.4 y 5.4: a cada acción se llega por un enlace, aunque sea un pop-up.
+- **Diálogos por la URL** (`hooks/useDialegPerUrl.ts`; abre y cierra con `replace` y `preventScrollReset`, sin
+  ensuciar el historial; rutas en `lib/enllacosDirectes.ts`, con test):
+  - `/receptor/mercat?oferta=<id>&accio=interes`: la oferta abierta vive en la URL; si la entidad ya la pidió, se abre
+    en detalle con su estado; si no está en su Mercat, aviso `mk.enllac_no_disponible` y ningún diálogo.
+  - `/receptor/interessos?operacio=<id>&accio=recollida`: `FitxaOperacio` con `RegistraRecollida` desplegado (props
+    `registraObert` y `desplegat`); operación ajena → `int.enllac_no_disponible`.
+  - `/equip/ofertes/:id?accio=assigna` (scroll a `#od-interes`, quita el parámetro) y `?accio=recollida&canalitzacio=<id>`
+    (abre `DialegRegistraRecollida`; al cerrarlo se limpia). Avisos: `od.enllac_assigna_no` (no publicada),
+    `od.enllac_recollida_no` (ajena o anulada), `recol.need_admin` (técnico).
+- **Mensajes** (`_shared/textOferta.ts`): el texto del bot acaba con `TANCAMENT_BOT`; `textOfertaPerCopiar(texto, enllac?)`
+  lo cambia por «obre l'enllaç i indica els kg…» + enlace, o por «respon aquest missatge…» sin él. `FitxaOferta`: «Copia
+  amb enllaç» (solo publicada o parcial) y «Copia sense enllaç»; «Comparteix» lleva el enlace; `od.copy_group` retirada.
+  `textRecollidaGrup(…, appUrl)` (RECOLLIDA CONFIRMADA) acaba con el enlace para registrar los kg reales: a la operación
+  si hay una sola canalización viva, a `/receptor/interessos` si hay varias. El correo de la oferta lleva su enlace.
+- **Entitats prioritzades**: `te_compte` de `v_entitats_llistat` (membresía activa de la organización, cualquier papel),
+  solo de las filas visibles. Con cuenta, «Copia i marca com a enviada» copia con enlace; sin ella, sin enlace, aviso
+  `od.sense_acces` y «Dona-li accés» (→ `/equip/entitats/<org>?pestanya=contacte`). Mientras no se sabe, sin enlace.
+- **Cola `ofertes_sense_enviar`** (`20270609100000`): `pendents_equip()` la da a 0 si correo y WhatsApp están apagados
+  (con las notificaciones apagadas no es una tarea). El paso «Sense enviar a cap entitat» del listado sale de las
+  respuestas, no de la cola, y se sigue viendo.
+- E2E `tests/e2e/enllacos-directes.e2e.ts` (6); adaptadas `missatges` y `gestio-autonoma`. Sin comprobar en pantalla:
+  una entidad sin cuenta en el ranking (en el clon todas la tienen; el test f lo mira si aparece).

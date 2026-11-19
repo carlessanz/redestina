@@ -26,7 +26,7 @@ import {
   retornDetall,
   textoEnvasos,
 } from '../supabase/functions/_shared/oferta.ts'
-import { diesValids, textDies } from '../supabase/functions/_shared/textOferta.ts'
+import { diesValids, textDies, textOfertaPerCopiar, TANCAMENT_BOT } from '../supabase/functions/_shared/textOferta.ts'
 
 /** Campos mínimos de una oferta, para variar solo lo que cada prueba mira. */
 function campos(extra: Partial<Parameters<typeof componerTextoOferta>[0]> = {}) {
@@ -456,5 +456,23 @@ describe('retorno con detalle, días y Maps de la oferta', () => {
       .toEqual({ detall: null, quantitat: null })
     expect(retornDetall({ retorn: 'No', retorn_envasos: 'caixes', retorn_quantitat: 20 }))
       .toEqual({ detall: null, quantitat: null })
+  })
+})
+
+describe('textOfertaPerCopiar (fase 4 de los puntos 4-6)', () => {
+  const text = componerTextoOferta({ producte: 'Carbassa', quantitat: '100 kg' })
+  it('cambia el cierre del bot por el del enlace', () => {
+    const r = textOfertaPerCopiar(text, 'https://x.test/receptor/mercat?oferta=1&accio=interes')
+    expect(r).not.toContain(TANCAMENT_BOT)
+    expect(r.endsWith("dia i l'hora de recollida:\nhttps://x.test/receptor/mercat?oferta=1&accio=interes")).toBe(true)
+  })
+  it('sin enlace, pide responder al mensaje', () => {
+    const r = textOfertaPerCopiar(text, null)
+    expect(r).not.toContain(TANCAMENT_BOT)
+    expect(r).toContain('respon aquest missatge')
+    expect(r.startsWith('📢 *OFERTA DISPONIBLE*')).toBe(true)
+  })
+  it('un texto sin el cierre del bot también recibe el nuevo', () => {
+    expect(textOfertaPerCopiar('Hola', '')).toBe("Hola\n\n✅ Si t'interessa, respon aquest missatge amb els kg que vols recollir, el dia i l'hora de recollida.")
   })
 })

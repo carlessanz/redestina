@@ -74,7 +74,10 @@ test('des del detall de l’oferta: copia i marca enviada, registra l’interès
   await copia.click()
   await expect.poll(() => sql(`select count(*) from oferta_respuestas where excedente_id = '${oferta}' and canal = 'manual' and estado = 'pendent'`))
     .toBe('1')
-  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('[E2E] Avellana')
+  // El cierre del bot se cambia por uno que se puede cumplir a mano: con el enlace al Mercat si la
+  // entidad tiene cuenta; si no, que responda (fase 4 de los puntos 4-6).
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toMatch(/^\[E2E\] Avellana\n\n✅ Si t'interessa, (obre l'enllaç|respon aquest missatge)/)
 
   // «Registra l'interès» (nivel 2): lo hace el TÉCNICO, en su propia sesión. Quien puede aprobar
   // ya no ve este botón sino «Registrar i confirmar recollida», que asigna en un acto

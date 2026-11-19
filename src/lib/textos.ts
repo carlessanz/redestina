@@ -18,8 +18,13 @@ export function textoRecollidaConfirmada(campos: {
   kgRecollits: string
   kgFalten: string
   comentaris: string
+  /**
+   * El enlace para registrar los kilos reales (fase 4 de los puntos 4-6, Excel 5.4). Con él,
+   * el mensaje acaba con una línea en blanco y la invitación; sin él, como siempre.
+   */
+  enllac?: string | null
 }): string {
-  return [
+  const lineas = [
     '🚚 *RECOLLIDA CONFIRMADA*',
     '',
     `🏛️ SDA / ENTITAT: ${campos.entitat}`,
@@ -27,5 +32,8 @@ export function textoRecollidaConfirmada(campos: {
     `⚖️ KG RECOLLITS: ${campos.kgRecollits}`,
     `🔴 KG FALTEN RECOLLIR: ${campos.kgFalten}`,
     `👥 Comentaris: ${campos.comentaris}`,
-  ].join('\n')
+  ]
+  const enllac = campos.enllac?.trim()
+  if (enllac) lineas.push('', `✅ Quan hagis fet la recollida, registra els kg reals aquí:\n${enllac}`)
+  return lineas.join('\n')
 }

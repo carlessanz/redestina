@@ -133,11 +133,28 @@ export function componerTextoOferta(campos: {
   if (ple(campos.causa)) lineas.push(`🔴 CAUSA: ${textCausa(campos.causa, campos.subcausa)}`);
   if (ple(campos.envasos)) lineas.push(`♻️ ENVASOS: ${campos.envasos}`);
   if (ple(campos.observacions)) lineas.push(`📝 OBSERVACIONS: ${campos.observacions.trim()}`);
-  lineas.push(
-    "",
-    "✅ Si t'interessa, prem *M'interessa* (o respon *SÍ*); si no, *Ara no*.",
-  );
+  lineas.push("", TANCAMENT_BOT);
   return lineas.join("\n");
+}
+
+/** El cierre que guarda `texto_oferta`: el del bot, que pone los botones «M'interessa / Ara no». */
+export const TANCAMENT_BOT = "✅ Si t'interessa, prem *M'interessa* (o respon *SÍ*); si no, *Ara no*.";
+
+/**
+ * El texto de la oferta para COPIARLO a mano (grupo o mensaje individual, fase 4 de los puntos
+ * 4-6, Excel 4.2): cambia el cierre del bot —que fuera de su conversación no tiene botones— por
+ * uno que se puede cumplir. Con enlace, a la oferta en el panel de la entidad; sin él, que
+ * responda al mensaje. Si el texto no termina en el cierre del bot (uno antiguo o editado), se
+ * le añade el nuevo igualmente.
+ */
+export function textOfertaPerCopiar(texto: string, enllac?: string | null): string {
+  const cos = texto.trimEnd();
+  const base = cos.endsWith(TANCAMENT_BOT) ? cos.slice(0, -TANCAMENT_BOT.length).trimEnd() : cos;
+  const url = typeof enllac === "string" ? enllac.trim() : "";
+  const tancament = url
+    ? `✅ Si t'interessa, obre l'enllaç i indica els kg que vols recollir, el dia i l'hora de recollida:\n${url}`
+    : "✅ Si t'interessa, respon aquest missatge amb els kg que vols recollir, el dia i l'hora de recollida.";
+  return `${base}\n\n${tancament}`;
 }
 
 /** «1 caixa», «3 caixes», «1 palet», «2 palets». */

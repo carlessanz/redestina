@@ -58,10 +58,15 @@ function dataInicial(op: Operacio): string {
 }
 
 export default function RegistraRecollida({
-  op, onFet, mode = 'propi', onCancel,
+  op, onFet, mode = 'propi', onCancel, desplegat = false,
 }: {
   op: Operacio
   onFet: () => void
+  /**
+   * En el modo propio, abierto desde el principio (el enlace directo del mensaje RECOLLIDA
+   * CONFIRMADA, fase 4 de los puntos 4-6): con los kilos asignados y la hora ya puestos.
+   */
+  desplegat?: boolean
   /** `assistit`: el equipo, en nombre de la receptora; registra Y valida. */
   mode?: ModeRegistre
   /** Solo en `assistit`: «Cancel·la» cierra quien lo contiene (el diálogo). */
@@ -71,12 +76,14 @@ export default function RegistraRecollida({
   const assistit = mode === 'assistit'
   const assignats = op.kg_assignats != null ? Number(op.kg_assignats) : null
   const kgInicial = assignats != null ? String(assignats).replace('.', ',') : ''
-  // En el modo asistido se abre directamente: ya va dentro de un diálogo que se abrió a eso.
-  const [obert, setObert] = useState(assistit)
+  // En el modo asistido se abre directamente: ya va dentro de un diálogo que se abrió a eso. Y
+  // en el propio, si se llega por el enlace directo (`desplegat`), igual que si se pulsara.
+  const obertInicial = assistit || desplegat
+  const [obert, setObert] = useState(obertInicial)
   const [resultat, setResultat] = useState<ResultatRecollida>('coincideix')
-  const [kg, setKg] = useState(assistit ? kgInicial : '')
+  const [kg, setKg] = useState(obertInicial ? kgInicial : '')
   const [obs, setObs] = useState('')
-  const [data, setData] = useState(() => (assistit ? dataInicial(op) : ''))
+  const [data, setData] = useState(() => (obertInicial ? dataInicial(op) : ''))
   const [foto, setFoto] = useState<File | null>(null)
   const [ocupat, setOcupat] = useState(false)
   const [error, setError] = useState<string | null>(null)

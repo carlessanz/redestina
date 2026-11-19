@@ -12,8 +12,14 @@
 //
 // ⚠️ `estado === 'pendent'` SÍ enseña el botón: significa que el equipo le mandó la oferta
 // y todavía no ha contestado. Es la fila que existe justamente para que la conteste.
+//
+// 🔗 LA OFERTA ABIERTA VIVE EN LA URL (fase 4 de los puntos 4-6, Excel 4.2): `?oferta=<id>`
+// abre su detalle y `&accio=interes`, el formulario de interés. Es el enlace que llevan los
+// mensajes («obre l’enllaç i indica els kg…»), y sobrevive al login (`lib/destiLogin.ts`). Si
+// la oferta ya no está en el Mercat de esta entidad —asignada, cerrada, la RLS no la deja ver—
+// se dice arriba, en vez de abrir un diálogo vacío.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
@@ -39,6 +45,7 @@ import { isoRecollida } from '../../lib/franja'
 import CampsRecollida from '../../components/CampsRecollida'
 import { llegeixMercatVist, marcaMercatVist } from '../../lib/avisos'
 import { useAppContext } from '../../hooks/useAppContext'
+import { useDialegPerUrl } from '../../hooks/useDialegPerUrl'
 import CarregantSeccio from '../../components/CarregantSeccio'
 import DetallOfertaReceptor, { preuDe } from '../../components/DetallOfertaReceptor'
 import type { OfertaReceptor } from '../../components/DetallOfertaReceptor'
@@ -87,6 +94,12 @@ export default function Mercat() {
   /** Las que puede recibir alguna de mis entidades; null = no se pudo leer (no se filtra). */
   const [compat, setCompat] = useState<Modalitat[] | null>(null)
   const [enviant, setEnviant] = useState(false)
+  // La oferta abierta y el modo, en la URL (`?oferta=…&accio=interes`).
+  const dialeg = useDialegPerUrl(['oferta', 'accio'] as const)
+  const ofertaUrl = dialeg.valors.oferta
+  const accioUrl = dialeg.valors.accio
+  /** La oferta de la URL que ya se ha abierto: los refrescos de la lista no la reabren. */
+  const aplicada = useRef<string | null>(null)
 
   const entidadId = organitzacio?.id ?? null
 
@@ -183,7 +196,8 @@ export default function Mercat() {
       : undefined)
   }
 
-  function obre(o: OfertaReceptor, m: 'detall' | 'interes') {
+  /** Prepara el diálogo para una oferta (lo llama el efecto que lee la URL). */
+  function prepara(o: OfertaReceptor, m: 'detall' | 'interes') {
     setObert(o)
     setMode(m)
     setKg(String(o.kg_total ?? ''))
@@ -193,6 +207,26 @@ export default function Mercat() {
     setDiaRec('')
     setHoraRec('')
   }
+
+  /** Abrir desde la pantalla es escribir la URL: el efecto de abajo hace el resto. */
+  function obre(o: OfertaReceptor, m: 'detall' | 'interes') {
+    dialeg.obre({ oferta: o.id, accio: m === 'interes' ? 'interes' : null })
+  }
+
+  // La URL manda: con `?oferta=` y la lista ya cargada, se abre esa oferta una vez. Si ya la ha
+  // pedido, en detalle (con su estado), no en el formulario: no se pide dos veces. Sin
+  // `?oferta=`, cerrado.
+  useEffect(() => {
+    if (!ofertaUrl) { aplicada.current = null; setObert(null); return }
+    if (carregant || aplicada.current === ofertaUrl) return
+    const o = ofertes.find((x) => x.id === ofertaUrl)
+    if (!o) return
+    aplicada.current = ofertaUrl
+    const meva = meves[o.id]
+    const jaDemanada = meva != null && meva.estado !== 'pendent'
+    prepara(o, accioUrl === 'interes' && !jaDemanada ? 'interes' : 'detall')
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al cambiar la oferta de la URL o al llegar la lista; `prepara` y `accioUrl` se leen en ese momento
+  }, [ofertaUrl, carregant, ofertes])
 
   async function envia() {
     if (!obert || !entidadId) return
@@ -226,7 +260,7 @@ export default function Mercat() {
       return
     }
     toast.success(t('mk.sent'))
-    setObert(null)
+    dialeg.tanca()
     await carrega()
   }
 
@@ -281,6 +315,10 @@ export default function Mercat() {
   const obertVenda = modalitat ? modalitat === 'venda' : ambPreu(obertMods)
   const obertMotiu = obert ? motiuNoPot(obert) : null
   // El precio mínimo con coma y dos decimales, como lo escribe la gente; sin mínimo, sin cifra.
+  // El enlace pedía una oferta que esta entidad ya no ve en el Mercat (asignada, cerrada, fuera
+  // de su perfil): se dice, no se abre nada.
+  const ofertaNoDisponible = ofertaUrl != null && !carregant && !errorCarrega
+    && !ofertes.some((o) => o.id === ofertaUrl)
   const preuMinim = obert?.preu_minim != null
     ? fmtPreu(obert.preu_minim)
     : null
@@ -338,6 +376,15 @@ export default function Mercat() {
         {carregant && <CarregantSeccio files={3} ambCapcalera={false} />}
         {!carregant && errorCarrega && (
           <p className="text-sm text-destructive">{t('c.error')}</p>
+        )}
+        {ofertaNoDisponible && (
+          <div role="status" data-testid="enllac-no-disponible"
+            className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md bg-aviso-fondo p-3 text-sm text-aviso">
+            <p className="min-w-0 flex-1">{t('mk.enllac_no_disponible')}</p>
+            <Button variant="outline" className="h-11 whitespace-normal md:h-8" onClick={dialeg.tanca}>
+              {t('c.ok')}
+            </Button>
+          </div>
         )}
         {!carregant && inactiva === true && (
           <p className="rounded-md bg-aviso-fondo p-3 text-sm text-aviso" data-testid="mercat-inactiva">{t('mk.entitat_inactiva')}</p>
@@ -430,7 +477,7 @@ export default function Mercat() {
       {/* UN solo diálogo, con dos modos: el detalle de la oferta y, desde él, el interés.
           ⚠️ `max-h` + scroll: al enfocar «quants kg» en un móvil el área visible baja a
           ~350px, y sin tope de altura el botón de enviar quedaba fuera de alcance. */}
-      <Dialog open={obert != null} onOpenChange={(v) => !v && setObert(null)}>
+      <Dialog open={obert != null} onOpenChange={(v) => { if (!v) dialeg.tanca() }}>
         {obert && (
           <DialogContent className="max-h-[85dvh] overflow-y-auto">
             <DialogHeader>
@@ -502,7 +549,7 @@ export default function Mercat() {
                   className="h-11 md:h-8"
                   disabled={obertMotiu !== null}
                   title={obertMotiu ? t(obertMotiu) : undefined}
-                  onClick={() => setMode('interes')}
+                  onClick={() => { setMode('interes'); dialeg.obre({ oferta: obert.id, accio: 'interes' }) }}
                 >{t('mk.interested')}</Button>
               )}
             </DialogFooter>

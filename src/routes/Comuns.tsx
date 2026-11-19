@@ -9,8 +9,10 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router'
 import { Hourglass, ShieldAlert, ShieldX } from 'lucide-react'
+import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
+import { esborraDesti, guardaDesti, llegeixDesti } from '../lib/destiLogin'
 import { useSessio } from '../hooks/useSessio'
 import { useVersioNova } from '../hooks/useVersioNova'
 import { AppContextProvider, useAppContext } from '../hooks/useAppContext'
@@ -41,16 +43,22 @@ export function ArrelApp() {
 /**
  * Guarda de sesión de toda la parte privada. Sin sesión manda al acceso que corresponde
  * —el del equipo si pedías algo de /equip, el de usuarios si no— y se guarda la URL
- * pedida para volver a ella después de entrar.
+ * pedida para volver a ella después de entrar: en `state.from`, como siempre, y además en
+ * `sessionStorage` (`lib/destiLogin.ts`), que sobrevive a una recarga, al enlace de primer
+ * acceso y a la recuperación de contraseña (fase 4 de los puntos 4-6, Excel 4.4).
+ *
+ * ⚠️ Si la sesión se acaba de CERRAR en esta pestaña, no se guarda: la pantalla de la que se
+ *    sale no es un destino, y quien entre después puede ser otra cuenta.
  */
 export function RequireSessio() {
-  const { session, carregant } = useSessio()
+  const { session, carregant, haSortit } = useSessio()
   const location = useLocation()
 
   if (carregant) return <Carregant />
   if (!session) {
     const desti = location.pathname.startsWith('/equip') ? '/admin' : '/login'
-    return <Navigate to={desti} replace state={{ from: location.pathname + location.search }} />
+    const from = location.pathname + location.search
+    return <AlAcces a={desti} from={from} guarda={!haSortit} />
   }
   return (
     <AppContextProvider>
@@ -59,11 +67,34 @@ export function RequireSessio() {
   )
 }
 
+/** Guarda el destino (en un efecto, no en pleno render) y manda a la puerta de entrada. */
+function AlAcces({ a, from, guarda }: { a: string; from: string; guarda: boolean }) {
+  useEffect(() => { if (guarda) guardaDesti(from) }, [guarda, from])
+  return <Navigate to={a} replace state={{ from }} />
+}
+
+/**
+ * Lleva al destino guardado al entrar, si lo hay y es interno; si no, a `alternativa`. Lo
+ * usan las puertas de entrada (`/login`, `/admin`, la landing) y `/panell`.
+ *
+ * Se lee al montar (lectura pura, aguanta el doble render del modo estricto) y se BORRA en un
+ * efecto: un destino se consume una sola vez, y si la cuenta no tiene ese panel, `RoleGuard`
+ * la manda al suyo sin que el destino vuelva a dispararse.
+ */
+export function NavegaAlDesti({ alternativa }: { alternativa: string }) {
+  // `alternativa` la pone el código (no viene de fuera): no se valida, y puede ser una ruta de
+  // entrada (`/sense-acces` desde `/panell`), que como destino guardado no valdría.
+  const [desti] = useState(() => llegeixDesti() ?? alternativa)
+  useEffect(() => { esborraDesti() }, [])
+  return <Navigate to={desti} replace />
+}
+
 /** `/panell` manda a cada cual al suyo. */
 export function ArrelPerRol() {
   const { carregant, rolActiu } = useAppContext()
   if (carregant) return <Carregant />
-  return <Navigate to={rutaArrel(rolActiu)} replace />
+  // Un destino pendiente (un enlace directo pedido antes de entrar) manda sobre la raíz.
+  return <NavegaAlDesti alternativa={rutaArrel(rolActiu)} />
 }
 
 /**
@@ -80,8 +111,20 @@ export function RoleGuard({ rol }: { rol: Rol }) {
   // daría un bucle —`Navigate` solo dispara una vez— sino algo peor: contenido en blanco
   // sin ningún error. `/panell` es el único sitio que no pertenece a ningún panel, así
   // que ahí sí se resuelve el destino de verdad.
-  if (!ctx.rols.includes(rol)) return <Navigate to="/panell" replace />
+  if (!ctx.rols.includes(rol)) {
+    // Con algún panel, se dice por qué no se ve lo pedido (un enlace de otro panel, típico de un
+    // mensaje reenviado). Sin ninguno, `/panell` ya acaba en «sense accés», que lo explica.
+    return ctx.rols.length > 0 ? <AvisAltrePanell /> : <Navigate to="/panell" replace />
+  }
   return <Outlet />
+}
+
+/** El aviso de «este enlace es de otro panel» y, a la vez, al propio. */
+function AvisAltrePanell() {
+  const { t } = useT()
+  // Con `id`: el doble efecto del modo estricto no lo duplica.
+  useEffect(() => { toast.warning(t('acces.altre_panell'), { id: 'acces-altre-panell' }) }, [t])
+  return <Navigate to="/panell" replace />
 }
 
 /**

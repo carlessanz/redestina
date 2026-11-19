@@ -5,9 +5,13 @@
 // Hasta entonces el detalle enseñaba el texto de la oferta y poco más: el formato de entrega, el
 // retorno de envases, los días o el enlace del punto de recogida solo se veían dentro del texto.
 //
-// El texto que se comparte es `texto_oferta`, tal cual: lo compone el servidor desde la fila al
-// publicar y al editar (`textoOfertaDeDades`), así que siempre dice lo que dice la oferta. No se
-// recompone aquí.
+// El texto que se comparte es `texto_oferta`: lo compone el servidor desde la fila al publicar y
+// al editar (`textoOfertaDeDades`), así que siempre dice lo que dice la oferta. No se recompone
+// aquí, salvo el CIERRE (fase 4 de los puntos 4-6, Excel 4.2): el del bot («prem M'interessa»)
+// no se puede cumplir fuera de su conversación, así que al copiar se cambia por el de
+// `textOfertaPerCopiar` —con el enlace a la oferta en el Mercat o pidiendo que respondan—. Dos
+// botones: «Copia amb enllaç» (el mismo enlace para todas las entidades: cada una entra con su
+// cuenta) y «Copia sense enllaç» (para quien no tiene cuenta). «Comparteix» lleva el enlace.
 
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -21,6 +25,7 @@ import { ambPreu, modalitatsOferta, textModalitats } from '../lib/modalitats'
 import { carregaCatalegCauses, textSubcausa, type CausaAmbSubcauses } from '../lib/causes'
 import { urlsFotos } from '../lib/fotos'
 import { comparteixOferta, esCompartible, nomFitxerFoto } from '../lib/compartirOferta'
+import { enllacInteresOferta, textOfertaPerCopiar } from '../lib/enllacosDirectes'
 import BotoCopiar from './BotoCopiar'
 import type { Excedente } from '../types'
 import { Button } from '@/components/ui/button'
@@ -36,8 +41,6 @@ interface Props {
   onEdita?: () => void
   /** Vencida con kilos sin cubrir (lo calcula quien monta la ficha). */
   vencida?: boolean
-  /** La etiqueta del botón de copiar (el equipo dice «Copiar per al grup»). */
-  etiquetaCopiar?: string
 }
 
 /** Una fila «etiqueta: valor». Sin valor no se pinta (como en el texto: nada de etiquetas vacías). */
@@ -50,7 +53,7 @@ function Dada({ etiqueta, children, ample }: { etiqueta: string; children: React
   )
 }
 
-export default function FitxaOferta({ oferta, ambCost = false, onEdita, vencida = false, etiquetaCopiar }: Props) {
+export default function FitxaOferta({ oferta, ambCost = false, onEdita, vencida = false }: Props) {
   const { t, lang } = useT()
   const [lloc, setLloc] = useState<Lloc | null>(null)
   const [cataleg, setCataleg] = useState<CausaAmbSubcauses[]>([])
@@ -86,13 +89,19 @@ export default function FitxaOferta({ oferta, ambCost = false, onEdita, vencida 
       .filter(Boolean).join(' · ')
     : oferta.retorn_envasos === 'No' ? t('c.no') : ''
   const compartible = esCompartible(oferta.estado)
+  // Los dos textos para copiar. El enlace, solo si la oferta circula: una pendiente de validar
+  // todavía no la ve ninguna entidad en el Mercat.
+  const textAmbEnllac = oferta.texto_oferta && compartible
+    ? textOfertaPerCopiar(oferta.texto_oferta, enllacInteresOferta(window.location.origin, oferta.id))
+    : null
+  const textSenseEnllac = oferta.texto_oferta ? textOfertaPerCopiar(oferta.texto_oferta, null) : ''
 
   async function comparteix() {
-    if (!oferta.texto_oferta) return
+    if (!textAmbEnllac) return
     setCompartint(true)
     const ruta = oferta.fotos?.[0] ?? null
     const url = ruta ? (await urlsFotos([ruta]))[ruta] ?? null : null
-    const r = await comparteixOferta(oferta.texto_oferta, url && ruta ? { url, nom: nomFitxerFoto(oferta.producto, ruta) } : null)
+    const r = await comparteixOferta(textAmbEnllac, url && ruta ? { url, nom: nomFitxerFoto(oferta.producto, ruta) } : null)
     setCompartint(false)
     if (r === 'copiat') toast.success(t(ruta ? 'fo.comparteix_copiat_foto' : 'fo.comparteix_copiat'))
     else if (r === 'error') toast.error(t('copia.err'))
@@ -158,7 +167,12 @@ export default function FitxaOferta({ oferta, ambCost = false, onEdita, vencida 
               {oferta.texto_oferta}
             </pre>
             <div className="flex flex-wrap gap-2">
-              <BotoCopiar text={oferta.texto_oferta} etiqueta={etiquetaCopiar} className="h-11 md:h-8" />
+              {textAmbEnllac && (
+                <BotoCopiar text={textAmbEnllac} etiqueta={t('fo.copia_amb_enllac')}
+                  className="h-11 whitespace-normal md:h-8" />
+              )}
+              <BotoCopiar text={textSenseEnllac} etiqueta={t('fo.copia_sense_enllac')}
+                className="h-11 whitespace-normal md:h-8" />
               {/* Solo lo que circula: un esborrany no tiene texto y una pendiente de validar
                   todavía no ha salido (filas 3.1.2 y 3.7.1). */}
               {compartible && (

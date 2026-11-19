@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { useSessio } from '../../hooks/useSessio'
+import { consumeixDesti } from '../../lib/destiLogin'
 import LayoutAcces, { ComprovantSessio } from '../../components/LayoutAcces'
 import { BotoUll } from '../../components/FormulariAcces'
 import { Button } from '@/components/ui/button'
@@ -55,7 +56,9 @@ export default function RestablirClau() {
     }
     toast.success(t('login.pw_updated'))
     netejaRecovery()
-    void navigate('/panell', { replace: true })
+    // El enlace de primer acceso y la recuperación pasan por aquí: si antes se pidió un
+    // enlace directo en esta pestaña, se vuelve a él (fase 4 de los puntos 4-6).
+    void navigate(consumeixDesti() ?? '/panell', { replace: true })
   }
 
   return (

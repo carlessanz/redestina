@@ -9,9 +9,10 @@
 // supabase-js confirma que hay token, o quien acaba de seguir su enlace se quedaría
 // mirando la portada.
 
-import { Link, Navigate } from 'react-router'
+import { Link } from 'react-router'
 import { useT } from '../../lib/i18n'
 import { useSessio } from '../../hooks/useSessio'
+import { NavegaAlDesti } from '../Comuns'
 import SelectorIdioma from '../../components/SelectorIdioma'
 import { ComprovantSessio } from '../../components/LayoutAcces'
 import { Button } from '@/components/ui/button'
@@ -36,7 +37,8 @@ export default function Landing() {
   const { session, carregant } = useSessio()
 
   if (carregant) return <ComprovantSessio />
-  if (session) return <Navigate to="/panell" replace />
+  // Con sesión, al destino pendiente si lo hay (un enlace directo pedido antes de entrar).
+  if (session) return <NavegaAlDesti alternativa="/panell" />
 
   return (
     <div className="min-h-dvh bg-background">

@@ -3,9 +3,11 @@
 // Mismo formulario que el del equipo, otro copy y dos cosas más: el enlace al registro y,
 // solo en entornos de prueba, los accesos directos.
 
-import { Link, Navigate, useLocation } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import { useT } from '../../lib/i18n'
 import { useSessio } from '../../hooks/useSessio'
+import { destiValid } from '../../lib/destiLogin'
+import { NavegaAlDesti } from '../Comuns'
 import { accessosActius } from '../../lib/accessosTest'
 import LayoutAcces, { ComprovantSessio } from '../../components/LayoutAcces'
 import FormulariAcces from '../../components/FormulariAcces'
@@ -20,8 +22,10 @@ export default function LoginUsuaris() {
   if (carregant) return <ComprovantSessio />
   // Con sesión, a donde se iba (RequireSessio guarda la URL que se pidió) o al panel.
   if (session) {
-    const desti = (location.state as { from?: string } | null)?.from
-    return <Navigate to={desti ?? '/panell'} replace />
+    // El destino guardado (sobrevive a recargas y a la recuperación) manda; si no, el del
+    // `state`, validado igual: solo rutas internas (`lib/destiLogin.ts`).
+    const desti = destiValid((location.state as { from?: string } | null)?.from)
+    return <NavegaAlDesti alternativa={desti ?? '/panell'} />
   }
 
   return (

@@ -140,6 +140,31 @@ describe('los mensajes de una oferta', () => {
     expect(txt).toContain('SDA / ENTITAT: Uno')
     expect(txt).not.toContain('Dos')
     expect(txt).toContain('KG FALTEN RECOLLIR: 200')
+    // Sin `appUrl`, sin enlace: el texto de siempre.
+    expect(txt).not.toContain('http')
+  })
+
+  it('RECOLLIDA CONFIRMADA lleva el enlace para registrar los kg reales (fase 4 de los puntos 4-6)', () => {
+    const una = textRecollidaGrup([
+      { id: 'c1', entidad_id: 'e1', kg_confirmados: 100, data_hora_recollida: null, estado: 'pendent' },
+      { id: 'c2', entidad_id: 'e2', kg_confirmados: 50, data_hora_recollida: null, estado: 'anulada' },
+    ], 300, () => 'Uno', 'ca', APP)
+    expect(una.endsWith(`${APP}/receptor/interessos?operacio=c1&accio=recollida`)).toBe(true)
+    const dues = textRecollidaGrup([
+      { id: 'c1', entidad_id: 'e1', kg_confirmados: 100, data_hora_recollida: null, estado: 'pendent' },
+      { id: 'c2', entidad_id: 'e2', kg_confirmados: 50, data_hora_recollida: null, estado: 'pendent' },
+    ], 300, () => 'Uno', 'ca', APP)
+    expect(dues.endsWith(`${APP}/receptor/interessos`)).toBe(true)
+    const ms = missatgesDeLOferta({ ...BASE, canalitzacions: [
+      { id: 'c1', entidad_id: 'ent-1', kg_confirmados: 120, data_hora_recollida: null, estado: 'pendent' },
+    ] }, OPC)
+    expect(ms.find((m) => m.clau === 'recollida_grup')!.whatsapp)
+      .toContain(`${APP}/receptor/interessos?operacio=c1&accio=recollida`)
+  })
+
+  it('el correo de la oferta enlaza directo a ella en el Mercat', () => {
+    const m = missatgesDeLOferta(BASE, OPC).find((x) => x.clau === 'oferta')!
+    expect(m.correu!.text.endsWith(`${APP}/receptor/mercat?oferta=exc-1&accio=interes`)).toBe(true)
   })
 })
 

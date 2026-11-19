@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
@@ -18,6 +18,8 @@ import { textError } from '../lib/textError'
 import { useConfirma } from './DialegConfirma'
 import { textRecollidaGrup } from '../lib/missatgesOferta'
 import { useMissatgesOferta } from '../hooks/useMissatgesOferta'
+import { useDialegPerUrl } from '../hooks/useDialegPerUrl'
+import { enllacInteresOferta, textOfertaPerCopiar } from '../lib/enllacosDirectes'
 import MissatgesDelPunt from './MissatgesDelPunt'
 import { PLANTILLA_OFERTA, PLANTILLA_OFERTA_APROVADA } from '../lib/plantillas'
 import { construirComponentsOferta } from '../lib/ofertaTemplate'
@@ -182,6 +184,8 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // Alguna de las lecturas de la ficha falló. Se conserva lo último que se leyó (no se pinta
   // «sin canalizaciones» por un error de red) y se avisa encima.
   const [errorCarrega, setErrorCarrega] = useState(false)
+  // La primera lectura de la ficha ha llegado: el enlace `?accio=recollida` espera a tenerla.
+  const [carregat, setCarregat] = useState(false)
   // Las anuladas no cuentan en ningún sitio: ni en lo canalizado, ni en lo que falta, ni en el
   // destino final (igual que `desti_excedent()` y `recalcula_estat_excedent()` en la base).
   const vives = canalizaciones.filter((c) => c.estado !== 'anulada')
@@ -209,6 +213,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     if (e.data) setExc(e.data)
     if (!c.error) setCanalizaciones(c.data ?? [])
     if (!a.error) setAlbarans((a.data as AlbaraDelRegistre[] | null) ?? [])
+    setCarregat(true)
     return e.data ?? null
   }, [excedente.id])
 
@@ -302,6 +307,30 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   }),
   [rankingOrdenado, filtreTipus, nomesProducte, filtreComarca, filtreRecepcio, filtreActivitat, nomesCapacitat, kgOferta,
     filtreModalitat, filtreKg])
+  // ¿Tiene cuenta cada entidad del ranking que se ve? (fase 4 de los puntos 4-6, Excel 4.2). El
+  // mensaje individual solo lleva el enlace al Mercat si puede entrar; si no, se dice y se ofrece
+  // «Dona-li accés» en su ficha. `te_compte` sale de `v_entitats_llistat` (no del ranking), y se
+  // pide solo para las filas a la vista que aún no se saben. `null` = la vista no la devolvió.
+  const [comptes, setComptes] = useState<Record<string, { org: string | null; teCompte: boolean | null }>>({})
+  const idsSenseCompte = rankingFiltrat.slice(0, mostrats).map((e) => e.id).filter((id) => !(id in comptes))
+  const clauComptes = [...idsSenseCompte].sort().join(',')
+  useEffect(() => {
+    if (!clauComptes) return
+    let viu = true
+    const ids = clauComptes.split(',')
+    void supabase.from('v_entitats_llistat').select('id, entidad_id, te_compte').in('entidad_id', ids)
+      .then(({ data, error }) => {
+        if (!viu || error) return
+        const nou: Record<string, { org: string | null; teCompte: boolean | null }> = {}
+        for (const id of ids) nou[id] = { org: null, teCompte: null }
+        for (const f of (data ?? []) as { id: string; entidad_id: string; te_compte: boolean | null }[]) {
+          nou[f.entidad_id] = { org: f.id, teCompte: f.te_compte }
+        }
+        setComptes((prev) => ({ ...prev, ...nou }))
+      })
+    return () => { viu = false }
+  }, [clauComptes])
+
   const modalitatsDelRanking = useMemo(() => modalitatsPresents(ranking), [ranking])
   const ambKgHabituals = useMemo(() => hiHaQuantitatHabitual(ranking), [ranking])
   const activitatsDelRanking = useMemo(() => activitatsPresents(ranking), [ranking])
@@ -547,7 +576,8 @@ export default function OfferDetail({ excedente, onBack }: Props) {
         // El equivalente del diálogo sí/no de WhatsApp (§5): quien recibe la oferta por
         // correo tiene un sitio donde decir que la quiere, en vez de tener que contestar
         // un correo que nadie captura de forma estructurada.
-        boton: { texto: t('od.email_button'), url: `${window.location.origin}/receptor/mercat` },
+        // Directo a ESTA oferta con el formulario de interés abierto (fase 4 de los puntos 4-6).
+        boton: { texto: t('od.email_button'), url: enllacInteresOferta(window.location.origin, exc.id) },
       },
     })
     if (r.ok) { await trasEnviar(ent, 'email', r.simulat, 'od.sent_email'); return }
@@ -598,6 +628,46 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   const ofertaOberta = exc.estado === 'publicada' || exc.estado === 'parcial'
   const editable = ['pendent_validacio', 'publicada', 'parcial', 'bloqueada'].includes(exc.estado)
   const vencida = exc.disponible_hasta != null && new Date(exc.disponible_hasta) < new Date() && faltan > 0
+
+  // 🔗 Enlaces directos del equipo (fase 4 de los puntos 4-6, `lib/enllacosDirectes.ts`):
+  //   `?accio=assigna` lleva al formulario «Assigna l’oferta»;
+  //   `?accio=recollida&canalitzacio=<id>` abre «Registrar la recollida» de esa canalización.
+  // Cada enlace se aplica una vez; si ya no se puede (oferta cerrada, canalización anulada o de
+  // otra oferta, sin permiso), se dice arriba en vez de abrir un diálogo vacío.
+  const enllac = useDialegPerUrl(['accio', 'canalitzacio'] as const)
+  const accioUrl = enllac.valors.accio
+  const canalUrl = enllac.valors.canalitzacio
+  const tancaEnllac = enllac.tanca
+  const accioAplicada = useRef<string | null>(null)
+  const [avisEnllac, setAvisEnllac] = useState<string | null>(null)
+  useEffect(() => {
+    if (!accioUrl) { accioAplicada.current = null; return }
+    const clau = `${accioUrl}|${canalUrl ?? ''}`
+    if (accioAplicada.current === clau) return
+    if (accioUrl === 'assigna') {
+      accioAplicada.current = clau
+      if (!ofertaOberta) { setAvisEnllac('od.enllac_assigna_no'); return }
+      requestAnimationFrame(() => {
+        document.getElementById('od-interes')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
+      tancaEnllac()
+      return
+    }
+    if (accioUrl === 'recollida') {
+      if (!carregat) return
+      accioAplicada.current = clau
+      const c = canalizaciones.find((x) => x.id === canalUrl)
+      if (!c || c.estado === 'anulada') { setAvisEnllac('od.enllac_recollida_no'); return }
+      if (!potAprovar) { setAvisEnllac('recol.need_admin'); return }
+      setRegistrant({ id: c.id, entitat: '' })
+      return
+    }
+    // Una acción que no se conoce: se ignora.
+    accioAplicada.current = clau
+  }, [accioUrl, canalUrl, carregat, canalizaciones, ofertaOberta, potAprovar, tancaEnllac])
+  const tancaAvisEnllac = () => { setAvisEnllac(null); tancaEnllac() }
+  /** El nombre de la entidad de una canalización (el diálogo de la recogida lo enseña). */
+  const nomDeCanal = (id: string) => nombrePorId(canalizaciones.find((c) => c.id === id)?.entidad_id ?? null)
 
   /**
    * Cubrir los kg hace aparecer de golpe el bloque «Recollida confirmada», que hasta ese
@@ -683,6 +753,15 @@ export default function OfferDetail({ excedente, onBack }: Props) {
         <ArrowLeft className="size-4" /> {t('od.back')}
       </Button>
       {errorCarrega && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
+      {avisEnllac && (
+        <div role="status" data-testid="enllac-no-disponible"
+          className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md bg-aviso-fondo p-3 text-sm text-aviso">
+          <p className="min-w-0 flex-1">{t(avisEnllac)}</p>
+          <Button variant="outline" className="h-11 whitespace-normal md:h-8" onClick={tancaAvisEnllac}>
+            {t('c.ok')}
+          </Button>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -847,7 +926,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
 
       {/* Todo lo de la oferta en lectura, su texto, «Copia» y «Comparteix» (fase C del punto
           3, fila 3.7.2). «Edita l'oferta» abre el mismo formulario del alta en modo editar. */}
-      <FitxaOferta oferta={exc} ambCost vencida={vencida} etiquetaCopiar={t('od.copy_group')}
+      <FitxaOferta oferta={exc} ambCost vencida={vencida}
         onEdita={editable ? () => setEditant(true) : undefined} />
 
       {/* Las entidades priorizadas, plegadas por defecto (mismo patrón que los mensajes): con la
@@ -941,8 +1020,17 @@ export default function OfferDetail({ excedente, onBack }: Props) {
             const puedeTest = !testMode || ent.es_test
             // Si no es usuari de prova, se muestra el motivo visible (antes solo en el title).
             const motivos = puedeTest ? ent.motivos : [...ent.motivos, t('od.not_test')]
+            // El enlace al Mercat, solo a quien puede entrar; sin cuenta, el texto pide que
+            // responda al mensaje. Sin saberlo todavía (cargando), sin enlace.
+            const compte = comptes[ent.id]
+            const senseCompte = compte?.teCompte === false
+            const textIndividual = exc.texto_oferta
+              ? textOfertaPerCopiar(exc.texto_oferta,
+                compte?.teCompte === true ? enllacInteresOferta(window.location.origin, exc.id) : null)
+              : ''
             return (
-              <div key={ent.id}
+              <div key={ent.id} data-testid="od-ranking-fila"
+                data-compte={compte === undefined ? 'pendent' : String(compte.teCompte)}
                 className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border p-2.5 ${ent.pendiente ? 'bg-aviso-fondo opacity-80' : ''}`}>
                 <div className="flex items-center gap-3">
                   <span className="w-6 text-center text-lg font-bold text-primary">{ent.puntuacion}</span>
@@ -969,6 +1057,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                         puede firmarse entremedias— lo que falla es aprobar. */}
                     {ent.sense_conveni && (
                       <div className="mt-1 text-xs text-aviso">{t('od.sense_conveni')}</div>
+                    )}
+                    {senseCompte && (
+                      <div className="mt-1 text-xs text-aviso" data-testid="od-sense-acces">{t('od.sense_acces')}</div>
                     )}
                   </div>
                 </div>
@@ -999,10 +1090,18 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                     onClick={() => void ambBloqueig(ent.id, () => enviarOfertaPanell(ent))}>{t('od.panel')}</Button>
                   {/* Sin pasar por ningún canal: el texto se copia y se pega a mano, y la
                       entidad consta como destinataria (`canal = 'manual'`). */}
-                  <BotoCopiar text={exc.texto_oferta ?? ''} etiqueta={t('manual.copy_mark')}
+                  <BotoCopiar text={textIndividual} etiqueta={t('manual.copy_mark')}
                     className="whitespace-normal"
                     disabled={enviant === ent.id || !ofertaOberta}
                     onCopiat={() => void ambBloqueig(ent.id, () => marcaEnviadaAMa(ent))} />
+                  {/* Sin cuenta: el flujo de «Dona-li accés» vive en su ficha (pestaña Contacte). */}
+                  {senseCompte && compte?.org && (
+                    <Button asChild size="sm" variant="outline" className="whitespace-normal">
+                      <Link to={`/equip/entitats/${compte.org}?pestanya=contacte`} data-testid="od-dona-acces">
+                        {t('acc.donar')}
+                      </Link>
+                    </Button>
+                  )}
                 </div>
               </div>
             )
@@ -1230,7 +1329,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
             )}
             {/* La fecha y los comentarios salían en blanco: ahora se toman de las entregas. */}
             <BotoCopiar etiqueta={t('od.copy_recollida')}
-              text={textRecollidaGrup(canalizaciones, total, nombrePorId, lang)} />
+              text={textRecollidaGrup(canalizaciones, total, nombrePorId, lang, window.location.origin)} />
           </CardHeader>
         </Card>
       )}
@@ -1268,8 +1367,8 @@ export default function OfferDetail({ excedente, onBack }: Props) {
           (o, en venta y maquila, la recogida conciliada sin albarán), y el diálogo los enseña. */}
       <DialegRegistraRecollida
         canalitzacio={registrant?.id ?? null}
-        entitat={registrant?.entitat ?? null}
-        onTancar={() => setRegistrant(null)}
+        entitat={registrant ? (registrant.entitat || nomDeCanal(registrant.id)) : null}
+        onTancar={() => { setRegistrant(null); if (accioUrl) tancaEnllac() }}
         onFet={() => { void recargar(); void refrescaComptadors() }}
       />
 
