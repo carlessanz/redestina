@@ -2027,6 +2027,21 @@ Fase 2 de los puntos 4-6 (RPC y códigos en `context/04bis`, «Asignación en un
   equipo y a las dos partes (`canalitzacions_de_les_meves_orgs()`), carpeta del productor; `subir-documento-externo`
   acepta `canalizacion`; `borrar_una_fitxa` se los lleva a `fitxers_orfes`.
 
+### La fecha de una recogida validada es la real (20-11-2026, `20270613100000`)
+
+Lo encontró el E2E del circuito completo (`tests/e2e/circuit-tomaquet.e2e.ts`): la receptora recoge **antes** de la hora
+prevista (lo registra hoy y el equipo lo valida hoy). `validar_recollida()` emitía el ENT y el REC con la fecha real
+(`recollida_real_at`), pero la canalización se quedaba con la **prevista** en `data_hora_recollida`, que es la que usan
+los cierres, los certificados, el 182, el impacto y Entrades i sortides. El albarán decía 20-11, el certificado de la
+oferta 21-11, y no se podía emitir hasta el día siguiente («El periode acaba el 2026-11-21 i encara no ha acabat»); en
+un cambio de año la misma donación caía en dos ejercicios.
+
+La regla: **al validar** (paso de `recollida_validada_at` de nulo a no nulo) `data_hora_recollida := recollida_real_at`.
+Un solo punto, el trigger `canalizaciones_data_real` (`trg_canalizaciones_data_real()`, sin `execute` para nadie), así
+valen todos los caminos que validan (`validar_recollida`, el registro asistido, la asignación en un acto). No es un
+cambio de hora que avisar: `trg_canalitzacio_avis_canvis()` se salta `recollida_canviada` en ese acto. **Sin backfill**:
+lo ya validado no se toca, porque podría mover un certificado emitido (deuda 203).
+
 ### Propuesta de cambios, origen de la recogida y Realtime (19-11-2026, fase 5 de los puntos 4-6)
 
 - `20270610100000_proposar_canvis.sql`: `oferta_respuestas.aprovacio` admite **`proposada`** (el equipo propuso cambios y

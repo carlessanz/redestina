@@ -39,8 +39,7 @@ certificados. Dos fases construidas: **1. infraestructura WhatsApp** y **2. Rede
   (el resto, `131030`). Mensajería siempre individual (la Cloud API no escribe en grupos).
 - **Documentación fuera del repo**: `docs/` (ignorado; funcionales y credenciales) y la carpeta de
   Drive `…/03-Redestina/` (se escribe solo en `3. Claude Code/`, nunca datos personales; detalle en
-  `CLAUDE.md`). Jerarquía: *Definición de producto v3* (porqué) › *funcional 2026 v3* (qué) › guía
-  técnica (cómo).
+  `CLAUDE.md`; jerarquía de documentos en `context/01`).
 - **Planes vivos** (`3. Claude Code/`): plan 1 CRM (**1E solo en el clon**; a producción antes del 31-12).
 - Vocabulario: la tabla `excedentes` es la «oferta» de los textos («AFCV» en el funcional).
 
@@ -79,7 +78,7 @@ Prevenció (expediente provisional; el plan básico, retirado), espigueo, catál
 - 🔴 **Un solo ancho**: el del shell, `w-[96%]` + `max(0.5rem, safe-area)`; ningún `max-w` de página (`ample`, retirado).
 - **Barra inferior de móvil: cuatro entradas como máximo** (`barra: false`, `labelBarraKey`).
 - **PWA sin service worker** (`selfDestroying`); `/version.json` + `useVersioNova` avisan de versión.
-- **Siete reglas de móvil medidas** (en el detalle): controles ≥16 px, `Button` `whitespace-nowrap
+- **Siete reglas de móvil** (en el detalle): controles ≥16 px, `Button` `whitespace-nowrap
   shrink-0`, `safe-area-inset`; **auditar `scrollWidth > clientWidth` en los hijos**.
 - **Tablas**: sin scroll horizontal (secundarias `hidden md:table-cell`), acciones en `BotoIcona`
   (tooltip y `aria-label`); `colSpan` completo con `usePuntTall`. **Clicar la fila o el título abre
@@ -138,15 +137,14 @@ comarca (editable), `tipus_activitat[]`, `perfil_receptor` jsonb,
 origen de la importación, 1E y §6; registro en `importacions_entitats[_files]`, sin escritura directa), ambas colgando de
 **`organizaciones`** (identidad común, `organizacion_id not null` por trigger; una ficha de cada
 tipo por organización; solo guarda identidad y `canal_preferido`, escrito por
-`actualizar_meu_canal()`). Vista `v_organizaciones` (`security_invoker`). **Naturalesa (A5, `20270523100000`)**:
+`actualizar_meu_canal()`). Vista `v_organizaciones` (`security_invoker`). **Naturalesa (A5)**:
 `organizaciones.naturalesa` (entitat_social·empresa) + `naturalesa_origen` (suggerida·confirmada); la sugiere un trigger
 por el NIF (`naturalesa_suggerida()`, `context/04`) y **solo la confirmada surte efecto** (P8, §8; `naturalesaEfectiva()`). Regla en tabla `modalitat_naturalesa_compat`. `productor_ubicaciones`
-(lugares; A4: `dies_setmana`, `franges` ≤4 y **un solo `es_principal`**, índice + trigger). **Operativa (A4,
-`20270521100000`, T4)**: producción y comercialización; `productores_operativa` **poda** lo que no cuelga. Fiscal (`20270517100000`): `regim_iva`, `*_fiscal` (si hay domicilio fiscal,
+(lugares; A4: `dies_setmana`, `franges` ≤4 y **un solo `es_principal`**, índice + trigger). **Operativa (A4, T4)**: producción y comercialización; `productores_operativa` **poda** lo que no cuelga. Fiscal: `regim_iva`, `*_fiscal` (si hay domicilio fiscal,
 convenio y certificados lo usan: `dada_fiscal()`), `contacte_facturacio_*`; `data_alta` («Data d'alta a
 l'organització», editable, trigger si falta) y `created_at` («Alta a la plataforma», solo lectura), equipo.
 
-**Estado de las fichas** (1A; **B1 `20270518100000`**): `estat_crm` (potencial · en_desenvolupament ·
+**Estado de las fichas** (1A; **B1**): `estat_crm` (potencial · en_desenvolupament ·
 actiu · inactiu) **MANDA** y `activo = (estat_crm = 'actiu')` lo deriva `trg_fitxa_estat` (`update of
 activo, estat_crm`; el `activo` legado se traduce) y `*_estat_alta`. Organización activa si lo está algún
 papel (D7). Activar exige NIF válido y razón social (`falta_nif`·`nif_invalid`·`falta_rao_social`); todo
@@ -171,7 +169,7 @@ cuenta a una organización; los crean triggers); `intake_sessions`; `espigoladas
 
 **Catálogos**: `productos` (iconos en `public/icones-productes/`), `causas` (C1–C7; las 8 de antes, inactivas) + `subcausas` (`C<n>.<m>`),
 `factores_conversion`, `costes_producto` (coste de **referencia**, uno por producto, +hist; un manual **no es oficial**: `criteri`+`font_origen`),
-**precios de referencia por mes** (D1, `20270531100000`; `context/04`): `preus_referencia` (producto × año × mes
+**precios de referencia por mes** (D1; `context/04`): `preus_referencia` (producto × año × mes
 validado, +hist), `preus_carregues`/`preus_observats` (original en el bucket `preus-fonts`), `productes_fonts`,
 `preus_fonts_estat`; `productos.preu_manual`/`nombre_es`. `preu_referencia_de()` (interna) valora las canalizaciones (D2).
 `tipos_caja`, `municipios` (947, INE), `codis_postals`, `tipus_activitat`, `factors_impacte`,
@@ -196,7 +194,7 @@ sin borrado salvo `reiniciar_documentos_prova()` y `reiniciar_dades_operatives()
 `pg_cron` `documentos-pendientes` (5 intentos, dos contadores). **Cinco columnas fuera del GRANT
 de SELECT**: `enlaces_token.token_hash/codigo_hash`, `evidencias.documento_identidad`,
 `parametros_documentales.apoderada_dni`, `documentos.envio` → `select('*')` da `42501`; toda
-columna nueva de `documentos` nace sin SELECT. **Firma** (05-11-2026; `context/04`): la contraparte firma CD·CR·REC·ENT
+columna nueva de `documentos` nace sin SELECT. **Firma** (`context/04`): la contraparte firma CD·CR·REC·ENT
 (trazo o PDF subido) y CONV (subido); firma = **versión n+1 `subtipo='signat'`, mismo `sha256_datos`**, en
 `firmes_document`; un externo nunca firma en prueba; nada se bloquea por la firma. **Lo emitido no se reescribe**; solo en
 modo test el super_admin lo regenera con los datos de la Fundació de ahora (`regenerar_documents_fundacio`:
@@ -206,10 +204,11 @@ versión n+1, salta los firmados; Configuració › Fundació).
 borrador→emitido→entregado→confirmado→conciliado, anulado, `R-`). 🔴 **Un REC por recogida** (fase 3, `context/04`):
 la donación nace con ENT y **su REC** (`canalizacion_id`) y `validar_recollida` los emite y concilia en un acto; el REC
 heredado (uno por oferta) sigue su modelo sin mezclar. **Venta y maquila sin albarán**: validar las deja `conciliada`.
+🔴 **Validar fija la fecha REAL** en `data_hora_recollida` (trigger, `20270613100000`): albarán, cierre y certificado, el mismo día.
 PDF `albara1p`. `documentos_externos` (también de una canalización). **Convenios** (`convenios`: tipos `col_productor`/
 `col_receptor` (los antiguos valen por equivalencia); `origen` plataforma · paper · **declarat**; uno vigente por tipo; número al
 firmar; `convenio_vigente()`/`exigir_convenio()`; **fecha de corte encendida** desde el
-16-09-2026: sin convenio no se publica ni se muestra interés). **Certificado de donación** (05-11-2026, modelo Tabaquet; detalle en §4 del fichero):
+16-09-2026: sin convenio no se publica ni se muestra interés). **Certificado de donación** (modelo Tabaquet; `context/04`):
 🔴 **certificable = donación conciliada a entidad `social`** (`motiu_exclusio_certificat()`, único
 criterio); reparto 1:1 por REC (heredado, en proporción) y se descarta lo no certificable. Ámbitos **ejercicio**
 (`cierres_ejercicio`, `cierres_donante`, `datos_182()`), **intervalo** y **oferta** (`cierres_periodo`,
@@ -220,7 +219,7 @@ notas, `complet`/`falten`, `actualitzat_*`) y **excedentes en tablas propias** (
 `diagnostic_excedents` (principal × `causas.codigo`: frecuencia, kg —P7—, gestión actual, destinos = modalidades,
 `detall`) → `diagnostic_accions` (una por destino, estado y nota que ve la organización). Solo lectura por RLS; escribe
 el equipo por RPC (D5). Un principal que deja de serlo **conserva** su bloque, que no cuenta para `complet` (en vivo:
-`diagnostic_falten_productor`). **Cuestionario y plan básico, fuera de la base** (174/175, `20270524100000`;
+`diagnostic_falten_productor`). **Cuestionario y plan básico, fuera de la base** (174/175;
 D4): quedan los emitidos; el plan es el **expediente** (`expedients_prevencion` + `diagnostic_id`). Impacto:
 `impacte_*` sobre kilos conciliados.
 
@@ -310,7 +309,7 @@ Catálogos por migración (`20260721120300_seed_catalogos.sql`). Fichas, dos ví
   `previsualitzar_importacio_entitats` → `importar_entitats`; nueva = **`potencial`**. 🔴 **D11: idempotente y
   ACTUALIZA** (ID Redestina → NIF → `AIRTABLE:` → hash `IMP:`; con ID o NIF nunca crea; celda vacía no toca). Nunca
   toca `activo`, `estat_crm`, `es_test`, `ref_externa`. «Naturalesa» importada = confirmada.
-- **Exportación** (B3, `20270518110000`; §6.3): `exportar_entitats` → `lib/exportEntitats.ts`, formato de la
+- **Exportación** (B3; §6.3): `exportar_entitats` → `lib/exportEntitats.ts`, formato de la
   plantilla; **exportar → reimportar = `sense_canvis`**.
 
 🔴 **Vaciado (fase 6, `context/06`)**: `reiniciar_dades_operatives(p_executar)` (solo `service_role`; con algo real se
@@ -408,7 +407,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270612100000`. Tabla operativa nueva → `v_ordre` del vaciado (§6).
+  Compatibles hacia atrás con el frontend publicado. Última: `20270613100000`. Tabla operativa nueva → `v_ordre` del vaciado (§6).
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -479,7 +478,8 @@ correo; sin ninguno, `cap`. `canal_preferido` se respeta si es viable. Lo decide
   consentimientos (`consentiments`, huella del texto del servidor).
 - `donar-acces` (1D, JWT + `pot_aprovar`; sustituye a `alta-assistida`): cuenta si no la hay →
   `concedir_acces_org` → enlace `recovery` por correo; si falla, `revertir_acces_org`. Correo apagado
-  409 salvo `manual` (§8); modo test, solo `es_test`. Sin consentimientos (deuda 152).
+  409 salvo `manual` (§8); modo test, solo `es_test`. Sin consentimientos (deuda 152). Invitar = botón con el
+  avión (`Send`); **crear o importar fichas no envía nada** (`tests/e2e/correus-alta.e2e.ts`).
 - **Firma electrónica simple en todos los documentos**: el servidor compone y hashea lo firmado
   (`409 document_canviat`), nombre, cargo y DNI, trazo PNG ≤1 MB, IP y UA en `evidencias`; vías correo,
   asistida y panel. `pujar-document-signat`: formato por **bytes** (`_shared/pujada.ts`), permiso antes de leer.
@@ -540,15 +540,15 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones; 13 a qué causa nueva van FC y GD.
 
-**Deuda abierta (96 vivas; siguiente: 203; los números no se reutilizan)**. Casi todas, decisiones con precio o a la espera (§12bis). Defectos o trabajo pendiente: **5** (filtros en cliente) · **126**
+**Deuda abierta (97 vivas; siguiente: 204; los números no se reutilizan)**. Casi todas, decisiones con precio o a la espera (§12bis). Defectos o trabajo pendiente: **5** (filtros en cliente) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el resumen aún ofrece la factura) · **135** (D3 residual en snapshots y `v_albaranes_bandeja`) · **136** (sin code
 splitting) · **138** (CR sin rectificar ni «enviat») · **143**
 (entrantes con WhatsApp apagado: nadie los ve) · **146** (`organizacion_contactos` sin uso) · **149**
 (dos vistas sin uso) · **151** (rama muerta en `registro/alta.ts`)
-· **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
+· **152** (privacidad en «Dona-li accés»)
 · **153** (el ARA no crea ubicaciones) · **154** (código muerto del CT) · **155**
-(rectificar reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **181** (el texto no sigue al lugar) · **182** (fotos huérfanas al cancelar) · **183** (Mercabarna: un día sin job se pierde) · **184-187** (flecos de D2) · **188** (envases: columnas sin uso) · **189** (E2E de precios provisionales) · **190** (anular en espigolada no reabre) · **191** (fixture de externos) · **192** (modelo heredado hasta la fase 6) · **193·195-202** (flecos de las fases 5 y 6).
+(rectificar reimprime la fecha) · **156** (selector de ámbito del certificado) ·
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **181** (el texto no sigue al lugar) · **182** (fotos huérfanas al cancelar) · **183** (Mercabarna sin job) · **184-187** (flecos de D2) · **188** (envases: columnas sin uso) · **189** (E2E de precios provisionales) · **190** (anular en espigolada no reabre) · **191** (fixture de externos) · **192** (modelo heredado) · **193·195-202** (flecos de las fases 5 y 6) · **203** (validadas con fecha prevista).
 Decisiones de negocio pendientes (en `context/12`): **69**, **131**, **132** (el `tecnic` escribe directo),
 **133·134** (frenos), **137**, **141**, **148**. El resto (entradas 4–116), en §12bis.
 
@@ -560,9 +560,9 @@ Decisiones de negocio pendientes (en `context/12`): **69**, **131**, **132** (el
    **Referencia: 2.274 de Vitest (105 ficheros, 1 saltada) + 60 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.396/2.396 y 47 sin datos; producción 2.301/2.301 y 142 (20-11-2026).** Cifra
+   **Referencia: clon 2.401/2.401 y 42 sin datos; producción 2.301/2.301 y 142 (20-11-2026).** Cifra
    que cambia sin checks nuevos = cambio de **datos**. `prueba-numeracion.ts` si toca la numeración.
-4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).
+4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`; el circuito: `circuit-tomaquet`).
 5. Publicar con `/publicar` (base → funciones → frontend).
 6. Estilos solo con tokens; un token nuevo va a `tokens.json`, `index.css` y `preview.html`.
 7. **Actualizar este fichero (≤ 48 KB) y el `context/<sección>.md` que toque**; §1bis si cambia

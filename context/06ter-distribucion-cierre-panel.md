@@ -2792,3 +2792,18 @@ manual**: todo sale de ofertas, canalizaciones, espigoladas y albaranes.
 - **Importación de ARA y Airtable**: no está hecha; solo planteada en la carpeta de Drive
   (`3. Claude Code/2026-11-20-planteamiento-importacion-ara-airtable.md`). Lo importado como canalización saldrá aquí
   sin tocar la pantalla, porque la fila tiene una sola definición (`sortides_base`).
+
+### Circuito completo en E2E y textos de venta/maquila sin albarán (20-11-2026)
+
+`tests/e2e/circuit-tomaquet.e2e.ts` recorre la canalización entera con cambio de rol, contra el clon: la ofertante
+(`productor`) publica 500 kg de tomate (donación + maquila), el super_admin valida, la entidad social (`receptor-social`)
+pide 250 kg en donación y el obrador (`receptor-carles`) 250 kg en maquila; se aprueban, cada una registra su recogida,
+el equipo valida (ENT y REC conciliados para la donación; la maquila, conciliada sin albarán), se emiten los PDF, el
+certificado de donación de la oferta (solo los 250 kg sociales; la maquila sale en «excloses») y el CR del día de la
+entidad social, y la ofertante y las dos receptoras ven el cierre. El CR es uno por periodo: si otra pasada del mismo
+día ya lo emitió, ese paso se salta (no hay rectificación del CR, deuda 138).
+
+Al recorrerlo salieron dos cosas: la fecha prevista frente a la real (`context/04`, `20270613100000`) y que, en venta y
+maquila, el aviso de «recogida registrada» y la ficha de la operación **prometían albaranes** que no existen. Ahora usan
+claves propias (`rrec.ok_sense_albara`, `rrec.ok_diferencia_sense_albara`, `op.pendent_validacio_nota[_tu]_sense_albara`)
+y el E2E lo comprueba.

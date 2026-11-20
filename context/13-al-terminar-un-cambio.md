@@ -423,3 +423,8 @@
 - **20-11-2026 · «Entrades i sortides» (6.7, `20270612100000`)**: clon **2.396/2.396 y 47 sin datos** (+34 checks
   `SORTIDES_*`; la cifra 2.362 de la línea anterior ya los contaba solo en parte). Vitest **2.274 (105 ficheros, 1
   saltada)** + 60 de Deno. Producción, tras publicar la migración y borrar allí las cuentas `pendent`/`sense_rol`: **2.301/2.301 y 142 sin datos**.
+- **20-11-2026 · fecha real de la recogida validada (`20270613100000`) y E2E del circuito completo**: clon **2.401/2.401
+  y 42 sin datos** (mismo total, 2.443: cinco checks pasan de «sin datos» a comprobados por los datos que dejan
+  `circuit-tomaquet` y `correus-alta`; ningún check nuevo). Vitest **2.274 (105 ficheros, 1 saltada)**. E2E nuevos:
+  `circuit-tomaquet` 12 + 1 saltado (el CR del día, si otra pasada ya lo emitió) y `correus-alta` 4/4; regresión de
+  `recollida`, `recollida-un-acte`, `acces` y `enllacos-directes`, 28/28.

@@ -153,7 +153,11 @@ export default function RegistraRecollida({
     // Lo que ha quedado registrado, y que ahora le toca al equipo. Sin números de albarán:
     // todavía no existen.
     const kgDecl = r.data?.kg_declarats ?? kgFinal
-    toast.success(t(ambDiferencia ? 'rrec.ok_diferencia' : 'rrec.ok', { kg: fmtKg(kgDecl) }))
+    // Venta y maquila no llevan albarán (fase 3): no se promete ninguno.
+    const clau = venda
+      ? (ambDiferencia ? 'rrec.ok_diferencia_sense_albara' : 'rrec.ok_sense_albara')
+      : (ambDiferencia ? 'rrec.ok_diferencia' : 'rrec.ok')
+    toast.success(t(clau, { kg: fmtKg(kgDecl) }))
     setObert(false)
     onFet()
   }

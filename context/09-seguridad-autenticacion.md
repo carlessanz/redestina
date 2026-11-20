@@ -859,3 +859,15 @@ datos**. Para recuperarlos: alta por `/registre` y una cuenta sin membresía, y 
 La cuenta de **doble rol** (`hola+productor-receptor@`) tiene botón en `/login` («Doble rol de prova», grupo
 de Carles); se le puso una contraseña nueva aleatoria el 20-11-2026 (la vieja la había puesto Carles en
 `/registre`), solo en `src/lib/accessosTest.ts` —no en el JSON del arnés, que no tiene bloque `doble_rol`—.
+
+### Ningún correo al crear o importar fichas; invitar es el avión de papel (20-11-2026)
+
+Auditoría pedida por Carles: importar entidades en masa o crear una ficha nueva **no envía nada** (ni correo, ni
+WhatsApp, ni aviso, ni cuenta, ni membresía). El único correo de acceso sale de `donar-acces`, al pulsar el botón de
+`AccesEntitat` (o marcar la casilla «Dona-li accés a la plataforma ara» del alta, desmarcada por defecto y solo para quien
+`pot_aprovar`). Los dos botones de invitar y reenviar llevan el icono `Send` (avión de papel) y `data-testid`
+`acces-convida`/`acces-reenvia`. Lo vigila `tests/e2e/correus-alta.e2e.ts`: importa un xlsx con correos, crea una ficha
+con correo, dispara los jobs de avisos y de recordatorios y comprueba que no hay nada en la base, en Mailpit ni en el log
+de las funciones; luego invita a una sola ficha y comprueba que sale **un** correo, solo a ella.
+
+Matiz abierto: `pot_aprovar` incluye al rol `admin`, así que hoy invita el admin además del super_admin.

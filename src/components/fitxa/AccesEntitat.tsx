@@ -5,8 +5,13 @@
 // Edge Function `donar-acces` (crea la cuenta si no la hay y manda el correo para poner la
 // contraseña); «Desactiva l'accés», a `desactivar_acces_org()`. Qué sale y por qué está gris,
 // en `lib/accesEntitat.ts`.
+//
+// 🔴 Invitar a la plataforma = el avión de papel (`Send`, 20-11-2026): se reconoce por el icono.
+// Crear o importar una ficha no envía nada (lo vigila `tests/e2e/correus-alta.e2e.ts`); el correo
+// de acceso sale solo cuando alguien que puede aprobar pulsa aquí (o marca la casilla del alta).
 
 import { useCallback, useEffect, useState } from 'react'
+import { Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
@@ -111,14 +116,16 @@ export default function AccesEntitat({ orgId, correu, correuCanviat, entitatActi
       <div className="flex flex-wrap gap-2">
         {accions.donar && (
           <BotoAmbMotiu variant="outline" size="sm" disabled={ocupat || !!accions.donar.motiu}
-            motiu={accions.donar.motiu ? t(accions.donar.motiu) : undefined} onClick={() => void envia(false)}>
-            {t('acc.donar')}
+            motiu={accions.donar.motiu ? t(accions.donar.motiu) : undefined} onClick={() => void envia(false)}
+            data-testid="acces-convida">
+            <Send className="size-4" aria-hidden /> {t('acc.donar')}
           </BotoAmbMotiu>
         )}
         {accions.reenviar && (
           <BotoAmbMotiu variant="outline" size="sm" disabled={ocupat || !!accions.reenviar.motiu}
-            motiu={accions.reenviar.motiu ? t(accions.reenviar.motiu) : undefined} onClick={() => void envia(true)}>
-            {t('acc.reenviar')}
+            motiu={accions.reenviar.motiu ? t(accions.reenviar.motiu) : undefined} onClick={() => void envia(true)}
+            data-testid="acces-reenvia">
+            <Send className="size-4" aria-hidden /> {t('acc.reenviar')}
           </BotoAmbMotiu>
         )}
         {accions.desactivar && (

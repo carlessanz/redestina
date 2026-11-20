@@ -162,7 +162,9 @@ export default function FitxaOperacio(
           )}
           {motiuReceptor && <p className="text-muted-foreground">«{motiuReceptor}»</p>}
           <p className="text-muted-foreground">
-            {t(op.rol === 'entidad' ? 'op.pendent_validacio_nota_tu' : 'op.pendent_validacio_nota')}
+            {t(esVendaOMaquila(op.modalitat)
+              ? (op.rol === 'entidad' ? 'op.pendent_validacio_nota_tu_sense_albara' : 'op.pendent_validacio_nota_sense_albara')
+              : (op.rol === 'entidad' ? 'op.pendent_validacio_nota_tu' : 'op.pendent_validacio_nota'))}
           </p>
         </div>
       )}
