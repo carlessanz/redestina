@@ -128,3 +128,4 @@ se va solo **cómo se llegó hasta aquí**.
 | 142 | Los consentimientos RGPD no tenían exportación ni forma de pedirse a quien no se registró | `20270506100000` (export en «Entitats», petición por correo desde la ficha) |
 | 139 | El REC de una oferta mixta (donación y venta) se repartía solo entre las donaciones e inflaba el certificado | `20270509100000` + `20270509100700` (05-11-2026) |
 | 85 | El CT no tenía prueba end-to-end | 05-11-2026: el CT se retiró (`20270509100400`) |
+| 194 | Dos recogidas registradas sin `recollida_registrada_per` se quedaban con `recollida_origen` a null | 20-11-2026 (vaciado de producción, fase 6) |

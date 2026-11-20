@@ -314,7 +314,7 @@ Catálogos por migración (`20260721120300_seed_catalogos.sql`). Fichas, dos ví
 🔴 **Vaciado (fase 6, `context/06`)**: `reiniciar_dades_operatives(p_executar)` (solo `service_role`; con algo real se
 niega: `22023 hi_ha_dades_reals`) vía `scripts/reiniciar-dades.ts` (dry-run por defecto) borra la operativa y **todas** las fichas, conserva
 catálogos, configuración y cuentas, y reinicia las series; `scripts/sembrar-entitats-ficticies.ts` siembra 7 fichas
-`es_test` con el tipo en el nombre (TEST-PENDENT-ARNES, **no aprobar nunca**). Clon: hecho. Producción: pendiente.
+`es_test` con el tipo en el nombre (TEST-PENDENT-ARNES, **no aprobar nunca**). Clon y producción: hecho (20-11).
 
 ## 6bis. Intake conversacional (detalle en `context/06bis-…md`)
 
@@ -543,7 +543,7 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones; 13 a qué causa nueva van FC y GD.
 
-**Deuda abierta (97 vivas; siguiente: 203; los números no se reutilizan)**. Casi todas, decisiones con precio o a la espera (§12bis). Defectos o trabajo pendiente: **5** (filtros en cliente) · **126**
+**Deuda abierta (96 vivas; siguiente: 203; los números no se reutilizan)**. Casi todas, decisiones con precio o a la espera (§12bis). Defectos o trabajo pendiente: **5** (filtros en cliente) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el resumen aún ofrece la factura) · **135** (D3 residual en snapshots y `v_albaranes_bandeja`) · **136** (sin code
 splitting) · **138** (CR sin rectificar ni «enviat») · **143**
 (entrantes con WhatsApp apagado: nadie los ve) · **146** (`organizacion_contactos` sin uso) · **149**
@@ -551,11 +551,11 @@ splitting) · **138** (CR sin rectificar ni «enviat») · **143**
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
 · **153** (el ARA no crea ubicaciones) · **154** (código muerto del CT) · **155**
 (rectificar reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **181** (el texto no sigue al lugar) · **182** (fotos huérfanas al cancelar) · **183** (Mercabarna: un día sin job se pierde) · **184-187** (flecos de D2) · **188** (envases: columnas sin uso) · **189** (E2E de precios provisionales) · **190** (anular en espigolada no reabre) · **191** (fixture de externos) · **192** (modelo heredado hasta la fase 6) · **193-202** (flecos de las fases 5 y 6).
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **181** (el texto no sigue al lugar) · **182** (fotos huérfanas al cancelar) · **183** (Mercabarna: un día sin job se pierde) · **184-187** (flecos de D2) · **188** (envases: columnas sin uso) · **189** (E2E de precios provisionales) · **190** (anular en espigolada no reabre) · **191** (fixture de externos) · **192** (modelo heredado hasta la fase 6) · **193·195-202** (flecos de las fases 5 y 6).
 Decisiones de negocio pendientes (en `context/12`): **69**, **131**, **132** (el `tecnic` escribe directo),
 **133·134** (frenos), **137**, **141**, **148**. El resto (entradas 4–116), en §12bis.
 
-**§12bis** y **§12ter** (99 cerradas, indexadas) viven en `context/`.
+**§12bis** y **§12ter** (100 cerradas, indexadas) viven en `context/`.
 
 ## 13. Al terminar cualquier cambio
 
@@ -563,7 +563,7 @@ Decisiones de negocio pendientes (en `context/12`): **69**, **131**, **132** (el
    **Referencia: 2.235 de Vitest (104 ficheros, 1 saltada) + 60 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 3.021/3.021 y 47 sin datos; producción 3.010/3.010 y 40 (19-11-2026).** Cifra
+   **Referencia: clon 3.021/3.021 y 47 sin datos; producción 2.926/2.926 y 142 (20-11-2026).** Cifra
    que cambia sin checks nuevos = cambio de **datos**. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).
 5. Publicar con `/publicar` (base → funciones → frontend).

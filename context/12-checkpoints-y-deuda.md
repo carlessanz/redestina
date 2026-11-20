@@ -152,6 +152,8 @@ apuntarían a la nada. Un número retirado no se reutiliza jamás.
 ⚠️ **19-11-2026 (`20270610100000`…`100200`, fase 5 de los puntos 4-6): se abren de la 193 a la 197** (flecos de la propuesta de cambios y del envío automático de albaranes): **92 vivas** y la siguiente es la 198.
 
 ⚠️ **19-11-2026 (`20270611100000`, fase 6 de los puntos 4-6, vaciado): se abren de la 198 a la 202**: **97 vivas** y la siguiente es la 203. La **192** queda redefinida (en el clon ya no hay REC heredado de oferta ni OPE; falta retirar las ramas heredadas, sin olvidar que la espigolada usa REC sin canalización) y la **194** se cierra cuando se vacíe producción.
+
+⚠️ **20-11-2026 (vaciado de producción, fase 6): se cierra la 194** (las dos recogidas sin registrador desaparecieron con el vaciado): **96 vivas**; la siguiente sigue siendo la 203.
 ⚠️ **17-11-2026 (`20270528100000`, fase A del punto 3): se abre la 180** (el interés en maquila y `preu_minim`): **77 vivas** y la siguiente entrada nueva es la 181.
 ⚠️ **16-11-2026 (`20270527100000`): se abre la 179** (la facturación, solo por rango): **76 vivas** y la siguiente entrada nueva es la 180.
 ⚠️ **11-11-2026 (sin código): se cierran la 115 y la 116**, que hablaban del cuestionario y del plan básico retirados en `20270524100000`: **75 vivas** y la siguiente entrada nueva sigue siendo la 179.
@@ -968,8 +970,9 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      resuelve solo con el vaciado de la fase 6; después, retirar las ramas heredadas. Precio: una migración de limpieza.
 193. **No hay «retirar propuesta» propia** (19-11-2026, fase 5). El equipo la retira con `respondre_proposta(id, false)`
      por la vía asistida y en el rastro queda como un rechazo (`proposta_resposta_per` = quien del equipo). Precio: una RPC.
-194. **Dos recogidas registradas sin `recollida_registrada_per`** se quedan con `recollida_origen` a null (no se puede
-     saber quién las registró). Sin efecto práctico: no envían albaranes solos. Desaparece con el vaciado de la fase 6.
+194. ~~**Dos recogidas registradas sin `recollida_registrada_per`** se quedan con `recollida_origen` a null (no se puede
+     saber quién las registró). Sin efecto práctico: no envían albaranes solos. Desaparece con el vaciado de la fase 6.~~
+     **Cerrada el 20-11-2026**: producción se vació y esas filas ya no existen.
 195. **Sin aviso al equipo cuando la entidad responde una propuesta** (decidido). Si la rechaza, vuelve a la cola de
      Aprovacions; si acepta fuera de venta, el equipo solo lo ve por la canalización nueva y los contadores en vivo.
 196. **El envío automático de albaranes no se reintenta** (19-11-2026, fase 5): si el isolate muere tras

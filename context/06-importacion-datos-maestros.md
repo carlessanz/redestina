@@ -456,6 +456,15 @@ CONV y PLA siempre se emiten en `modo='real'`, por eso el criterio no es «todo 
   cuenta de pruebas y no a la de Carles. La siembra añade los correos de las cuentas de prueba a `email_test_recipients`.
 - **Clon (19-11-2026)**: 734 organizaciones (720 del ARA) y 6.398 filas operativas → 0; 662 ficheros borrados; series a
   0; ninguna cuenta borrada. Tras siembra y fixtures: arnés 3.021/3.021 y 47 sin datos; E2E de escritorio en verde.
-- **Producción**: pendiente de que Carles vea el dry-run y lo confirme. Pasos: migración con `aplicar-migracion.ts` →
-  `reiniciar-dades.ts` (dry-run; BLOQUEOS «cap») → `--executar --produccio` → `sembrar-entitats-ficticies.ts --dry-run` y
-  `--produccio` → arnés (nueva referencia). **Sin fixtures en producción.**
+- **Producción (20-11-2026, hecho, con la confirmación expresa de Carles tras ver el dry-run)**: migración con
+  `aplicar-migracion.ts` → `reiniciar-dades.ts` (dry-run) → `--executar --produccio` → `sembrar-entitats-ficticies.ts
+  --dry-run` y `--produccio` → arnés. **Sin fixtures en producción.** El primer dry-run dio un bloqueo
+  (`operativa_fitxes_reals`): una ficha de productor creada el 18-11 en la reunión, sin marcar como prueba y con un
+  convenio numerado; Carles confirmó que era una prueba, se marcó `es_test` y el segundo dry-run salió limpio.
+  Borradas 1.463 filas (17 organizaciones, 55 ofertas, 36 canalizaciones, 59 albaranes, 94 documentos, 20 convenios,
+  484 mensajes) y 142 ficheros; conservadas las 17 cuentas y los 5 roles; series a 0. Tras la siembra: 7
+  organizaciones, 8 fichas (todas `es_test`), 7 convenios declarados (`CONV-COL-PROD-2026-0001…3`,
+  `CONV-COL-REC-2026-0001…4`). Arnés: **2.926/2.926 y 142 sin datos** (producción no lleva fixtures).
+  ⚠️ El arnés dio 2 FALLAS falsas la primera vez: sin ninguna oferta, `@meva_oferta_publicada` caía al uuid nulo y
+  `esborrar_esborrany_oferta` respondía `42501` en vez de `22023`. Corregido en el arnés: una `rpc` con
+  `requiereFixture` cuyo marcador `@…` no encuentra fila se cuenta como saltada.
