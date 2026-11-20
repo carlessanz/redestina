@@ -994,4 +994,5 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
 203. **Las recogidas validadas antes de `20270613100000` conservan la fecha prevista** en `data_hora_recollida` aunque
      su albarán lleve la real (20-11-2026). No se hizo backfill porque podría mover un cierre o un certificado ya
      emitido. Arreglo: revisarlas una a una (`recollida_real_at <> data_hora_recollida and recollida_validada_at is not
-     null`) y corregir solo las que no tengan cierre; en producción, tras el vaciado, no debería quedar ninguna.
+     null`) y corregir solo las que no tengan cierre. **En producción, 0** al publicar la migración (20-11-2026): solo
+     afecta al clon.

@@ -427,4 +427,5 @@
   y 42 sin datos** (mismo total, 2.443: cinco checks pasan de «sin datos» a comprobados por los datos que dejan
   `circuit-tomaquet` y `correus-alta`; ningún check nuevo). Vitest **2.274 (105 ficheros, 1 saltada)**. E2E nuevos:
   `circuit-tomaquet` 12 + 1 saltado (el CR del día, si otra pasada ya lo emitió) y `correus-alta` 4/4; regresión de
-  `recollida`, `recollida-un-acte`, `acces` y `enllacos-directes`, 28/28.
+  `recollida`, `recollida-un-acte`, `acces` y `enllacos-directes`, 28/28. Producción, tras publicar la migración: **2.301/2.301 y
+  142 sin datos** (sin cambios).
