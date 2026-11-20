@@ -78,7 +78,10 @@ export default function NovaEntitat() {
   const { t } = useT()
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const potAprovar = useAppContext().ctx?.potAprovar ?? false
+  const ctx = useAppContext().ctx
+  const potAprovar = ctx?.potAprovar ?? false
+  // Invitar (mandar el correo de acceso) es solo del super_admin (20-11-2026).
+  const potConvidar = ctx?.esSuperAdmin ?? false
   const motiuAprovar = potAprovar ? undefined : t('appr.need_approver')
   const { confirma, dialeg: dialegConfirma } = useConfirma()
 
@@ -220,7 +223,7 @@ export default function NovaEntitat() {
       const { error: errNat } = await supabase.rpc('fixar_naturalesa', { p_org: org, p_naturalesa: natTriada })
       if (errNat) toast.warning(textError(t, errNat.message))
     }
-    if (org && ambAcces && !motiuAcces) {
+    if (org && potConvidar && ambAcces && !motiuAcces) {
       // El alta ya está hecha: un fallo aquí no la deshace, se dice y el acceso se da desde la ficha.
       const r = await donarAcces(org, correuAlta, { manual: !!motiuCorreu })
       if (r.ok) toast.success(t('acc.ok_donat', { email: correuAlta }))
@@ -397,7 +400,7 @@ export default function NovaEntitat() {
                 razón social, así que `crear_entitat()` la deja Actiu. */}
             <p className="text-sm text-muted-foreground" data-testid="ne-estat-inicial">{t('ne.estat_inicial')}</p>
             <FilaCasella checked={esTest} onChange={setEsTest}>{t('ne.es_test')}</FilaCasella>
-            {potAprovar && (
+            {potConvidar && (
               <div data-testid="ne-acces">
                 <FilaCasella checked={ambAcces && !motiuAcces} onChange={setAmbAcces} disabled={!!motiuAcces}>
                   {t('ne.dona_acces')}

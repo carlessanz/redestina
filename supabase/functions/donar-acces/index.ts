@@ -9,8 +9,9 @@
 // notificaciones apagadas (§8, `_shared/enviamentManual.ts`): ni el precheck ni `sendEmail`
 // miran entonces los interruptores. El modo test sigue mandando. Sin él, como antes.
 //
-// AUTORIZACIÓN: `exigirEquipo` y, encima, `pot_aprovar` (admin o super_admin): crear una cuenta
-// ya aprobada es aprobar un alta. Mismo idioma que tenía `alta-assistida`.
+// AUTORIZACIÓN: `exigirEquipo` y, encima, **solo el super_admin** (20-11-2026; antes `pot_aprovar`):
+// es el único correo que sale al crear o tocar una ficha, y Carles quiere que ninguno salga sin el
+// consentimiento del super_admin. Un admin recibe 403 `forbidden`.
 //
 // GATES, ANTES DE CREAR NADA:
 //   · el interruptor del correo (general Y `email_activo`, §8) apagado → 409 `correu_desactivat`.
@@ -76,8 +77,8 @@ Deno.serve(async (req) => {
     const { error, code, status } = auth.rechazo;
     return responder({ error, code }, status);
   }
-  if ((await rolesActivos(supabase)) && !auth.ctx.potAprovar) {
-    return responder({ error: "Només admin o super_admin poden donar accés", code: "forbidden" }, 403);
+  if ((await rolesActivos(supabase)) && auth.ctx.rol !== "super_admin") {
+    return responder({ error: "Només el super_admin pot convidar a la plataforma", code: "forbidden" }, 403);
   }
 
   // Lo que hay que deshacer si algo falla después de crearlo.

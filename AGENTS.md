@@ -476,7 +476,7 @@ correo; sin ninguno, `cap`. `canal_preferido` se respeta si es viable. Lo decide
   deduplica por correo/teléfono exactos (principales deniegan `409`, secundarias → revisión),
   anti-abuso proporcionado, no manda correo (aprobar sí). RGPD: privacidad obligatoria + dos
   consentimientos (`consentiments`, huella del texto del servidor).
-- `donar-acces` (1D, JWT + `pot_aprovar`; sustituye a `alta-assistida`): cuenta si no la hay →
+- `donar-acces` (1D, JWT + **solo super_admin**; era `alta-assistida`): cuenta si no la hay →
   `concedir_acces_org` → enlace `recovery` por correo; si falla, `revertir_acces_org`. Correo apagado
   409 salvo `manual` (§8); modo test, solo `es_test`. Sin consentimientos (deuda 152). Invitar = botón con el
   avión (`Send`); **crear o importar fichas no envía nada** (`tests/e2e/correus-alta.e2e.ts`).
@@ -557,7 +557,7 @@ Decisiones de negocio pendientes (en `context/12`): **69**, **131**, **132** (el
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.274 de Vitest (105 ficheros, 1 saltada) + 60 de Deno.**
+   **Referencia: 2.275 de Vitest (105 ficheros, 1 saltada) + 60 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
    **Referencia: clon 2.401/2.401 y 42 sin datos; producción 2.301/2.301 y 142 (20-11-2026).** Cifra

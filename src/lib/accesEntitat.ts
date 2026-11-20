@@ -7,8 +7,13 @@ export type EstatAcces = 'sense' | 'pendent' | 'enviat' | 'actiu' | 'desactivat'
 
 export interface CondicionsAcces {
   estat: EstatAcces
-  /** admin o super_admin: el `tecnic` ve el estado pero no da ni quita acceso. */
+  /** admin o super_admin: el `tecnic` ve el estado pero no quita acceso. */
   potAprovar: boolean
+  /**
+   * Solo el super_admin INVITA (manda el correo de acceso), 20-11-2026: ningún correo de acceso
+   * sale sin su consentimiento. El admin ve el botón gris con el motivo.
+   */
+  potConvidar: boolean
   /** Alguna ficha de la organización activa (`v_organizaciones.activa`). */
   entitatActiva: boolean
   /** El correo de la ficha, tal como está en el formulario. */
@@ -34,7 +39,7 @@ export interface AccionsAcces {
 
 /** Por qué no se puede mandar el correo de acceso ahora, o null si se puede. */
 function motiuEnviar(c: CondicionsAcces): string | null {
-  if (!c.potAprovar) return 'appr.need_approver'
+  if (!c.potConvidar) return 'acc.m_nomes_super_admin'
   if (!c.entitatActiva) return 'acc.m_inactiva'
   if (!c.correu.trim()) return 'acc.m_sense_correu'
   if (c.correuCanviat) return 'acc.m_desa_correu'

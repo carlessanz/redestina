@@ -870,4 +870,9 @@ WhatsApp, ni aviso, ni cuenta, ni membresía). El único correo de acceso sale d
 con correo, dispara los jobs de avisos y de recordatorios y comprueba que no hay nada en la base, en Mailpit ni en el log
 de las funciones; luego invita a una sola ficha y comprueba que sale **un** correo, solo a ella.
 
-Matiz abierto: `pot_aprovar` incluye al rol `admin`, así que hoy invita el admin además del super_admin.
+**Solo el super_admin invita** (decisión de Carles, 20-11-2026; antes bastaba `pot_aprovar`, que incluye al
+`admin`). Tres capas: `donar-acces` responde `403 forbidden` a quien no sea `super_admin` (con `roles_activos`
+encendido); en la ficha, «Dona-li accés» y «Torna a enviar» salen grises para el admin con el motivo
+`acc.m_nomes_super_admin` (`lib/accesEntitat.ts`, `potConvidar`), aunque **desactivar** el acceso sigue siendo de
+`pot_aprovar`; y el alta (`NovaEntitat`) solo enseña la casilla al super_admin. El E2E (`3b`) hace `admin` por un
+momento la cuenta `equip` del arnés y comprueba el botón gris, la casilla ausente y el 403 de la función.

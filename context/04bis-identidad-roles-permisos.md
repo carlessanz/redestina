@@ -495,7 +495,7 @@ super_admin lee, añade y borra (`22023`) y tampoco inserta directo.
 
 D5 + P1: **el alta del equipo es siempre sin acceso** (`crear_entitat`), y el acceso se da después,
 **sobre la organización que ya existe**, con un correo para que la persona ponga su contraseña. Lo hace
-la Edge Function `donar-acces` (§9) con cuatro RPC:
+la Edge Function `donar-acces` (§9; **solo el super_admin**, 20-11-2026) con cuatro RPC:
 
 | RPC | Quién | Qué hace |
 | --- | --- | --- |

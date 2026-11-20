@@ -18,7 +18,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import writeXlsxFile from 'write-excel-file/node'
-import { entra, motiuSaltClon, pestanya, sql, sqlCom } from './ajuda'
+import { compte, entra, motiuSaltClon, pestanya, sql, sqlCom } from './ajuda'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -177,6 +177,45 @@ test('3. tampoc després: els jobs que envien no escriuen a cap de les tres', as
   expect(rastreEnviament()).toBe('0|0|0|0|0')
   for (const c of TOTS) expect(await correusA(c), `correus a ${c}`).toBe(0)
   expect(logAmb(TOTS), 'línies del log de funcions amb aquests correus').toEqual([])
+})
+
+test('3b. un admin no pot convidar: el botó surt gris i donar-acces li respon 403', async ({ page }) => {
+  test.skip(!orgAlta, 'depèn del pas 2')
+  // La cuenta `equip` del arnés es `tecnic`; durante esta prueba se hace `admin` y se devuelve.
+  const correuEquip = compte('equip')!.email.replace(/'/g, "''")
+  const uid = sql(`select id from auth.users where email = '${correuEquip}'`)
+  const rolAbans = sql(`select rol from usuario_roles where user_id = '${uid}'`)
+  sql(`update usuario_roles set rol = 'admin' where user_id = '${uid}'`)
+  try {
+    const enviaments = escoltaEnviaments(page)
+    await entra(page, 'equip')
+    await page.goto(`/equip/entitats/${orgAlta}`)
+    await pestanya(page, 'contacte')
+    const boto = page.getByTestId('acces-convida')
+    await expect(boto).toBeVisible({ timeout: 30_000 })
+    await expect(boto).toBeDisabled()
+    await expect(page.getByTestId('acces-motiu')).toContainText(/només ho pot fer el super_admin|solo lo puede hacer el super_admin/)
+    // Y el alta tampoco ofrece la casilla.
+    await page.goto('/equip/entitats/nova')
+    await expect(page.getByRole('heading').first()).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByTestId('ne-acces')).toHaveCount(0)
+    expect(enviaments, 'la pantalla no ha cridat cap funció que enviï').toEqual([])
+    // La segunda red: la función, llamada a mano con su sesión.
+    const token = await page.evaluate(() => {
+      const clau = Object.keys(localStorage).find((k) => k.startsWith('sb-') && k.endsWith('-auth-token'))!
+      return JSON.parse(localStorage.getItem(clau)!).access_token as string
+    })
+    const r = await page.request.post('http://127.0.0.1:55321/functions/v1/donar-acces', {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      data: { organizacion_id: orgAlta, email: correuAlta, manual: true },
+    })
+    const resposta = `${r.status()}|${((await r.json()) as { code?: string }).code ?? ''}`
+    expect(resposta).toBe('403|forbidden')
+    expect(await correusA(correuAlta)).toBe(0)
+    expect(sql(`select count(*) from auth.users where email = '${correuAlta}'`)).toBe('0')
+  } finally {
+    sql(`update usuario_roles set rol = '${rolAbans}' where user_id = '${uid}'`)
+  }
 })
 
 test('4. convidar és el botó de l’avió de paper: una crida i un sol correu, al contacte de la fitxa', async ({ page }) => {

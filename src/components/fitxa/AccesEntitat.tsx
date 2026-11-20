@@ -8,7 +8,8 @@
 //
 // 🔴 Invitar a la plataforma = el avión de papel (`Send`, 20-11-2026): se reconoce por el icono.
 // Crear o importar una ficha no envía nada (lo vigila `tests/e2e/correus-alta.e2e.ts`); el correo
-// de acceso sale solo cuando alguien que puede aprobar pulsa aquí (o marca la casilla del alta).
+// de acceso sale solo cuando el SUPER_ADMIN pulsa aquí (o marca la casilla del alta); el admin lo ve gris,
+// y `donar-acces` responde 403 a quien no lo sea.
 
 import { useCallback, useEffect, useState } from 'react'
 import { Send } from 'lucide-react'
@@ -39,13 +40,15 @@ const COLOR: Record<EstatAcces, string> = {
   desactivat: 'bg-muted text-muted-foreground',
 }
 
-export default function AccesEntitat({ orgId, correu, correuCanviat, entitatActiva, potAprovar, motiuCorreu, onCanviat }: {
+export default function AccesEntitat({ orgId, correu, correuCanviat, entitatActiva, potAprovar, potConvidar, motiuCorreu, onCanviat }: {
   orgId: string
   /** El correo de la ficha, tal como está en el formulario. */
   correu: string
   correuCanviat: boolean
   entitatActiva: boolean
   potAprovar: boolean
+  /** Solo el super_admin invita (20-11-2026). */
+  potConvidar: boolean
   motiuCorreu: string | null
   /** El acceso ha cambiado: quien monta esto recarga la ficha (estado del listado, correo). */
   onCanviat: () => void
@@ -94,7 +97,7 @@ export default function AccesEntitat({ orgId, correu, correuCanviat, entitatActi
 
   if (!estat) return <p className="text-sm text-muted-foreground">{t('c.loading')}</p>
 
-  const accions = accionsAcces({ estat: estat.estat, potAprovar, entitatActiva, correu, correuCanviat, motiuCorreu })
+  const accions = accionsAcces({ estat: estat.estat, potAprovar, potConvidar, entitatActiva, correu, correuCanviat, motiuCorreu })
   const detall = [
     estat.compte_email && t('acc.d_compte', { email: estat.compte_email }),
     estat.estat === 'enviat' && estat.enviat_at && t('acc.d_enviat', { data: dataCurta(estat.enviat_at) }),

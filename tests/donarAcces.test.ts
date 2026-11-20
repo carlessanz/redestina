@@ -87,7 +87,7 @@ describe('errorConcedir: los rechazos de concedir_acces_org()', () => {
 
 describe('accionsAcces: los botones del bloque «Contacte i accés»', () => {
   const base: CondicionsAcces = {
-    estat: 'sense', potAprovar: true, entitatActiva: true, correu: 'a@x.cat', correuCanviat: false, motiuCorreu: null,
+    estat: 'sense', potAprovar: true, potConvidar: true, entitatActiva: true, correu: 'a@x.cat', correuCanviat: false, motiuCorreu: null,
   }
 
   it('sin cuenta: solo «Dona-li accés», y se puede pulsar', () => {
@@ -103,12 +103,19 @@ describe('accionsAcces: los botones del bloque «Contacte i accés»', () => {
     expect(accionsAcces({ ...base, estat: 'pendent' })).toEqual({ donar: null, reenviar: null, desactivar: null })
   })
   it('los motivos, en orden: permiso, entidad inactiva, sin correo, correo sin desar', () => {
-    expect(accionsAcces({ ...base, potAprovar: false, entitatActiva: false }).donar?.motiu).toBe('appr.need_approver')
+    expect(accionsAcces({ ...base, potConvidar: false, entitatActiva: false }).donar?.motiu).toBe('acc.m_nomes_super_admin')
     expect(accionsAcces({ ...base, entitatActiva: false, correu: '' }).donar?.motiu).toBe('acc.m_inactiva')
     expect(accionsAcces({ ...base, correu: '  ', correuCanviat: true }).donar?.motiu).toBe('acc.m_sense_correu')
     expect(accionsAcces({ ...base, correuCanviat: true, motiuCorreu: 'canal.motiu_email' }).donar?.motiu).toBe('acc.m_desa_correu')
     // Con el correo apagado ya no sale gris: es un envío manual (§8, 04-11-2026).
     expect(accionsAcces({ ...base, motiuCorreu: 'canal.motiu_email' }).donar?.motiu).toBeNull()
+  })
+  it('solo el super_admin invita: el admin ve «Dona-li accés» y «Torna a enviar» grises, pero desactiva', () => {
+    const admin = { ...base, potConvidar: false }
+    expect(accionsAcces(admin).donar).toEqual({ motiu: 'acc.m_nomes_super_admin' })
+    const actiu = accionsAcces({ ...admin, estat: 'actiu' })
+    expect(actiu.reenviar).toEqual({ motiu: 'acc.m_nomes_super_admin' })
+    expect(actiu.desactivar).toEqual({ motiu: null })
   })
   it('desactivar no depende del correo, solo del permiso', () => {
     const a = accionsAcces({ ...base, estat: 'actiu', correu: '', motiuCorreu: 'canal.motiu_notificacions' })

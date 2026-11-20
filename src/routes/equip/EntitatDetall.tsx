@@ -473,7 +473,7 @@ export default function EntitatDetall() {
               <BlocCamps {...blocProps} camps={camps('contacte')} />
               <AccesEntitat orgId={org.id} correu={correu}
                 correuCanviat={correu.toLowerCase() !== String(inicial.email ?? '').trim().toLowerCase()}
-                entitatActiva={Boolean(org.activa)} potAprovar={potAprovar} motiuCorreu={motiuEmail}
+                entitatActiva={Boolean(org.activa)} potAprovar={potAprovar} potConvidar={potEsborrar} motiuCorreu={motiuEmail}
                 onCanviat={recarrega} />
               <CanalPreferit canal={canal} onChange={setCanal} potEditar telefon={telefon} correu={correu} id="ed-canal" />
             </Seccio>
