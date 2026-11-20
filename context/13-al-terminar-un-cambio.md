@@ -422,4 +422,4 @@
 
 - **20-11-2026 · «Entrades i sortides» (6.7, `20270612100000`)**: clon **2.396/2.396 y 47 sin datos** (+34 checks
   `SORTIDES_*`; la cifra 2.362 de la línea anterior ya los contaba solo en parte). Vitest **2.274 (105 ficheros, 1
-  saltada)** + 60 de Deno. Producción: la nueva referencia se mide tras publicar la migración.
+  saltada)** + 60 de Deno. Producción, tras publicar la migración y borrar allí las cuentas `pendent`/`sense_rol`: **2.301/2.301 y 142 sin datos**.
