@@ -2978,6 +2978,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       tabla: "esborrar_esborrany_oferta", op: "rpc", esperado: "permitir", errorExigit: "22023",
       args: { p_id: "@meva_oferta_publicada" },
       descripcion: "NO esborra una oferta seva ja publicada (22023 no_es_esborrany)",
+      requiereFixture: "una oferta publicada del productor (sin ninguna, el uuid nulo da 42501)",
     },
     {
       tabla: "excedentes",
@@ -3912,7 +3913,16 @@ async function comprobar(cliente: SupabaseClient, check: Check): Promise<{ ok: b
 
   if (check.op === "rpc") {
     const funcion = check.rpc ?? check.tabla;
-    const { data, error } = await cliente.rpc(funcion, await resolverArgs(cliente, check.args ?? {}));
+    const args = await resolverArgs(cliente, check.args ?? {});
+    // Un marcador `@…` que no encuentra fila cae al uuid nulo. Si el check declara su
+    // `requiereFixture`, eso es «sin datos», no una prueba: sin ninguna oferta (producción
+    // recién vaciada, fase 6) `@meva_oferta_publicada` daba 42501 en vez de 22023 —el permiso
+    // va antes que la existencia— y salía FALLA sin que nada de los permisos hubiera cambiado.
+    if (check.requiereFixture !== undefined && Object.entries(check.args ?? {}).some(
+      ([k, v]) => typeof v === "string" && v.startsWith("@") && args[k] === UUID_NULO)) {
+      return { ok: check.esperado === "permitir", detalle: "0 filas: el marcador no encuentra fila" };
+    }
+    const { data, error } = await cliente.rpc(funcion, args);
     if (error) {
       if (esRechazo(error)) {
         return { ok: check.esperado === "denegar", detalle: `rechazado (${error.code ?? "42501"})` };
