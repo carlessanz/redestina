@@ -2725,3 +2725,33 @@ Excel 5.2 (nivel 2), 6.3 y 6.5 (nivel 2).
   prueba (antes no: contra §8).
 - E2E `tests/e2e/proposar-canvis.e2e.ts` (8: aceptar por enlace, rechazar con motivo, el técnico no ve el botón, badge
   por Realtime sin navegar, 360 px).
+
+### Listado de Ofertes del equipo: fecha, ofertante y grado de aprovechamiento (20-11-2026)
+
+Petición de Carles: identificar rápido cada oferta, quién la hizo y cuánto se ha aprovechado. Solo toca
+`components/OffersList.tsx` y `lib/llistatOfertes.ts`; **sin migraciones ni funciones** (`git push` y listo).
+- **Columnas** (`/equip/ofertes`): Referència · **Data** · **Ofertant** · Producte (con «N kg oferts» debajo) · Progrés (kg)
+  · Estat · acción. Los **receptores NO son columna**: una oferta se reparte entre varios y se consultan en el detalle
+  (asignaciones, recogidas y salidas). Clicar la fila o el título sigue abriendo el detalle (`FilaClicable`/`TitolFila`).
+- **Ofertante** = `productores(name, empresa)` embebido en el mismo `select('*, productores(name, empresa)')` de Actives,
+  Esborranys y Històric (sin consulta nueva); `nomOfertant()` da la empresa y, si no, la persona. El buscador de las
+  pestañas de cliente **también encuentra por ofertante**; el del Històric (en servidor) sigue siendo por referencia,
+  producto y variedad.
+- **Progrés** (`kgDeLaFila()`): barra + «X de Y kg amb sortida» + «falten Z kg» (o «complet»). «Con salida» = kilos de las
+  canalizaciones **vivas** (`kgPerOferta`; las anuladas no cuentan, como ya hacía la barra); lo pendiente nunca es
+  negativo y el porcentaje se corta en 100. Un esborrany no tiene barra, solo los kg que lleva escritos. `role="progressbar"`
+  con `aria-label`.
+- **Orden cronológico**: la cabecera «Data» es un botón (`data-testid="ordre-data"`, `aria-sort`) que alterna
+  recent ↔ antiga, y el desplegable «Ordena per» suma «Més antigues» (`ordenaPerData()`: las filas sin fecha, siempre al
+  final; a igual fecha, desempate por id, estable entre recargas). El orden por fecha de alta; «Disponibilitat» sigue.
+  En el **Històric** el mismo botón/desplegable ordena **por cierre** (`tancada_at`, las canceladas detrás por alta) y
+  va al servidor: cambiarlo vuelve a la página 1. La fecha que se ve en la columna es siempre la de alta.
+- **Responsive sin scroll horizontal**: el menú lateral se come ~250 px, así que a 1024 px la tabla solo tiene ~700. La
+  fecha y el progreso ganan columna desde `md`; el **ofertante desde `xl`** y la **referencia desde `2xl`** (antes, `xl`).
+  Mientras no tienen columna salen bajo el nombre del producto (móvil: fecha · ofertante, kilos con salida y pendientes,
+  y referencia). Medido a 375, 1024 y 1440 px: `scrollWidth == clientWidth`.
+- i18n nuevas (ca/es): `off.c_data`, `off.c_ofertant`, `off.kg_oferts`, `off.kg_sortida`, `off.ordre_data_recent|antiga`,
+  `fl.o_antiga`, `fl.o_tancament_recent|antic`.
+- Tests: `tests/llistatOfertes.test.ts` (+`nomOfertant`, `kgDeLaFila`, `ordenaPerData`, claves) y E2E
+  `tests/e2e/ofertes-llistat.e2e.ts` (solo lectura: columnas, sin receptores, orden y `?tab=`, apertura del detalle; en
+  escritorio y móvil). Comprobado contra el clon.

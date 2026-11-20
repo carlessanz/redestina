@@ -356,11 +356,10 @@ Lo que manda hoy, en una línea cada uno:
 - **Alta de oferta por bloques** (`FormulariNovaOferta`): el lugar trae municipio, Maps, días y franja;
   disponible = hoy + 2; **causa por su subcausa** (`lib/causes.ts`).
 - **Productes** (D1-D2, `context/06ter`): Catàleg · Preus de referència · Càrregues (`?pestanya=`, `?mes=`).
-- **Ofertes del equipo** (`context/06ter`): «Més recents» por defecto; pestañas Per validar · Actives (con
-  `no_colocada`) · Esborranys · **Històric** (`cerrada`+`cancelada`, paginado en servidor; `?tab=` en la URL); el paso del
-  proceso bajo el badge (`lib/llistatOfertes.ts`). Canalització, sin las cerradas. **Selectores predictivos**
-  (`SelectorEntitat`) y buscador en Aprovacions, Tancament y Plans. **«Transformació en obrador
-  (maquila)»** en la interfaz (en base, `maquila`).
+- **Ofertes del equipo** (`context/06ter`): columnas Data (ordena) · Ofertant · Producte (+kg oferts) · Progrés (kg con
+  salida y pendientes) · Estat, **sin receptores** (van al detalle); pestañas Per validar · Actives · Esborranys ·
+  **Històric** (servidor; `?tab=`); paso del proceso bajo el badge (`lib/llistatOfertes.ts`). Canalització, sin cerradas.
+  **Selectores predictivos** (`SelectorEntitat`) y buscador en Aprovacions, Tancament y Plans; «Transformació en obrador» = `maquila`.
 - **Gestión autónoma del super_admin**: convenio **declarado**, **asignación en un acto** («Registrar i confirmar
   recollida»; el técnico solo registra interés), Modifica/Anul·la en la ficha, recogida asistida, mensajes para copiar
   (`MissatgesDelPunt`); **Ciclo guiado** `/equip/canalitzacio/:id` (17 pasos, 6 fases, RPC reales).

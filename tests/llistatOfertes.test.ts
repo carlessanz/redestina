@@ -3,8 +3,8 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  CLAUS_PAS_LLISTAT, ESTATS_ACTIUS, ESTATS_HISTORIC, filtreCercaHistoric, kgPerOferta, limitsDies,
-  llegeixPestanya, nombrePagines, pasDeLaFila, patroIlike, rangPagina, resumPerOferta, textPagina,
+  CLAUS_PAS_LLISTAT, ESTATS_ACTIUS, ESTATS_HISTORIC, filtreCercaHistoric, kgDeLaFila, kgPerOferta, limitsDies,
+  llegeixPestanya, nombrePagines, nomOfertant, ordenaPerData, pasDeLaFila, patroIlike, rangPagina, resumPerOferta, textPagina,
   type CanalLlistat, type OfertaLlistat,
 } from '../src/lib/llistatOfertes'
 import { DICTS } from '../src/lib/i18n'
@@ -199,5 +199,60 @@ describe('límites del rango de fechas de cierre', () => {
   it('sin fechas o con una mal escrita, sin límite', () => {
     expect(limitsDies('', '')).toEqual({ gte: null, lt: null })
     expect(limitsDies('ahir', '2026-13-45')).toEqual({ gte: null, lt: null })
+  })
+})
+
+describe('columnas del listado (20-11-2026)', () => {
+  it('nomOfertant: empresa, si no persona, si no «—»', () => {
+    expect(nomOfertant({ name: 'Anna', empresa: 'Hort del Pla' })).toBe('Hort del Pla')
+    expect(nomOfertant({ name: 'Anna', empresa: '  ' })).toBe('Anna')
+    expect(nomOfertant({ name: null, empresa: null })).toBe('—')
+    expect(nomOfertant(null)).toBe('—')
+    expect(nomOfertant(undefined)).toBe('—')
+  })
+
+  it('kgDeLaFila: ofrecidos, con salida, pendientes y porcentaje acotado', () => {
+    expect(kgDeLaFila(100, 40)).toEqual({ total: 100, canalitzats: 40, falten: 60, pct: 40 })
+    expect(kgDeLaFila('250', 250)).toEqual({ total: 250, canalitzats: 250, falten: 0, pct: 100 })
+    // Asignado de más: lo pendiente no es negativo y la barra no pasa del 100 %.
+    expect(kgDeLaFila(100, 130)).toEqual({ total: 100, canalitzats: 130, falten: 0, pct: 100 })
+    // Sin kilos ofrecidos (un esborrany vacío): sin porcentaje, sin división por cero.
+    expect(kgDeLaFila(null, 0)).toEqual({ total: 0, canalitzats: 0, falten: 0, pct: 0 })
+    expect(kgDeLaFila(100, -5).canalitzats).toBe(0)
+  })
+
+  it('kgDeLaFila cuadra con kgPerOferta: una canalización anulada no cuenta', () => {
+    const k = kgPerOferta([canal({ kg_confirmados: 30 }), canal({ kg_confirmados: 50, estado: 'anulada' })])
+    expect(kgDeLaFila(100, k.o1 ?? 0).falten).toBe(70)
+  })
+
+  it('ordenaPerData: sentido, huecos al final y desempate estable', () => {
+    const f = [
+      { id: 'b', d: '2026-11-10T10:00:00Z' },
+      { id: 'x', d: null },
+      { id: 'a', d: '2026-11-10T10:00:00Z' },
+      { id: 'c', d: '2026-11-18T10:00:00Z' },
+      { id: 'z', d: '2026-11-01T10:00:00Z' },
+    ]
+    const ids = (r: typeof f) => r.map((o) => o.id)
+    expect(ids(ordenaPerData(f, (o) => o.d, 'recent', (o) => o.id))).toEqual(['c', 'b', 'a', 'z', 'x'])
+    expect(ids(ordenaPerData(f, (o) => o.d, 'antiga', (o) => o.id))).toEqual(['z', 'a', 'b', 'c', 'x'])
+    // A igual fecha el desempate sigue el sentido (orden exactamente inverso). No toca el original.
+    expect(ids(f)).toEqual(['b', 'x', 'a', 'c', 'z'])
+  })
+})
+
+describe('claves i18n de las columnas nuevas', () => {
+  const claus = ['off.c_data', 'off.c_ofertant', 'off.kg_oferts', 'off.kg_sortida', 'off.ordre_data_recent',
+    'off.ordre_data_antiga', 'fl.o_antiga', 'fl.o_tancament_recent', 'fl.o_tancament_antic']
+  it.each(claus)('%s existe en ca y es', (c) => {
+    expect(DICTS.ca[c]).toBeTruthy()
+    expect(DICTS.es[c]).toBeTruthy()
+  })
+  it('las que llevan variables las llevan en los dos idiomas', () => {
+    expect(DICTS.ca['off.kg_sortida']).toMatch(/\{a\}.*\{b\}/)
+    expect(DICTS.es['off.kg_sortida']).toMatch(/\{a\}.*\{b\}/)
+    expect(DICTS.ca['off.kg_oferts']).toContain('{n}')
+    expect(DICTS.es['off.kg_oferts']).toContain('{n}')
   })
 })

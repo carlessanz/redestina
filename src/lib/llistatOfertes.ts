@@ -205,6 +205,72 @@ export function fetsDeLlistat(o: OfertaLlistat, r: ResumOferta | undefined, ara:
   }
 }
 
+// --- Qué enseña cada columna (20-11-2026) ------------------------------------------------
+//
+// El listado se lee de izquierda a derecha como una pregunta: ¿cuál es la oferta (referencia),
+// cuándo entró (fecha), quién la hizo (ofertante), qué es y cuánto había (producto y kilos
+// ofrecidos), cuánto se ha colocado (barra), en qué estado está. Los receptores NO van en el
+// listado: una oferta se reparte entre varios y eso se ve en su detalle, no aquí.
+
+/** La productora tal y como la devuelve el embebido `productores(name, empresa)`. */
+export interface OfertantLlistat {
+  name: string | null
+  empresa: string | null
+}
+
+/** El nombre que se ve: la empresa y, si no hay, la persona; «—» sin ninguna. */
+export function nomOfertant(p: OfertantLlistat | null | undefined): string {
+  return p?.empresa?.trim() || p?.name?.trim() || '—'
+}
+
+/** Los kilos de la barra: ofrecidos, con salida, pendientes y el porcentaje (0–100, entero). */
+export interface KgOferta {
+  total: number
+  canalitzats: number
+  falten: number
+  pct: number
+}
+
+/**
+ * Kilos ofrecidos frente a los que ya tienen salida (canalizaciones vivas: `kgPerOferta`).
+ * Lo pendiente nunca es negativo y el porcentaje no pasa del 100 aunque se asigne de más.
+ */
+export function kgDeLaFila(total: number | string | null | undefined, canalitzats: number): KgOferta {
+  const t = Number(total ?? 0)
+  const c = Math.max(0, canalitzats)
+  return {
+    total: t,
+    canalitzats: c,
+    falten: Math.max(0, t - c),
+    pct: t > 0 ? Math.min(100, Math.round((c / t) * 100)) : 0,
+  }
+}
+
+/** El sentido de la fecha: `recent` = lo último arriba, `antiga` = lo primero arriba. */
+export type OrdreData = 'recent' | 'antiga'
+
+/**
+ * Ordena por una fecha ISO. Las filas sin fecha van SIEMPRE al final (no se mezclan con las
+ * más antiguas ni con las más recientes) y, a igual fecha, `desempat` decide para que el
+ * orden sea estable entre recargas. No toca el original.
+ */
+export function ordenaPerData<T>(
+  files: readonly T[],
+  data: (f: T) => string | null | undefined,
+  ordre: OrdreData,
+  desempat: (f: T) => string = () => '',
+): T[] {
+  const sentit = ordre === 'antiga' ? 1 : -1
+  return [...files].sort((a, b) => {
+    const da = data(a) ?? ''
+    const db = data(b) ?? ''
+    if (!da && !db) return 0
+    if (!da) return 1
+    if (!db) return -1
+    return sentit * (da.localeCompare(db) || desempat(a).localeCompare(desempat(b)))
+  })
+}
+
 // --- La frase de la fila ----------------------------------------------------------------
 
 /** La línea corta bajo el badge: una clave, lo que interpola y si le toca al equipo. */
