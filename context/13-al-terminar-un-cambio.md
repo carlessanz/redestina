@@ -419,3 +419,7 @@
 
 - **20-11-2026 · cuentas `pendent`/`sense_rol` del arnés borradas**: clon **2.362/2.362 y 47 sin datos** (antes 3.021: las dos cuentas
   sostenían ~659 checks, casi todos de `DOCUMENTAL_EXTERN`). Producción conserva su cifra hasta que se borren allí (`context/09`).
+
+- **20-11-2026 · «Entrades i sortides» (6.7, `20270612100000`)**: clon **2.396/2.396 y 47 sin datos** (+34 checks
+  `SORTIDES_*`; la cifra 2.362 de la línea anterior ya los contaba solo en parte). Vitest **2.274 (105 ficheros, 1
+  saltada)** + 60 de Deno. Producción: la nueva referencia se mide tras publicar la migración.

@@ -33,6 +33,7 @@ import Missatgeria from '../routes/equip/Missatgeria'
 import Documents from '../routes/equip/Documents'
 import Albarans from '../routes/equip/Albarans'
 import AlbaraDetall from '../routes/equip/AlbaraDetall'
+import EntradesSortides from '../routes/equip/EntradesSortides'
 import Canalitzacio from '../routes/equip/Canalitzacio'
 import CanalitzacioDetall from '../routes/equip/CanalitzacioDetall'
 import { EspigoladaDetall, Espigolades, NovaEspigolada } from '../routes/equip/Espigolades'
@@ -159,6 +160,9 @@ export const router = createBrowserRouter([
                   { path: 'documents', element: <Documents />, handle: { titleKey: 'nav.documents' } },
                   { path: 'albarans', element: <Albarans />, handle: { titleKey: 'nav.albarans' } },
                   { path: 'albarans/:id', element: <AlbaraDetall />, handle: { titleKey: 'nav.albarans' } },
+                  // «Entrades i sortides» (punto 6.7): una fila por salida, el resumen y el Excel.
+                  // `?pestanya=sortides|resum`, `?per=` y `?canalitzacio=` (la ficha) en la URL.
+                  { path: 'entrades-sortides', element: <EntradesSortides />, handle: { titleKey: 'nav.entrades_sortides' } },
                   { path: 'espigolades', element: <Espigolades />, handle: { titleKey: 'nav.espigolades' } },
                   { path: 'espigolades/nova', element: <NovaEspigolada />, handle: { titleKey: 'nav.espigolades' } },
                   { path: 'espigolades/:id', element: <EspigoladaDetall />, handle: { titleKey: 'nav.espigolades' } },

@@ -2755,3 +2755,40 @@ Petición de Carles: identificar rápido cada oferta, quién la hizo y cuánto s
 - Tests: `tests/llistatOfertes.test.ts` (+`nomOfertant`, `kgDeLaFila`, `ordenaPerData`, claves) y E2E
   `tests/e2e/ofertes-llistat.e2e.ts` (solo lectura: columnas, sin receptores, orden y `?tab=`, apertura del detalle; en
   escritorio y móvil). Comprobado contra el clon.
+
+## «Entrades i sortides» (punto 6.7, 20-11-2026, `20270612100000`)
+
+Vista global de las **salidas de producto** del equipo, la equivalente a la hoja `Aprofitat` del ARA: una fila por
+salida (una `canalizaciones`) de un ofertante a un receptor, sin agrupar por oferta y sin Espigoladors como
+intermediario. Las ofertas sin ninguna salida no salen: se consultan en «Ofertes». **No hay tablas nuevas ni registro
+manual**: todo sale de ofertas, canalizaciones, espigoladas y albaranes.
+
+- **Ruta** `/equip/entrades-sortides` (menú «Operació», después de «Albarans»; `barra: false`), pantalla
+  `routes/equip/EntradesSortides.tsx`, componentes en `components/sortides/` (`FranjaXifres`, `TaulaSortides`,
+  `TaulaResum`, `DialegSortida`) y módulo puro `lib/sortides.ts` (filtros → argumentos de la RPC, etiquetas, filas y
+  hojas del Excel; `tests/sortides.test.ts`).
+- **La fila**: fecha de salida (`coalesce(recollida_real_at, data_hora_recollida, conciliada_at, created_at)`, hora de
+  Madrid) · ofertante (`coalesce(excedentes.productor_id, espigoladas.productor_id)`) · producto y variedad · receptor ·
+  kg de salida (`kg_confirmados`) · kg recogidos (`coalesce(kg_conciliados, kg_reales)`) · modalidad (`donacio`,
+  `venda`, `maquila` y **`espigolada`** = donación sobre un excedente con `espigolada_id`, «Espigolada – Donació») ·
+  estado (el de la recogida, `estat_recollida_canalitzacio()`, más `anulada`). Las anuladas solo salen filtrando por
+  ellas. La zona es la comarca de la oferta o, si falta, la de la ficha del ofertante.
+- **Filtros** (`BarraFiltres`, guardados con `useFiltresLlistat('equip-entrades-sortides')`): fechas, ofertante,
+  receptor, producto, zona, modalidad, estado y texto. Las opciones salen de `entrades_sortides_resum` sin filtros.
+- **Pestañas** (`?pestanya=sortides|resum`): la tabla paginada en servidor (25, como el Històric de Ofertes) con la
+  franja de totales de lo filtrado; y el **Resum** agrupado por ofertante, receptor, producto, modalidad, mes, zona o
+  estado (`?per=`), con salidas, kg, ofertantes, receptores, espigoladas y el desglose por modalidad (los indicadores de
+  la hoja `Indicadors` del ARA).
+- **Clic en la fila**: `FitxaOperacio` en un diálogo abierto por la URL (`?canalitzacio=<id>`, `useDialegPerUrl`), con
+  enlaces a la oferta y a sus albaranes debajo (no dentro: la ficha del receptor y del productor no cambia).
+- **Excel** (`es-exporta`): todo lo filtrado, de 1.000 en 1.000; hoja de salidas con las columnas del ARA (variedad,
+  causa, municipio, zona, cajas, €/kg, valor, números de albarán) y hoja de resumen. Sin dependencias nuevas
+  (`write-excel-file`).
+- Móvil sin scroll horizontal: tres columnas («ofertante → receptor», producto con la fecha, kg); fecha propia desde
+  `md`, receptor, recogidos y estado desde `lg`, modalidad desde `xl`.
+- El estado `programada` usa una clave propia (`sort.estat_programada`) porque en la ficha `op.estat_pendent` y
+  `op.estat_programada` dicen lo mismo. 70 claves nuevas por idioma (`sort.*`, `nav.entrades_sortides`, `op.estat_anulada`).
+- E2E `tests/e2e/entrades-sortides.e2e.ts` (solo lectura, 4 pruebas × escritorio y móvil).
+- **Importación de ARA y Airtable**: no está hecha; solo planteada en la carpeta de Drive
+  (`3. Claude Code/2026-11-20-planteamiento-importacion-ara-airtable.md`). Lo importado como canalización saldrá aquí
+  sin tocar la pantalla, porque la fila tiene una sola definición (`sortides_base`).

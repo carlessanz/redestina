@@ -11,7 +11,7 @@
 // se ve como tooltip, y dos «La meva organització» seguidos no distinguen nada.
 
 import {
-  Apple, Building2, Calculator, ClipboardCheck, ClipboardList, FileSignature, FileText, FolderOpen, Handshake, History,
+  Apple, ArrowLeftRight, Building2, Calculator, ClipboardCheck, ClipboardList, FileSignature, FileText, FolderOpen, Handshake, History,
   Home, Inbox, LayoutDashboard, Leaf, Receipt,
   MessageSquare, Package, PlusCircle, Settings2, ShieldCheck, Sprout, Store, Truck, Workflow,
 } from 'lucide-react'
@@ -103,6 +103,10 @@ const EQUIP: NavGrup[] = [
       { to: '/equip/aprovacions', labelKey: 'nav.approvals', icon: ClipboardCheck, comptador: 'aprovacions' },
       { to: '/equip/missatgeria', labelKey: 'nav.messaging', icon: MessageSquare, comptador: 'missatges', requereix: 'whatsapp' },
       { to: '/equip/albarans', labelKey: 'nav.albarans', icon: Truck, comptador: 'albarans' },
+      // La vista global de lo que ha salido (punto 6.7, la hoja «Aprofitat» del ARA): una fila por
+      // salida, indicadores y Excel. Al final del grupo: no es una parada del camino, es su
+      // registro. `barra: false`, como las demás del equipo que no caben en la barra de móvil.
+      { to: '/equip/entrades-sortides', labelKey: 'nav.entrades_sortides', icon: ArrowLeftRight, barra: false },
     ],
   },
   {

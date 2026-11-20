@@ -1694,3 +1694,71 @@ export interface ResultatImportacio {
   resum: { creades: number; actualitzades: number; paper_afegit: number; sense_canvis: number; omeses: number; errors: number }
   files: ImportacioFilaResultat[]
 }
+
+// ---------------------------------------------------------------------------
+// «Entrades i sortides» (punto 6.7, migración 20270612100000): `entrades_sortides()` y
+// `entrades_sortides_resum()`, solo equipo. Una fila por salida (canalización) de un ofertante
+// a un receptor. Los numéricos pueden llegar como texto: se leen con `Number()` (`lib/sortides.ts`).
+// ---------------------------------------------------------------------------
+export type ModalitatSortida = 'donacio' | 'venda' | 'maquila' | 'espigolada'
+export type EstatSortida = 'pendent' | 'programada' | 'registrada' | 'entregada' | 'confirmada' | 'conciliada' | 'anulada'
+export type AgrupacioSortides = 'ofertant' | 'receptor' | 'producte' | 'modalitat' | 'mes' | 'zona' | 'estat'
+export interface AlbaraSortida {
+  id: string
+  tipo: 'ENT' | 'OPE' | 'REC'
+  numero: string | null
+  estado: string
+}
+export interface FilaSortida {
+  canalizacion_id: string
+  excedente_id: string | null
+  id_excedente: string | null
+  espigolada_id: string | null
+  created_at: string
+  /** `AAAA-MM-DD` (día de Madrid): la recogida real, la prevista, la conciliación o el alta. */
+  data_sortida: string
+  productor_id: string | null
+  productor_nom: string | null
+  productor_org: string | null
+  entidad_id: string | null
+  entidad_nom: string | null
+  entidad_org: string | null
+  producto: string | null
+  variedad: string | null
+  kg_sortida: number | null
+  kg_recollits: number | null
+  modalitat: ModalitatSortida
+  estat: EstatSortida
+  causa_codigo: string | null
+  municipi: string | null
+  municipi_ine: string | null
+  zona: string | null
+  caixes_entregades: number | null
+  caixes_retornades: number | null
+  preu_kg: number | null
+  valor: number | null
+  albara_ent: AlbaraSortida | null
+  albara_rec: AlbaraSortida | null
+}
+export interface EntradesSortides {
+  total: number
+  kg_sortida: number
+  kg_recollits: number
+  files: FilaSortida[]
+}
+export interface XifresModalitat {
+  sortides: number
+  kg_sortida: number
+  kg_recollits: number
+}
+export interface XifresSortides extends XifresModalitat {
+  ofertants: number
+  receptors: number
+  espigolades: number
+  per_modalitat: Record<ModalitatSortida, XifresModalitat>
+}
+export type GrupSortides = XifresSortides & { clau: string | null; etiqueta: string | null }
+export interface ResumSortides {
+  total: XifresSortides
+  grups: GrupSortides[]
+}

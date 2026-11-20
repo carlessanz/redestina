@@ -876,3 +876,20 @@ perfil (internas denegadas, rastro y lectura del mes solo del equipo).
   `convenio_vigente()` del productor daría 42501); `aprovat_per` = quien propuso. En venta deja `pendent` con los
   valores propuestos para que el equipo apruebe con precio. Rechazar → `pendent` con lo pedido.
 - Arnés: bloques `PROPOSTA_*` (35 checks; clon 3.001/3.001).
+
+### Entrades i sortides (punto 6.7, `20270612100000`, 20-11-2026)
+
+Solo lectura y solo del equipo (también `tecnic`). Nueve filtros comunes, null = sin filtro: `p_desde`, `p_hasta`
+(date, inclusivos), `p_productor`, `p_entidad` (uuid), `p_producto`, `p_zona`, `p_modalitat`, `p_estat`, `p_cerca`.
+
+| Función | Qué hace | Quién |
+|---|---|---|
+| `sortides_base(<9 filtros>)` | **Única definición** de la fila y de los filtros (returns table). `security invoker` | Interna: sin EXECUTE para `public`, `anon` ni `authenticated` |
+| `estat_recollida_canalitzacio(estado, registrada_at, validada_at, data_hora, albara_estado)` | El `case` del estado de la recogida, sacado de `operacio_detall` (que se recreó idéntica salvo esa llamada; las 26 canalizaciones del clon dan el mismo estado) | Interna, `immutable` |
+| `entrades_sortides(<9 filtros>, p_limit 1-1000, p_offset)` | `{total, kg_sortida, kg_recollits, files[]}`; totales de todo lo filtrado | `security definer`; `es_intern()` o `42501` |
+| `entrades_sortides_resum(<9 filtros>, p_per)` | `{total, grups[]}` por `ofertant|receptor|producte|modalitat|mes|zona|estat`, con `per_modalitat` | Ídem |
+
+Errores `22023`: `periode_invalid`, `modalitat_invalida`, `estat_invalid`, `limit_invalid`, `offset_invalid`,
+`agrupacio_invalida`. La guarda va antes que la validación (un externo recibe `42501`). `albara_rec`: el REC propio, o
+el heredado de la oferta o de la jornada, este último **solo en donación**. Arnés: `SORTIDES_INTERNES`,
+`SORTIDES_EXTERN` y `SORTIDES_EQUIP` (34 checks).

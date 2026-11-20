@@ -66,6 +66,7 @@ src/
   routes/equip/EntitatDetall.tsx  La ficha ÚNICA por organización del equipo (1C)
   routes/equip/NovaEntitat.tsx  «Nova entitat» en dos pasos: buscar (cerca_entitats) y dar de alta (crear_entitat) (1B)
   routes/equip/ImportaEntitats.tsx  «Importa des d'Excel» (super_admin): Fitxer → Revisió → Resultat (§6.2, 06-11-2026)
+  routes/equip/EntradesSortides.tsx  «Entrades i sortides» (6.7): una fila por salida, Resum y Excel; components/sortides/, lib/sortides.ts
   hooks/useEsborrarFitxa.tsx   Borrar una organización (`borrar_ficha_completa`, diálogo de doble rol)
   routes/PerfilRecepcio.tsx    «El meu perfil de recepció» del receptor (fase 9, §6ter)
   routes/PlaOrganitzacio.tsx   «El meu pla de prevenció», solo lectura (fase 11, §6ter)

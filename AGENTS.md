@@ -270,6 +270,8 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
 - **Diagnóstico**: escribe solo `es_intern()` (`42501` también sobre lo suyo, D5): `desar_excedents_diagnostic`
   (reemplaza el conjunto, conserva acciones) y `fixar_estat_accio` (A3).
   Lectura: `diagnostic_estat`, `diagnostic_datos` (la usa `diagnostic-pdf`). `fixar_lloc_principal` (A4).
+- **Entrades i sortides (6.7)**: `entrades_sortides(<9 filtros>, p_limit, p_offset)` y `…_resum(…, p_per)`, del equipo,
+  solo lectura; la fila, solo en la interna `sortides_base()`; el estado, `estat_recollida_canalitzacio()` (con `operacio_detall`).
 - **Precios (D1)**: `preus_proposta_mes`, `noms_fonts_preus` (equipo); validar mes/periodo, `fixar_preu_referencia`
   (motivo si difiere), equivalencias, `fixar_preu_manual`, `fixar_origen_cost_producte`, `crear_producte`, `marcar_carrega_preus` (`pot_aprovar`);
   `fixar_font_preus` (super_admin). Propuesta: Gencat (el mes o su último) → Mercabarna (último día, mes cerrado) → manual; `font_mes`: su mes; alta, solo Mercabarna: precio del día. **D2**: `preus_canalitzacions_mes`
@@ -327,7 +329,7 @@ catalán. La oferta del panel se **precarga** de la Operativa (`predeterminats`)
 
 | Panel | Rutas | Qué ve |
 | --- | --- | --- |
-| Equip | `/equip/tauler · canalitzacio[/:id] · ofertes[/:id] · espigolades · aprovacions · missatgeria · albarans · productes · tancament · entitats[/nova · /importa · /:orgId] · convenis · documents · diagnostics · plans · configuracio` | Todo; badges de `pendents_equip()` |
+| Equip | `/equip/tauler · canalitzacio[/:id] · ofertes[/:id] · espigolades · aprovacions · missatgeria · albarans · entrades-sortides · productes · tancament · entitats[/nova · /importa · /:orgId] · convenis · documents · diagnostics · plans · configuracio` | Todo; badges de `pendents_equip()` |
 | Productor | `/productor/inici · ofertes · ofertes/nova · ofertes/:id · documents` | Sus ofertas, embudo, alta (descriptor del intake) |
 | Receptor | `/receptor/mercat · interessos · historic · impacte · documents` | Ofertas compatibles (RLS con `modalitat_receptor_compat`), interés, histórico |
 | Organització | `/organitzacio · perfil-recepcio · diagnostic · pla` | Ficha propia por secciones (el equipo no la ve) |
@@ -336,42 +338,38 @@ Lo que manda hoy, en una línea cada uno:
 - **El modelo del proceso** (`lib/procesOferta.ts`, `seguentPas.ts`, `components/proces/`):
   etapas publicada → assignada → recollida → confirmada → tancada; «lo que te toca» en `aviso`,
   lo demás neutro; **estados simples** para los paneles externos (`BadgeEstat`).
-- **Validación**: una oferta de productor nace `pendent_validacio` (interruptor
-  `validacio_ofertes`); el equipo valida o rechaza. Modalidad múltiple; franja de recogida.
+- **Validación**: la oferta de productor nace `pendent_validacio` (`validacio_ofertes`); el equipo valida o rechaza.
 - **Avisos** (`avisos` + `enviar-avis`, campana y badges); D1 tras aprobar (las partes se ven);
   editar oferta = formulario del alta (`DialegEdicioOferta`: todo salvo producto y entidad) → `crear-oferta/editar`,
   D4; esborranys `crear-oferta/esborrany`·`/publicar`; `FitxaOferta` (ficha, texto, «Comparteix»).
-- **Recogida** (fase 3, `context/06ter`): el receptor declara o el equipo registra desde la ficha; validar emite y
-  concilia el ENT y el REC de esa recogida (venta/maquila: sin albarán, documentos propios); el job solo avisa.
-- **Destino final de los kilos** (`excedente_destins`, `DestiFinal`): `cerrada` = todo con
-  destino; `no_colocada` = falta decir qué pasó; `cancelada` = error o incidencia con motivo.
+- **Recogida** (fase 3, `context/06ter`): el receptor declara o el equipo registra; validar emite y concilia el ENT y
+  el REC de esa recogida (venta/maquila: sin albarán); el job solo avisa.
+- **Destino final** (`DestiFinal`): `cerrada` = todo con destino; `no_colocada` = falta; `cancelada` = error con motivo.
 - **Proposa canvis** (fase 5, `context/06ter`): la entidad responde en Interessos (`?resposta=<id>`). **Contadores en vivo** por Realtime (`useComptadorsEnViu`).
 - **Ficha de la operación** (`operacio_detall`), ofertas «per a tu», «No m'interessa». **Enlaces directos** (fase 4,
   `context/06ter`): la URL abre el diálogo (`useDialegPerUrl`); «Copia amb/sense enllaç»; en el ranking, enlace si `te_compte`.
-- **Certificat de donació, firma y Configuració › Equip** (05-11 y 09-11; detalle en `context/06ter`):
-  `DialegCertificatDonacio`, `DialegSignaDocument`/`AccionsSignatura` (**`accionsSignatura()` decide el botón**), `SeccioEquip`.
+- **Certificat de donació, firma, Configuració › Equip** (`context/06ter`): `DialegCertificatDonacio`,
+  `DialegSignaDocument` (**`accionsSignatura()` decide el botón**), `SeccioEquip`.
 - **Importa des d'Excel** (`ImportaEntitats`, §6). **Convenio único de col·laboració** por papel. Filtros comunes
   (`lib/filtres.ts`, `lib/territori.ts`). **Diagnòstic**: lo contesta el equipo; la ficha y «El meu diagnòstic» lo leen (PDF);
   Pla = **expediente**.
 - **Alta de oferta por bloques** (`FormulariNovaOferta`): el lugar trae municipio, Maps, días y franja;
   disponible = hoy + 2; **causa por su subcausa** (`lib/causes.ts`).
 - **Productes** (D1-D2, `context/06ter`): Catàleg · Preus de referència · Càrregues (`?pestanya=`, `?mes=`).
+- **Entrades i sortides** (6.7, `context/06ter`): una fila por salida (canalización), filtros, «Resum» agrupado
+  (`?per=`) y Excel (`lib/sortides.ts`); la fila abre `FitxaOperacio` (`?canalitzacio=`).
 - **Ofertes del equipo** (`context/06ter`): columnas Data (ordena) · Ofertant · Producte (+kg oferts) · Progrés (kg con
   salida y pendientes) · Estat, **sin receptores** (van al detalle); pestañas Per validar · Actives · Esborranys ·
   **Històric** (servidor; `?tab=`); paso del proceso bajo el badge (`lib/llistatOfertes.ts`). Canalització, sin cerradas.
   **Selectores predictivos** (`SelectorEntitat`) y buscador en Aprovacions, Tancament y Plans; «Transformació en obrador» = `maquila`.
-- **Gestión autónoma del super_admin**: convenio **declarado**, **asignación en un acto** («Registrar i confirmar
-  recollida»; el técnico solo registra interés), Modifica/Anul·la en la ficha, recogida asistida, mensajes para copiar
-  (`MissatgesDelPunt`); **Ciclo guiado** `/equip/canalitzacio/:id` (17 pasos, 6 fases, RPC reales).
+- **Super_admin autónomo**: convenio **declarado**, **asignación en un acto** (el técnico solo registra interés),
+  Modifica/Anul·la, recogida asistida, `MissatgesDelPunt`; **Ciclo guiado** `/equip/canalitzacio/:id` (17 pasos).
 - Doble rol = todos los paneles, el activo por la URL (`useOrganitzacio`); el ofertante no ve el `E-…`.
 - **Ficha única «Entitat» (1C)**: `lib/campsFitxa.ts`, **única definición de campos** (paridad SQL en su test);
   `EntitatDetall` en seis pestañas (`?pestanya=`); `PerfilOrganitzacio`, por sus RPC.
-- **Estado CRM (B1)**: «Estat i papers» (`BlocRols`, `fixar_estat_crm`, `lib/estatCrm.ts`); «Entitats» filtra por
-  estado (`?rol=`) y abre con `actiu`.
-- **Plan 1 sobre la ficha** (`context/06ter`): «Nova entitat» (1B), «Dona-li accés» (1D), «Gestió interna» (1F + 1.5)
-  y, sin que la entidad entre, convenio, RGPD, albarán y correos con consentimiento.
-- **Naturalesa (A5)**: `fitxa/SelectorNaturalesa` (equipo; el titular, una vez); perfil por la confirmada (`campsPerfil`);
-  el interés asistido filtra por P8 (`modalitatsDeLaNaturalesa`).
+- **Estado CRM (B1)**: «Estat i papers» (`BlocRols`, `lib/estatCrm.ts`); «Entitats» filtra (`?rol=`), abre con `actiu`.
+- **Plan 1** (`context/06ter`): «Nova entitat», «Dona-li accés», «Gestió interna»; convenio, RGPD y albarán sin que entre.
+- **Naturalesa (A5)**: `SelectorNaturalesa` (equipo; el titular, una vez); el interés asistido filtra por P8.
 
 ## 6quater. Parte pública y accesos (detalle en `context/06quater-…md`)
 
@@ -410,7 +408,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270611100000`. Tabla operativa nueva → `v_ordre` del vaciado (§6).
+  Compatibles hacia atrás con el frontend publicado. Última: `20270612100000`. Tabla operativa nueva → `v_ordre` del vaciado (§6).
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -559,10 +557,10 @@ Decisiones de negocio pendientes (en `context/12`): **69**, **131**, **132** (el
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.235 de Vitest (104 ficheros, 1 saltada) + 60 de Deno.**
+   **Referencia: 2.274 de Vitest (105 ficheros, 1 saltada) + 60 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.362/2.362 y 47 sin datos; producción 2.926/2.926 y 142 (20-11-2026).** Cifra
+   **Referencia: clon 2.396/2.396 y 47 sin datos; producción 2.926/2.926 y 142 (20-11-2026).** Cifra
    que cambia sin checks nuevos = cambio de **datos**. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).
 5. Publicar con `/publicar` (base → funciones → frontend).
