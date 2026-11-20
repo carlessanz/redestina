@@ -33,6 +33,8 @@ import { textError } from '../../lib/textError'
 import { useAppContext } from '../../hooks/useAppContext'
 import { esborrarCostProducte, eurKg, fixarCostProducte } from '../../lib/tancament'
 import { dataCurta } from '../../lib/albarans'
+import { carregaPreusVigents, type PreuVigent } from '../../lib/preus'
+import { textMes } from '../../lib/sortides'
 import type { CosteProducto } from '../../types'
 import { IconaProducte } from '../../components/FotosOferta'
 import DialegMotiu from '../../components/DialegMotiu'
@@ -170,6 +172,10 @@ interface PropsCataleg {
 function Cataleg({ productes, errorProductes, potAprovar, esSuperAdmin }: PropsCataleg) {
   const { t } = useT()
   const [costos, setCostos] = useState<CosteProducto[]>([])
+  /** El precio de referencia validado que se aplica hoy (Gencat, Mercabarna o manual del mes). */
+  const [vigents, setVigents] = useState<Map<string, PreuVigent>>(new Map())
+  /** Las fuentes de cada producto (`productes_fonts`): explican por qué uno aún no tiene precio. */
+  const [fontsDe, setFontsDe] = useState<Map<string, Set<string>>>(new Map())
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { cerca, setCerca, q } = useCerca()
@@ -190,24 +196,36 @@ function Cataleg({ productes, errorProductes, potAprovar, esSuperAdmin }: PropsC
     const { data, error: err } = await supabase
       .from('costes_producto')
       .select('producto, coste_kg, motivo, fijado_por, updated_at')
-    return { llista: (data as CosteProducto[] | null) ?? [], err }
+    // Lo que de verdad valora una canalización (`preu_referencia_de`): el último mes validado y,
+    // solo si no hay ninguno, el coste manual. Sin esto, Poma o Pera salían «Sense cost».
+    const [v, f] = await Promise.all([
+      carregaPreusVigents(),
+      supabase.from('productes_fonts').select('producto, font'),
+    ])
+    const fonts = new Map<string, Set<string>>()
+    for (const r of (f.data as { producto: string; font: string }[] | null) ?? []) {
+      fonts.set(r.producto, (fonts.get(r.producto) ?? new Set()).add(r.font))
+    }
+    setFontsDe(fonts)
+    return { llista: (data as CosteProducto[] | null) ?? [], err: err ?? (v.error ? { message: v.error } : null), mapa: v.mapa }
   }, [])
 
   const refresca = useCallback(async () => {
-    const { llista, err } = await carrega()
+    const { llista, err, mapa } = await carrega()
     if (err) { setError(err.message); return }
     setError(null)
     setCostos(llista)
+    setVigents(mapa)
   }, [carrega])
 
   useEffect(() => {
     let viu = true
     setCarregant(true)
     void (async () => {
-      const { llista, err } = await carrega()
+      const { llista, err, mapa } = await carrega()
       if (!viu) return
       if (err) setError(err.message)
-      else { setError(null); setCostos(llista) }
+      else { setError(null); setCostos(llista); setVigents(mapa) }
       setCarregant(false)
     })()
     return () => { viu = false }
@@ -219,16 +237,21 @@ function Cataleg({ productes, errorProductes, potAprovar, esSuperAdmin }: PropsC
     return mapa
   }, [costos])
 
+  const ambPreu = useCallback(
+    (nom: string) => vigents.has(nom) || Boolean(perProducte[nom]),
+    [vigents, perProducte],
+  )
+
   const files = useMemo(() => {
     return productes.filter((p) => {
-      if (nomesAmbCost && !perProducte[p.nombre]) return false
+      if (nomesAmbCost && !ambPreu(p.nombre)) return false
       return casaCerca([p.nombre, p.familia], q)
     })
-  }, [productes, perProducte, q, nomesAmbCost])
+  }, [productes, ambPreu, q, nomesAmbCost])
 
   const senseCost = useMemo(
-    () => productes.filter((p) => !perProducte[p.nombre]).length,
-    [productes, perProducte],
+    () => productes.filter((p) => !ambPreu(p.nombre)).length,
+    [productes, ambPreu],
   )
 
   function obreEdicio(producte: string) {
@@ -286,7 +309,7 @@ function Cataleg({ productes, errorProductes, potAprovar, esSuperAdmin }: PropsC
 
           <div className="flex flex-wrap items-center gap-3">
             <Badge className="bg-secondary text-secondary-foreground">
-              {t('cost.with_cost', { n: costos.length })}
+              {t('cost.with_cost', { n: productes.length - senseCost })}
             </Badge>
             <Badge className={senseCost > 0 ? 'bg-aviso-fondo text-aviso' : 'bg-exito-fondo text-exito'}>
               {t('cost.without_cost', { n: senseCost })}
@@ -332,6 +355,13 @@ function Cataleg({ productes, errorProductes, potAprovar, esSuperAdmin }: PropsC
               <TableBody>
                 {files.map((p) => {
                   const c = perProducte[p.nombre]
+                  const v = vigents.get(p.nombre)
+                  // Sin precio: por qué (solo Mercabarna = sale el día 1 del mes siguiente).
+                  const fp = fontsDe.get(p.nombre)
+                  const motiuSense = v || c ? null
+                    : fp?.has('gencat') ? t('preu.motiu_gencat_sense_dades')
+                    : fp?.has('mercabarna') ? t('preu.motiu_mercabarna_mes_obert')
+                    : t('preu.motiu_manual')
                   const obert = editant === p.nombre
                   return (
                     <Fragment key={p.nombre}>
@@ -346,12 +376,25 @@ function Cataleg({ productes, errorProductes, potAprovar, esSuperAdmin }: PropsC
                           {p.familia && <span className="block text-xs text-muted-foreground">{p.familia}</span>}
                         </TableCell>
                         <TableCell className="text-center tabular-nums whitespace-normal">
-                          {c
-                            ? eurKg(c.coste_kg)
-                            : <Badge className="bg-aviso-fondo text-aviso">{t('cost.missing')}</Badge>}
+                          {v ? (
+                            <>
+                              {eurKg(v.eur_kg)}
+                              <span className="block text-xs text-muted-foreground" data-testid="cost-font">
+                                {t(`preu.font_${v.font}`)} · {textMes(`${v.exercici}-${String(v.mes).padStart(2, '0')}`, t)}
+                              </span>
+                            </>
+                          ) : c ? (
+                            <>
+                              {eurKg(c.coste_kg)}
+                              <span className="block text-xs text-muted-foreground" data-testid="cost-font">{t('cost.font_manual')}</span>
+                            </>
+                          ) : <Badge className="bg-aviso-fondo text-aviso" title={motiuSense ?? undefined}>{t('cost.missing')}</Badge>}
+                          {v && c && Number(c.coste_kg) !== Number(v.eur_kg) && (
+                            <span className="block text-xs text-muted-foreground">{t('cost.manual_reserva', { e: eurKg(c.coste_kg) })}</span>
+                          )}
                         </TableCell>
                         <TableCell className="hidden text-sm whitespace-normal text-muted-foreground xl:table-cell">
-                          <span className="line-clamp-2">{c?.motivo ?? '—'}</span>
+                          <span className="line-clamp-2">{c?.motivo ?? motiuSense ?? '—'}</span>
                         </TableCell>
                         <TableCell className="hidden text-center text-muted-foreground md:table-cell">
                           {dataCurta(c?.updated_at ?? null)}

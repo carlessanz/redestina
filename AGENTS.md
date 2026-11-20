@@ -9,7 +9,7 @@ trabajan en este repositorio. `CLAUDE.md` lo importa; **no dupliques contenido a
 > está roto.
 
 > 🔴 **Regla de tamaño (02-11-2026): este fichero se carga ENTERO en cada sesión y no puede pasar
-> de 48 KB** (llegó a 681 KB y cada sesión se compactaba antes de empezar). Aquí vive **solo lo
+> de 48 KB**. Aquí vive **solo lo
 > vigente, compacto**; el detalle, la historia y los porqués de cada § están en
 > **`context/<sección>.md`** (bajo demanda, con la misma regla permanente; «AGENTS.md §N» vale para
 > los dos). `tests/agentsMida.test.ts` falla si se pasa. **Lo histórico va al detalle, nunca aquí.**
@@ -36,7 +36,7 @@ certificados. Dos fases construidas: **1. infraestructura WhatsApp** y **2. Rede
 (intake, priorización, canalización, cierre, sistema documental, paneles por rol).
 
 - Meta en **pruebas** (`WHATSAPP_ENVIO_REAL=true`): solo entrega a los ≤5 de `meta_test_recipients`
-  (el resto, `131030`). Mensajería siempre individual (la Cloud API no escribe en grupos).
+  (el resto, `131030`). Mensajería siempre individual.
 - **Documentación fuera del repo**: `docs/` (ignorado; funcionales y credenciales) y la carpeta de
   Drive `…/03-Redestina/` (se escribe solo en `3. Claude Code/`, nunca datos personales; detalle en
   `CLAUDE.md`; jerarquía de documentos en `context/01`).
@@ -75,7 +75,7 @@ Prevenció (expediente provisional; el plan básico, retirado), espigueo, catál
   `vercel.json` lleva el rewrite de SPA.
 - **Contrato de alturas**: shell `h-dvh overflow-hidden`; `main` `min-h-0 flex-1` scrollea con
   `scrollbar-gutter: stable`; ninguna pantalla escribe `h-dvh`. Flag de ruta `fullBleed` (Mensajería).
-- 🔴 **Un solo ancho**: el del shell, `w-[96%]` + `max(0.5rem, safe-area)`; ningún `max-w` de página (`ample`, retirado).
+- 🔴 **Un solo ancho**: el del shell, `w-[96%]` + `max(0.5rem, safe-area)`; ningún `max-w` de página. **Diálogos al 80 %** (`ui/dialog`; confirmar, `max-w-lg`).
 - **Barra inferior de móvil: cuatro entradas como máximo** (`barra: false`, `labelBarraKey`).
 - **PWA sin service worker** (`selfDestroying`); `/version.json` + `useVersioNova` avisan de versión.
 - **Siete reglas de móvil** (en el detalle): controles ≥16 px, `Button` `whitespace-nowrap
@@ -160,7 +160,7 @@ hasta publicar; `dades_esborrany`; solo → publicada; borrar: `esborrar_esborra
 pendent_validacio · parcial · bloqueada · cerrada · no_colocada · cancelada; `modalitat` +
 `modalitats[]`; `preu_minim`, `coste_kg`, `fotos[]`, `producte_al_camp`, `format_entrega`,
 `transport_propi`, `municipi_ine`/`comarca` por trigger, franja `hora_recollida_*`,
-`disponible_hasta`; `dies_recollida[]`, `gmaps_url` propio (envases: deuda 188); `hectarees`; `subcausa_codigo` → la causa, por trigger); `oferta_respuestas` (`estado` de la entidad × `aprovacio` del equipo, `proposada` = cambios del equipo que espera a la entidad, `proposta_*`;
+`disponible_hasta`; `dies_recollida[]`, `gmaps_url` propio (envases: deuda 188); `hectarees`; `espigolada_demanada` (pide jornada: va a validación); `subcausa_codigo` → la causa, por trigger); `oferta_respuestas` (`estado` de la entidad × `aprovacio` del equipo, `proposada` = cambios del equipo que espera a la entidad, `proposta_*`;
 `canal` whatsapp·email·panel·asistido·manual; `kg_solicitados/kg_aprovats`, `modalitat`,
 `recollida_at`); `canalizaciones` (kg confirmados/reales/conciliados, `valorizacion`, `coste_kg` = **precio del mes
 del albarán** (D2: `preu_*`, rastro `canalizaciones_preu_hist`; `context/04`), `data_hora_recollida`, `recollida_origen` (entitat_receptora·equip), columnas de la recogida protegidas por trigger);
@@ -321,8 +321,8 @@ catálogos, configuración y cuentas, y reinicia las series; `scripts/sembrar-en
 
 21 pasos (`_shared/camposOferta.ts`, servidos por `GET crear-oferta/campos`; ca/es en el descriptor; la lista
 con sus `soloPanel`/`oculto`, en `context/06bis`). `aplica()` en cascada; guía Sí/Ara no; listas de 9 + «Més…»;
-3 fallos → repite; `Stop` cancela; texto ≤400; ubicación por Maps o `location` (P5); convenio al final. Bot en
-catalán. La oferta del panel se **precarga** de la Operativa (`predeterminats`).
+3 fallos → repite; `Stop` cancela; texto ≤400; ubicación por Maps o `location` (P5); convenio al final.
+La oferta del panel se **precarga** de la Operativa (`predeterminats`).
 
 ## 6ter. Paneles y procesos (detalle, por fecha y fase, en `context/06ter-…md`)
 
@@ -352,9 +352,9 @@ Lo que manda hoy, en una línea cada uno:
 - **Importa des d'Excel** (`ImportaEntitats`, §6). **Convenio único de col·laboració** por papel. Filtros comunes
   (`lib/filtres.ts`, `lib/territori.ts`). **Diagnòstic**: lo contesta el equipo; la ficha y «El meu diagnòstic» lo leen (PDF);
   Pla = **expediente**.
-- **Alta de oferta por bloques** (`FormulariNovaOferta`): el lugar trae municipio, Maps, días y franja;
+- **Alta de oferta por bloques** (`FormulariNovaOferta`): opción **Espigolada** (el equipo: jornada `oberta` al acto); el lugar trae municipio, Maps, días y franja;
   disponible = hoy + 2; **causa por su subcausa** (`lib/causes.ts`).
-- **Productes** (D1-D2, `context/06ter`): Catàleg · Preus de referència · Càrregues (`?pestanya=`, `?mes=`).
+- **Productes** (D1-D2, `context/06ter`): Catàleg (precio vigente: último mes validado, si no el manual) · Preus de referència · Càrregues.
 - **Entrades i sortides** (6.7, `context/06ter`): una fila por salida (canalización), filtros, «Resum» agrupado
   (`?per=`) y Excel (`lib/sortides.ts`); la fila abre `FitxaOperacio` (`?canalitzacio=`).
 - **Ofertes del equipo** (`context/06ter`): columnas Data (ordena) · Ofertant · Producte (+kg oferts) · Progrés (kg con
@@ -407,7 +407,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270613100000`. Tabla operativa nueva → `v_ordre` del vaciado (§6).
+  Compatibles hacia atrás con el frontend publicado. Última: `20270614100000`. Tabla operativa nueva → `v_ordre` del vaciado (§6).
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -557,12 +557,11 @@ Decisiones de negocio pendientes (en `context/12`): **69**, **131**, **132** (el
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.275 de Vitest (105 ficheros, 1 saltada) + 60 de Deno.**
+   **Referencia: 2.277 de Vitest (105 ficheros, 1 saltada) + 60 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.401/2.401 y 42 sin datos; producción 2.301/2.301 y 142 (20-11-2026).** Cifra
-   que cambia sin checks nuevos = cambio de **datos**. `prueba-numeracion.ts` si toca la numeración.
-4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`; el circuito: `circuit-tomaquet`).
+   **Referencia: clon 2.401/2.401 y 42 sin datos; producción 2.301/2.301 y 142 (20-11-2026).** `prueba-numeracion.ts` si toca la numeración.
+4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; el circuito: `circuit-tomaquet`).
 5. Publicar con `/publicar` (base → funciones → frontend).
 6. Estilos solo con tokens; un token nuevo va a `tokens.json`, `index.css` y `preview.html`.
 7. **Actualizar este fichero (≤ 48 KB) y el `context/<sección>.md` que toque**; §1bis si cambia

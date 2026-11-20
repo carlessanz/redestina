@@ -10,7 +10,7 @@
 //      y el PDF imprime la fuente del valor.
 //
 // Solo en el clon, con `E2E_ESCRIU=1`, y en escritorio. Ficha y producto sintéticos
-// (`E2E-D2 …`, `TEST-E2E-D2`); el precio de M del producto se borra antes para poder repetirla.
+// (`Fruites del Segrià SL`, `Rebost Solidari del Barri`, producto `Nespra`, solo en el clon); el precio de M del producto se borra antes para poder repetirla.
 
 import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
@@ -19,7 +19,8 @@ import { entra, motiuSaltClon, sql, sqlCom } from './ajuda'
 
 test.describe.configure({ mode: 'serial' })
 
-const PROD = 'TEST-E2E-D2'
+// Un producto que solo existe en el clon (lo crea esta prueba): nombre real, sin «TEST-E2E» en pantalla.
+const PROD = 'Nespra'
 const marca = Date.now().toString(36).slice(-5)
 let oferta = ''
 let canal = ''
@@ -39,7 +40,7 @@ test.beforeAll(({}, info) => {
   mes = m
   // El producto, su manual vigente (0,80: la propuesta de M) y M-2 validado a 0,50.
   if (sql(`select count(*) from productos where nombre = '${PROD}'`) === '0') {
-    sqlCom('super_admin', `select crear_producte('${PROD}', 'Varis', null)`)
+    sqlCom('super_admin', `select crear_producte('${PROD}', 'Fruita Dolça', null)`)
   }
   sql(`insert into costes_producto (producto, coste_kg, motivo) values ('${PROD}', 0.80, 'E2E D2')
        on conflict (producto) do update set coste_kg = 0.80`)
@@ -64,18 +65,18 @@ test.beforeAll(({}, info) => {
           end loop;
         end loop;
         insert into productores (name, empresa, razon_social, email, nif, direccion, codigo_postal, poblacion, es_test)
-        values ('E2E-D2 Productor', 'E2E-D2 Productor SL', 'E2E-D2 Productor SL', 'e2e-d2-prod@example.invalid', v_nif,
+        values ('Fruites del Segrià', 'Fruites del Segrià SL', 'Fruites del Segrià SL', 'e2e-d2-prod@example.invalid', v_nif,
                 'Carrer de Prova 2', '08001', 'Barcelona', true);
       end if;
       if not exists (select 1 from entidades where email = 'e2e-d2-ent@example.invalid') then
         insert into entidades (nombre, email, es_test, tipo_receptor, estat, activo)
-        values ('E2E-D2 Entitat social', 'e2e-d2-ent@example.invalid', true, 'social', 'Signat', false);
+        values ('Rebost Solidari del Barri', 'e2e-d2-ent@example.invalid', true, 'social', 'Signat', false);
       end if;
     end $d$`)
   const prod = sql(`select id from productores where email = 'e2e-d2-prod@example.invalid'`)
   const ent = sql(`select id from entidades where email = 'e2e-d2-ent@example.invalid'`)
   oferta = sql(`insert into excedentes (id_excedente, productor_id, producto, kg_total, modalitat, estado, origen, observacions)
-                values ('E-E2E-D2-${marca}', '${prod}', '${PROD}', 100, 'donacio', 'publicada', 'asistido', '[E2E] D2 ${marca}')
+                values ('E-E2E-D2-${marca}', '${prod}', '${PROD}', 100, 'donacio', 'publicada', 'asistido', 'Nespres madures, collides aquesta setmana. Caixes de 10 kg.')
                 returning id`).split('\n')[0]
   canal = sql(`insert into canalizaciones (excedente_id, entidad_id, kg_confirmados, valorizacion, estado)
                values ('${oferta}', '${ent}', 100, 'donacio', 'confirmada') returning id`).split('\n')[0]

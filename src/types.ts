@@ -330,6 +330,8 @@ export interface Excedente {
    * `espigolades_per_convertir` del equipo.
    */
   producte_al_camp: boolean
+  /** Se eligió «Espigolada» en el alta (20270614100000): lo pide quien la dio de alta. */
+  espigolada_demanada?: boolean
   /** Derivados por el trigger `excedentes_ubica` (20270331100000). El receptor ve la comarca. */
   municipi_ine: string | null
   comarca: string | null

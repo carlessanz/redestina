@@ -2807,3 +2807,24 @@ Al recorrerlo salieron dos cosas: la fecha prevista frente a la real (`context/0
 maquila, el aviso de «recogida registrada» y la ficha de la operación **prometían albaranes** que no existen. Ahora usan
 claves propias (`rrec.ok_sense_albara`, `rrec.ok_diferencia_sense_albara`, `op.pendent_validacio_nota[_tu]_sense_albara`)
 y el E2E lo comprueba.
+
+### «Espigolada» en el alta de oferta, popups al 80 % y Catàleg con el precio vigente (20-11-2026, `20270614100000`)
+
+- **Espigolada como cuarta opción** junto a donació, venda y maquila en `FormulariNovaOferta` (`data-testid="of-espigolada"`,
+  excluyente con las otras tres; solo en el alta, no al editar). No es una modalidad: marca `espigolada_demanada`, guarda
+  `modalitat = donacio` (el reparto de una jornada es donación) y fuerza `producte_al_camp`.
+  - **Equipo (alta asistida)**: `crear-oferta/publicar` llama a `crear_espigolada(p_excedente => …)` en el acto: la oferta
+    queda `borrador`/`espigolament` y la jornada `oberta` (pendiente de espigolar); el diálogo navega a
+    `/equip/espigolades/<id>`. Si la conversión falla, la oferta queda creada y avisa (`po.espigolada_error`).
+  - **Productora**: la oferta va **siempre** a validación (`trg_excedentes_validacio`) y la ficha muestra el aviso
+    `od-espigolada-demanada`; el equipo la convierte con «Converteix en espigolada».
+- **Popups al 80 % del ancho** (`ui/dialog.tsx`: `sm:w-[80vw] sm:max-w-[80vw]`); las confirmaciones (`DialegConfirma`)
+  conservan `sm:max-w-lg`. Un diálogo que quiera otro ancho lo pide con su `className`.
+- **Catàleg de Productes**: la columna «Cost de referència» leía solo `costes_producto`, y un producto con su precio de
+  Gencat validado (Poma 0,6858, Pera 0,7965) salía «Sense cost». Ahora enseña **lo que valora una canalización**
+  (`preu_referencia_de`): el último mes validado de `preus_referencia` hasta el actual, con fuente y mes
+  (`carregaPreusVigents`/`preusVigents` en `lib/preus.ts`), y solo si no hay ninguno el manual; el manual que queda de
+  reserva y difiere se ve debajo. Sin precio, el motivo sale en la columna Motiu y en el `title` del badge (solo
+  Mercabarna → el mes sale el día 1 del siguiente). La captura de Gencat era correcta: el fallo era de lectura.
+  En producción quedan costes manuales viejos de prueba (Poma 2 «proba», Carbassa «Fixture de proves»…): solo cuentan
+  si un producto no tiene ningún mes validado; borrarlos, decisión de Carles.

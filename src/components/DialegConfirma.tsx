@@ -61,7 +61,7 @@ export function useConfirma() {
 
   const dialeg = (
     <Dialog open={opcions !== null} onOpenChange={(v) => { if (!v) tanca(false) }}>
-      <DialogContent className="max-h-[85dvh] overflow-y-auto">
+      <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{opcions?.titol}</DialogTitle>
           {opcions?.descripcio && (
@@ -127,7 +127,7 @@ export function useTria() {
 
   const dialeg = (
     <Dialog open={opcions !== null} onOpenChange={(v) => { if (!v) tanca(null) }}>
-      <DialogContent className="max-h-[85dvh] overflow-y-auto">
+      <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{opcions?.titol}</DialogTitle>
           {opcions?.descripcio && (

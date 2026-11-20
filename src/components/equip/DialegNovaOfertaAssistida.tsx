@@ -20,6 +20,8 @@
 // vez de un campo de búsqueda y un desplegable aparte que había que usar uno detrás del otro.
 
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router'
+import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import { supabase } from '../../lib/supabase'
@@ -47,7 +49,20 @@ interface Fitxa { id: string; nom: string; poblacio: string | null }
 
 export default function DialegNovaOfertaAssistida({ obert, onTancar, onCreada, onEsborranyDesat }: Props) {
   const { t } = useT()
+  const navega = useNavigate()
   const [productors, setProductors] = useState<Fitxa[]>([])
+  // «Espigolada» (20270614100000): convertida en el acto, se va a la jornada, que es lo que
+  // queda por hacer (espigolar); si la conversión falló, se avisa y se sigue como siempre.
+  const trasCrear = (r: ResultatNovaOferta) => {
+    if (r.espigolada_id) {
+      toast.success(t('po.espigolada_creada'))
+      onTancar()
+      navega(`/equip/espigolades/${r.espigolada_id}`)
+      return
+    }
+    if (r.espigolada_error) toast.error(t('po.espigolada_error'))
+    onCreada(r)
+  }
   const [carregant, setCarregant] = useState(true)
   const [triat, setTriat] = useState('')
 
@@ -132,7 +147,7 @@ export default function DialegNovaOfertaAssistida({ obert, onTancar, onCreada, o
                 key={triat}
                 productorId={triat}
                 esEquip
-                onCreada={onCreada}
+                onCreada={trasCrear}
                 onEsborranyDesat={(id) => (onEsborranyDesat ? onEsborranyDesat(id) : onTancar())}
                 onCancel={onTancar}
               />

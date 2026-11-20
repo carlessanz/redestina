@@ -15,8 +15,9 @@
 //
 // Solo contra el CLON LOCAL y en escritorio: emite numeración legal de albaranes (ENT/REC) y de
 // prueba de certificados (P-CDP/P-CR). Todas las fichas son `es_test` y el modo test está
-// encendido: ningún correo sale fuera de las fichas de prueba. La oferta queda cerrada y
-// marcada «[E2E circuit tomàquet]» (`scripts/local/cargar-local.sh` devuelve el clon a la copia).
+// encendido: ningún correo sale fuera de las fichas de prueba. La oferta queda cerrada con un texto
+// REAL (20-11-2026: Carles no quiere ver «[E2E …]» en las pantallas); la prueba la encuentra por la
+// hora de alta, no por el texto (`scripts/local/cargar-local.sh` devuelve el clon a la copia).
 //
 //   E2E_CLON=1 E2E_ESCRIU=1 npx playwright test tests/e2e/circuit-tomaquet.e2e.ts --project escriptori
 //   (con E2E_CAPTURES=<carpeta>, una captura por paso)
@@ -33,7 +34,10 @@ test.describe.configure({ mode: 'serial' })
 const OFERTANT = 'productor'
 const SOCIAL = 'receptor-social'
 const OBRADOR = 'receptor-carles'
-const marca = `[E2E circuit tomàquet ${Date.now()}]`
+/** Lo que escribiría una ofertante de verdad. */
+const OBSERVACIONS = 'Tomàquet de pera madur, collit aquesta setmana. Hi ha bona part per a salsa: ideal per a obrador.'
+/** Desde cuándo: la oferta de esta pasada es la de Tomàquet de la ofertante creada después. */
+const inici = new Date().toISOString()
 
 let oferta = ''
 let codi = ''
@@ -58,7 +62,8 @@ test.beforeAll(({}, info) => {
   if (motiuSaltClon('super_admin', OFERTANT, SOCIAL, OBRADOR) || info.project.name !== 'escriptori') return
   if (process.env.E2E_ESCRIU !== '1') return
   // Las ofertas de una pasada que se quedó a medias (sin canalizaciones), fuera del Mercat.
-  sql(`update excedentes e set estado = 'cancelada' where e.observacions like '[E2E circuit tomàquet%'
+  sql(`update excedentes e set estado = 'cancelada' where e.producto = 'Tomàquet' and e.kg_total = 500
+         and e.productor_id = '${productorDe(OFERTANT)}' and e.observacions in ('${OBSERVACIONS}')
          and e.estado in ('pendent_validacio', 'publicada')
          and not exists (select 1 from canalizaciones c where c.excedente_id = e.id)`)
   // Las tres partes, con su Conveni de col·laboració vigente (sin él no se publica ni se pide).
@@ -94,7 +99,7 @@ test('1. l’ofertant dona d’alta 500 kg de tomàquet (donació i maquila)', a
       },
       pas: 0, pasMaxim: 99, costTocat: true, proposats: [], canviaLloc: false, desat: Date.now(),
     }))
-  }, [`redestina-oferta-esborrany:${prod}`, lloc, familia, marca])
+  }, [`redestina-oferta-esborrany:${prod}`, lloc, familia, OBSERVACIONS])
   await page.goto('/productor/ofertes/nova')
   await expect(page.getByTestId('formulari-oferta')).toBeVisible()
   // Los kilos, a mano: 500.
@@ -102,8 +107,9 @@ test('1. l’ofertant dona d’alta 500 kg de tomàquet (donació i maquila)', a
   await captura(page, '1-alta')
   await page.getByRole('button', { name: 'Publicar oferta' }).click()
 
-  await expect.poll(() => sql(`select count(*) from excedentes where observacions = '${marca}'`), { timeout: 20_000 }).toBe('1')
-  oferta = sql(`select id from excedentes where observacions = '${marca}'`)
+  const meva = `from excedentes where productor_id = '${prod}' and producto = 'Tomàquet' and created_at >= '${inici}'`
+  await expect.poll(() => sql(`select count(*) ${meva}`), { timeout: 20_000 }).toBe('1')
+  oferta = sql(`select id ${meva}`)
   codi = sql(`select id_excedente from excedentes where id = '${oferta}'`)
   expect(sql(`select estado || '|' || kg_total::numeric(12,2) || '|' || producto || '|' || array_to_string(modalitats, ',') || '|' || coalesce(coste_kg::numeric(12,2)::text, '-')
                 from excedentes where id = '${oferta}'`)).toBe('pendent_validacio|500.00|Tomàquet|donacio,maquila|0.60')

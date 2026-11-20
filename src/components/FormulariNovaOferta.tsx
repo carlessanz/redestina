@@ -63,6 +63,7 @@ import { useConfirma } from './DialegConfirma'
 import type { Excedente } from '../types'
 import { modalitatsDe } from '../lib/modalitats'
 import { esFranjaValida } from '../lib/franja'
+import { useAppContext } from '../hooks/useAppContext'
 import type { Franja } from '../lib/franja'
 import type { Municipi } from '../lib/municipis'
 import SelectorMunicipi from './SelectorMunicipi'
@@ -203,6 +204,9 @@ export interface ResultatNovaOferta {
   id: string
   /** `enviat` cuando la confirmación por correo salió de verdad. */
   confirmacio_email?: string | null
+  /** «Espigolada» del equipo: la jornada que se creó en el acto (o por qué no). */
+  espigolada_id?: string | null
+  espigolada_error?: string | null
 }
 
 /** `crear` (alta), `esborrany` (reabrir uno guardado) o `editar` (una oferta publicada). */
@@ -252,6 +256,9 @@ export default function FormulariNovaOferta({
   const { t, lang } = useT()
   const { confirma, dialeg: dialegConfirma } = useConfirma()
   const editar = mode === 'editar'
+  // «Espigolada» en el alta (20-11-2026): el equipo la convierte en el acto en una jornada; la
+  // productora la pide y la decide el equipo. El texto de la opción lo dice según quién la ve.
+  const esIntern = useAppContext().ctx?.esIntern ?? false
   /** Lo que la oferta decía al abrirla (editar): para no exigir lo que ya faltaba antes. */
   const original = useMemo<Datos>(() => (oferta ? datosDeFila(oferta) : {}), [oferta])
   // El descriptor tal como llega (catalán + castellano), y debajo, en el idioma de la pantalla.
@@ -935,21 +942,41 @@ export default function FormulariNovaOferta({
           // VARIAS a la vez (05-10-2026): una casilla por opción, con su explicación al lado,
           // que aquí sí cabe. El valor es la lista de ids, en el orden de las opciones.
           const triades = modalitatsDe(valor) as string[]
+          // «Espigolada» va con las modalidades pero NO es una (20270614100000): excluye las otras
+          // tres. Por debajo viaja como donación con el producto en el campo y `espigolada: true`.
+          const ambEspigolada = campo.clave === 'modalitat' && !editar
+          const espigolada = ambEspigolada && datos.espigolada === true
           const canvia = (idOpcio: string, on: boolean) => {
             const nou = (campo.opciones ?? [])
               .map((o) => o.id)
-              .filter((x) => (x === idOpcio ? on : triades.includes(x)))
+              .filter((x) => (x === idOpcio ? on : !espigolada && triades.includes(x)))
+            if (espigolada) set('espigolada', false)
             set(campo.clave, nou)
+          }
+          const triaEspigolada = (on: boolean) => {
+            set('espigolada', on)
+            set(campo.clave, on ? ['donacio'] : [])
+            if (on) set('producte_al_camp', 'si')
           }
           return (
             <div id={id} role="group" aria-invalid={invalid}
               className={cn('space-y-1 rounded-md', invalid && 'ring-2 ring-destructive/40')}>
               {(campo.opciones ?? []).map((o) => (
-                <FilaCasella key={o.id} checked={triades.includes(o.id)} onChange={(on) => canvia(o.id, on)}>
+                <FilaCasella key={o.id} checked={!espigolada && triades.includes(o.id)} onChange={(on) => canvia(o.id, on)}>
                   <span className="font-medium">{o.titulo}</span>
                   {o.descripcion && <span className="block text-xs text-muted-foreground">{o.descripcion}</span>}
                 </FilaCasella>
               ))}
+              {ambEspigolada && (
+                <div data-testid="of-espigolada">
+                  <FilaCasella checked={espigolada} onChange={triaEspigolada}>
+                    <span className="font-medium">{t('po.mod_espigolada')}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {t(esIntern ? 'po.mod_espigolada_d_equip' : 'po.mod_espigolada_d')}
+                    </span>
+                  </FilaCasella>
+                </div>
+              )}
               {campo.clave === 'modalitat' && avisModalitats && (
                 <p className="text-xs text-aviso">{avisModalitats}</p>
               )}

@@ -303,6 +303,9 @@ export async function creaOferta(
     estado?: string
     /** Las modalidades marcadas para las que falta el convenio (no impiden publicar). */
     modalitats_sense_conveni?: string[]
+    /** «Espigolada» del equipo (20270614100000): la jornada creada en el acto, o el error. */
+    espigolada_id?: string | null
+    espigolada_error?: string | null
   }> & {
     /**
      * Las claves (`CampoOferta.clave`) que la RPC echa en falta, cuando el rechazo es

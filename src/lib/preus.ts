@@ -372,6 +372,55 @@ export async function carregaOrigensManuals(): Promise<Map<string, { criteri: st
   }
 }
 
+/** El precio de referencia que se aplica hoy a un producto: el último mes validado hasta el actual. */
+export interface PreuVigent {
+  producto: string
+  exercici: number
+  mes: number
+  eur_kg: number
+  font: FontPreu
+}
+
+/**
+ * De las filas de `preus_referencia` (de la más reciente a la más antigua), la primera de cada
+ * producto que no sea de un mes futuro: lo mismo que `preu_referencia_de()` usa antes de caer en
+ * el coste manual. Puro, para el test.
+ */
+export function preusVigents(files: readonly PreuVigent[], ara: Date = new Date()): Map<string, PreuVigent> {
+  const a = mesActual(ara)
+  const ordenades = [...files].sort((x, y) => (y.exercici - x.exercici) || (y.mes - x.mes))
+  const res = new Map<string, PreuVigent>()
+  for (const f of ordenades) {
+    if (f.exercici > a.exercici || (f.exercici === a.exercici && f.mes > a.mes)) continue
+    if (!res.has(f.producto)) res.set(f.producto, f)
+  }
+  return res
+}
+
+/**
+ * Carga el precio vigente de cada producto (Catàleg, 20-11-2026): antes la columna leía solo
+ * `costes_producto` y un producto con su precio de Gencat validado salía «Sense cost». Pagina de
+ * 1.000 en 1.000 (el tope de PostgREST); solo los dos últimos ejercicios.
+ */
+export async function carregaPreusVigents(ara: Date = new Date()): Promise<{ mapa: Map<string, PreuVigent>; error: string | null }> {
+  const desde = mesActual(ara).exercici - 1
+  const files: PreuVigent[] = []
+  for (let des = 0; ; des += 1000) {
+    const { data, error } = await supabase
+      .from('preus_referencia')
+      .select('producto, exercici, mes, eur_kg, font')
+      .gte('exercici', desde)
+      .order('exercici', { ascending: false })
+      .order('mes', { ascending: false })
+      .range(des, des + 999)
+    if (error) return { mapa: new Map(), error: error.message }
+    const pag = (data as PreuVigent[] | null) ?? []
+    files.push(...pag)
+    if (pag.length < 1000) break
+  }
+  return { mapa: preusVigents(files, ara), error: null }
+}
+
 export function carregaPropostaMes(exercici: number, mes: number) {
   return rpc<PropostaPreu[]>('preus_proposta_mes', { p_exercici: exercici, p_mes: mes })
 }

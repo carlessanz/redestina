@@ -12,7 +12,7 @@ vi.mock('../src/lib/supabase', () => ({ supabase: {}, supabaseUrl: '' }))
 import {
   accionsCarregues, claveMes, motiuSensePreu, pasCarrega,
   esDunAltreMes, esMesFutur, esSaltGran, exercicisDisponibles, fontHaCanviat, mesActual, mesAnterior, mesDeData,
-  mesFontDeFila, preuDeFila,
+  mesFontDeFila, preuDeFila, preusVigents,
   resumMes, textVariacio, valorDeFont, variacio, type PropostaPreu,
 } from '../src/lib/preus'
 
@@ -185,5 +185,25 @@ describe('qué espera una carga', () => {
   })
   it('claveMes', () => {
     expect(claveMes({ exercici: 2026, mes: 3 })).toBe('2026-03')
+  })
+})
+
+describe('preusVigents (Catàleg, 20-11-2026)', () => {
+  const ara = new Date('2026-11-20T10:00:00Z')
+  const f = (producto: string, exercici: number, mes: number, eur_kg: number, font: 'gencat' | 'mercabarna' | 'manual' = 'gencat') =>
+    ({ producto, exercici, mes, eur_kg, font })
+
+  it('toma el último mes validado de cada producto, sin meses futuros', () => {
+    const m = preusVigents([
+      f('Poma', 2026, 9, 0.62), f('Poma', 2026, 10, 0.6858), f('Poma', 2026, 12, 9),
+      f('Pera', 2025, 12, 0.9, 'mercabarna'),
+    ], ara)
+    expect(m.get('Poma')?.eur_kg).toBe(0.6858)
+    expect(m.get('Pera')).toMatchObject({ exercici: 2025, mes: 12, font: 'mercabarna' })
+    expect(m.has('Ceba')).toBe(false)
+  })
+
+  it('el mes en curso cuenta si ya está validado', () => {
+    expect(preusVigents([f('Ceba', 2026, 11, 0.4), f('Ceba', 2026, 10, 0.5)], ara).get('Ceba')?.eur_kg).toBe(0.4)
   })
 })

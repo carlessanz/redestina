@@ -21,7 +21,7 @@ test.beforeAll(() => {
   ofertaId = sql(`insert into excedentes
       (id_excedente, productor_id, producto, variedad, kg_total, estado, origen, modalitat,
        modalitats, disponible_hasta, observacions, texto_oferta)
-    values ('E-E2E-DESTI-' || floor(extract(epoch from now()))::text, '${productor}', 'Lima',
+    values ('E-E2E-DESTI-' || floor(extract(epoch from now()))::text, '${productor}', 'Llima',
             null, 150, 'publicada', 'asistido', 'donacio', '{donacio}', current_date - 3,
             '[E2E] destí final', '[E2E]')
     returning id`).split('\n')[0]

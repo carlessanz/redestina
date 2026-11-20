@@ -866,6 +866,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
           {exc.producte_al_camp && !exc.espigolada_id && (
             <div className="rounded-lg border border-aviso/30 bg-aviso-fondo p-3">
               <p className="text-sm font-medium text-aviso">{t('conv_esp.banner')}</p>
+              {exc.espigolada_demanada && (
+                <p className="mt-1 text-sm text-aviso" data-testid="od-espigolada-demanada">{t('conv_esp.demanada')}</p>
+              )}
               {/* El motivo del gris va TAMBIÉN visible: en táctil no hay hover, así que el
                   tooltip de `BotoAmbMotiu` no existe para media aplicación (§6ter). */}
               {motiuNoConvertible && (

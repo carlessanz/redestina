@@ -21,7 +21,7 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import {
-  canvisOferta, crearExcedente, desarEsborrany, modalitatsAmbConveni, textoOfertaDeFila,
+  canvisOferta, crearExcedente, desarEsborrany, esEspigolada, modalitatsAmbConveni, textoOfertaDeFila,
 } from "../_shared/oferta.ts";
 import { modalitatsDe } from "../_shared/modalitats.ts";
 import { CAMPOS, FAMILIES_ES, SECCIONES, faltantes } from "../_shared/camposOferta.ts";
@@ -333,6 +333,20 @@ Deno.serve(async (req) => {
       }
       return responder({ error: r.error ?? "No s'ha pogut crear l'oferta" }, 500);
     }
+    // «Espigolada» (20-11-2026, `20270614100000`): si la da de alta el EQUIPO, se convierte en el
+    // acto en una jornada `oberta` (pendiente de espigolar) con la misma RPC que el botón
+    // «Converteix en espigolada». Si la da de alta la productora, se queda con la marca y va a
+    // validación (lo impone el trigger): el destino lo decide el equipo.
+    let espigoladaId: string | null = null;
+    let espigoladaError: string | null = null;
+    if (esEspigolada(d.espigolada) && ctx.esIntern && r.excedenteId) {
+      const { data: esp, error: errEsp } = await supabase.rpc("crear_espigolada", {
+        p_productor: v.productor.id,
+        p_excedente: r.excedenteId,
+      });
+      if (errEsp) espigoladaError = errEsp.message;
+      else espigoladaId = (esp as { espigolada_id?: string } | null)?.espigolada_id ?? null;
+    }
     // La confirmación que el intake manda por WhatsApp, aquí por correo: quien publica desde el
     // panel también tiene derecho a su referencia por escrito.
     const confirmacio = await confirmarOfertaPerCorreu(
@@ -341,8 +355,10 @@ Deno.serve(async (req) => {
     return responder({
       ok: true, id: r.excedenteId, id_excedente: r.idExcedente, confirmacio_email: confirmacio,
       // `pendent_validacio` o `publicada` (05-10-2026): lo decide la base.
-      estado: r.estado ?? "publicada",
+      estado: espigoladaId ? "borrador" : r.estado ?? "publicada",
       modalitats_sense_conveni: v.senseConveni,
+      espigolada_id: espigoladaId,
+      espigolada_error: espigoladaError,
     }, 200);
   };
 

@@ -2062,3 +2062,10 @@ lo ya validado no se toca, porque podría mover un certificado emitido (deuda 20
 - `20270610100200_realtime_comptadors.sql`: `supabase_realtime` publica además `avisos`, `convenios`, `albaranes`,
   `firmes_document`, `excedentes_canvis` y `documentos`. Realtime filtra por RLS y por `has_column_privilege`, así que
   las columnas fuera del GRANT (`documentos.envio`…) no salen; un DELETE solo manda la clave primaria.
+
+### `excedentes.espigolada_demanada` (20-11-2026, `20270614100000`)
+
+Quien da de alta la oferta eligió «Espigolada». No es una modalidad (no entra en `modalitats` ni en
+`modalitat_receptor_compat`): es una petición de destino. Con origen `panel`/`intake`, `trg_excedentes_validacio` la
+manda a `pendent_validacio` aunque `validacio_ofertes` esté apagada; el equipo la convierte con `crear_espigolada()`
+(si la crea el equipo, `crear-oferta` la convierte en el acto). `producte_al_camp` la acompaña siempre.

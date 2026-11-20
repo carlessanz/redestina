@@ -85,6 +85,11 @@ export function retornDetall(d: Record<string, unknown>): { detall: string | nul
   return { detall, quantitat: Number.isInteger(q) && q > 0 ? q : null };
 }
 
+/** ¿Se eligió «Espigolada» en el alta? Solo un `true` (o `"si"`) explícito del panel. */
+export function esEspigolada(valor: unknown): boolean {
+  return valor === true || valor === "si";
+}
+
 export function esProducteAlCamp(valor: unknown): boolean {
   if (typeof valor === "boolean") return valor;
   const v = String(valor ?? "").trim().toLowerCase()
@@ -356,9 +361,12 @@ export function filaDeDades(
 ): Record<string, unknown> {
   const kgN = Number(String(d.kg ?? "").replace(",", "."));
   const kg = Number.isFinite(kgN) && kgN > 0 ? kgN : null;
+  // «Espigolada» (20-11-2026, `20270614100000`): no es una modalidad, es un destino. Implica el
+  // producto en el campo y una donación (lo que reparte la jornada); la marca la lleva aparte.
+  const espigolada = esEspigolada(d.espigolada);
   // Las modalidades, en plural desde el 05-10-2026 (`modalitats.ts`). `modalitat` sigue
   // guardando la PRINCIPAL para todo lo que todavía lee una sola.
-  const modalitats = modalitatsDe(d.modalitat);
+  const modalitats = modalitatsDe(espigolada ? "donacio" : d.modalitat);
   const preuN = ambPreu(modalitats) && d.preu_minim != null && d.preu_minim !== ""
     ? Number(String(d.preu_minim).replace(",", "."))
     : null;
@@ -379,7 +387,8 @@ export function filaDeDades(
     producto: String(d.producte ?? "").trim() || null,
     variedad: typeof d.varietat === "string" && d.varietat.trim() ? d.varietat.trim().slice(0, 400) : null,
     // Se resuelve UNA vez: el texto que circula y la columna que decide el flujo dicen lo mismo.
-    producte_al_camp: esProducteAlCamp(d.producte_al_camp),
+    producte_al_camp: espigolada || esProducteAlCamp(d.producte_al_camp),
+    espigolada_demanada: espigolada,
     hectarees: hectareesDe(d),
     kg_total: kg,
     num_caixes: Number.isInteger(caixes) && caixes > 0 ? caixes : null,
