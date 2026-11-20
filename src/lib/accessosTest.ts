@@ -38,10 +38,11 @@ export const GRUPS_ACCESSOS: GrupAccessos[] = [
     // clon y siembra de organizaciones ficticias, `scripts/sembrar-entitats-ficticies.ts`) gestiona
     // el Obrador de prova. Las otras cuatro del grupo (Sebas, Raquel, Anna y Laura) y la del
     // Obrador de antes se quedaron sin organización y se retiraron de aquí: su botón llevaba a
-    // `/sense-acces`. El doble rol de prueba no está porque su contraseña no está en el arnés.
+    // `/sense-acces`.
     titolKey: 'test.grp_wa',
     comptes: [
       { organitzacio: 'Obrador de prova (maquila)', tipus: 'Entitat de transformació', email: 'hola+wa-carles@carlessanz.com', password: 'I4261-jWy0M-yefs7' },
+      { organitzacio: 'Doble rol de prova', tipus: 'Productor i entitat social (dos panells)', email: 'hola+productor-receptor@carlessanz.com', password: 'jaHkq-im9F7-7bjYm' },
     ],
   },
   // Un solo usuario por organización: el producto no tiene cargos dentro de la empresa,

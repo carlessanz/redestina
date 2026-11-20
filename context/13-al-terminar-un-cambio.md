@@ -416,3 +416,6 @@
 **E2E contra el clon** (punto 4 del canónico): `tests/e2e/*.e2e.ts`; `tests/e2e/ajuda.ts` da `sql()`,
 `sqlCom()`, `compte()`, `entra()` y `motiuSaltClon()`. Un test que apaga un interruptor
 (`email_activo`…) lo restaura en un `finally`.
+
+- **20-11-2026 · cuentas `pendent`/`sense_rol` del arnés borradas**: clon **2.362/2.362 y 47 sin datos** (antes 3.021: las dos cuentas
+  sostenían ~659 checks, casi todos de `DOCUMENTAL_EXTERN`). Producción conserva su cifra hasta que se borren allí (`context/09`).

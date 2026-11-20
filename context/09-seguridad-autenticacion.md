@@ -847,3 +847,15 @@ Las 9 cuentas de `scripts/data/cuentas-prueba.json` siguen; sus fichas son ahora
 organización: `senserol-arnes` (a propósito), `recowner-obrador` y `wa-sebas/raquel/anna/laura` (deuda 201). Los
 botones de `/login` (`src/lib/accessosTest.ts`, solo con `VITE_ACCESSOS_TEST`) dicen los nombres nuevos y ya no
 ofrecen las cuentas sin organización; el grupo `test.grp_wa` se titula «Compte de proves de Carles».
+
+### Cuentas arnés `pendent` y `sense_rol`, borradas (20-11-2026)
+
+A petición de Carles (no querer ver «arnés» en la interfaz) se **borraron** `hola+pendent-arnes@` y
+`hola+senserol-arnes@` (cuentas de Auth) y la ficha `TEST-PENDENT-ARNES` (por `borrar_ficha_completa`,
+que retiró también su organización). Se quitaron de `scripts/data/cuentas-prueba.json` (quedan 7) y el
+bloque de siembra desapareció de `scripts/sembrar-entitats-ficticies.ts`. El arnés **ya no recorre los
+bloques `pendent` ni `sense_rol`** (siguen escritos como especificación): clon **2.362/2.362 y 47 sin
+datos**. Para recuperarlos: alta por `/registre` y una cuenta sin membresía, y volver a ponerlas en el JSON.
+La cuenta de **doble rol** (`hola+productor-receptor@`) tiene botón en `/login` («Doble rol de prova», grupo
+de Carles); se le puso una contraseña nueva aleatoria el 20-11-2026 (la vieja la había puesto Carles en
+`/registre`), solo en `src/lib/accessosTest.ts` —no en el JSON del arnés, que no tiene bloque `doble_rol`—.

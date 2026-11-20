@@ -23,7 +23,6 @@
 //   TEST-ENT-COMERCIAL  Empresa receptora de prova          receptora comercial (empresa: P8)  receptor-comercial
 //   TEST-ENT-OBRADOR    Obrador de prova (maquila)          receptora transformador             receptor-carles
 //   TEST-DOBLE-*        Doble rol de prova                  productor + receptora social       hola+productor-receptor@ (doble rol de Carles)
-//   (sin codigo)        TEST-PENDENT-ARNES                  productor, registro PENDIENTE      pendent-arnes (NO SE APRUEBA NUNCA)
 //
 // Los `codigo` son los de siempre a propósito: los fixtures del clon (`crear-datos-documentales-
 // prueba.ts`, `crear-respuestas-prueba.ts`) y el arnés buscan las fichas por ellos.
@@ -37,10 +36,8 @@
 //   · la naturalesa, `fixar_naturalesa()`; el convenio, `declarar_conveni()` (consume un número de la
 //     serie CONV-COL-*, como en la pantalla);
 //   · el acceso, `concedir_acces_org()` (solo `service_role`: es lo que hace `donar-acces`, sin el correo);
-//   · TEST-PENDENT-ARNES, como lo crea el registro público (`registro/alta.ts`): organización, ficha
-//     «En desenvolupament» y membresía **pendent** con la service key.
 //
-// NO CREA CUENTAS. Las nueve del arnés (`scripts/data/cuentas-prueba.json`) y la del doble rol ya
+// NO CREA CUENTAS. Las siete del arnés (`scripts/data/cuentas-prueba.json`) y la del doble rol ya
 // existen; si falta alguna, avisa y sigue. `hola@carlessanz.com` (super_admin) NO puede tener
 // organización: `trg_membresia_no_equip` lo impide (`compte_equip`); por eso el doble rol va a su
 // cuenta de pruebas `hola+productor-receptor@`.
@@ -282,16 +279,6 @@ const ORGS: OrgFicticia[] = [
   },
 ];
 
-/** TEST-PENDENT-ARNES: igual que la crea el registro público y como estaba (sostiene 73 checks). */
-const PENDENT = {
-  empresa: "TEST-PENDENT-ARNES",
-  name: "Compte de proves de l'arnes",
-  compte: correu("pendent-arnes"),
-  phone: "600000001", // ni E.164 ni móvil real: no puede recibir nada
-  poblacion: "Barcelona",
-  municipi: "08019",
-};
-
 // ---------------------------------------------------------------------------
 // Auxiliares
 // ---------------------------------------------------------------------------
@@ -482,38 +469,6 @@ for (const o of ORGS) {
   }
 
   resum.push(`${o.nom} · ${o.rols.join("+")} · ${o.nif} · ${o.compte}`);
-}
-
-// ---------------------------------------------------------------------------
-// TEST-PENDENT-ARNES: el registro pendiente, por el camino del registro público
-// ---------------------------------------------------------------------------
-pas("TEST-PENDENT-ARNES (registre PENDENT: no s'aprova mai)");
-{
-  const userId = usuaris.get(PENDENT.compte.toLowerCase());
-  const { data: ja } = await admin.from("productores").select("id").eq("empresa", PENDENT.empresa).maybeSingle();
-  if (ja) {
-    ok("ja existeix");
-  } else if (!userId) {
-    avis(`no existeix el compte ${PENDENT.compte}: no es crea`);
-  } else if (DRY_RUN) {
-    fa(`organització + productor «${PENDENT.empresa}» (en_desenvolupament, es_test) + membresia pendent de ${PENDENT.compte}`);
-  } else {
-    const { data: org, error: eOrg } = await admin.from("organizaciones").insert({ creada_por: userId }).select("id").single();
-    if (eOrg) throw new Error(`organització pendent: ${eOrg.message}`);
-    const { data: f, error: eF } = await admin.from("productores").insert({
-      name: PENDENT.name, empresa: PENDENT.empresa, email: PENDENT.compte, phone: PENDENT.phone,
-      poblacion: PENDENT.poblacion, municipio_ine: PENDENT.municipi, organizacion_id: org.id,
-      es_test: true, estat_crm: "en_desenvolupament",
-    }).select("id").single();
-    if (eF) throw new Error(`fitxa pendent: ${eF.message}`);
-    const { error: eM } = await admin.from("membresias").insert({
-      user_id: userId, tipo: "productor", productor_id: f.id, entidad_id: null,
-      rol_org: "titular", activo: false, aprovacio: "pendent",
-    });
-    if (eM) throw new Error(`membresia pendent: ${eM.message}`);
-    ok("creada: fitxa en_desenvolupament i membresia pendent");
-  }
-  resum.push(`${PENDENT.empresa} · productor · sense NIF · ${PENDENT.compte} (pendent)`);
 }
 
 pas("Resum");

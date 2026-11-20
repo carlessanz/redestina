@@ -36,6 +36,10 @@
 // Es la cuenta que crea scripts/crear-usuarios-prueba.ts con la membresía
 // `aprovacio = 'pendent'` + `activo = false` (su contraseña se imprime al crearla).
 //
+// ⚠️ Desde el 20-11-2026 vuelve a NO haber cuenta para `sense_rol` ni `pendent`: se borraron
+// `pendent-arnes` y `senserol-arnes` (y la ficha TEST-PENDENT-ARNES) a petición de Carles, para que
+// no aparezcan en Entitats ni en Aprovacions. Sus bloques siguen aquí como especificación.
+//
 // Las escrituras solo se prueban sobre filas de prueba (codigo like 'TEST-%') y
 // siempre se revierten; si una fila fixture no existe, la comprobación se salta y
 // se avisa, en vez de tocar datos reales.
@@ -927,6 +931,32 @@ const PROPOSTA_LECTURA_RECEPTOR: Check[] = [
   { tabla: "canalizaciones", op: "leer", esperado: "permitir", columnas: "id, recollida_origen", descripcion: "veu qui va registrar la recollida de les seves canalitzacions (fase 5)", requiereFixture: "alguna canalitzacio de la seva entitat" },
 ];
 
+// «Entrades i sortides» (20270612100000, punto 6.7): una fila por salida, solo lectura y solo
+// del equipo (también `tecnic`).
+//   · `sortides_base` (la fila y los filtros) y `estat_recollida_canalitzacio` (el `case` del
+//     estado que comparte con `operacio_detall`) son internas: 42501 a toda sesión;
+//   · las dos públicas ponen la guarda antes que la validación: un externo, 42501; el equipo,
+//     22023 con argumentos inválidos (`limit_invalid`, `periode_invalid`, `agrupacio_invalida`).
+//   · Devuelven `jsonb`, así que el «permitir» sale «ejecutada» con o sin canalizaciones: el
+//     `requiereFixture` documenta que el contenido solo se ve con alguna.
+const SORTIDES_INTERNES: Check[] = [
+  { tabla: "sortides_base", op: "rpc", esperado: "denegar", args: { p_desde: null }, descripcion: "NO crida la consulta interna d'entrades i sortides (6.7)" },
+  { tabla: "estat_recollida_canalitzacio", op: "rpc", esperado: "denegar", args: { p_estado: "confirmada", p_registrada_at: null, p_validada_at: null, p_data_hora: null, p_albara_estado: null }, descripcion: "NO crida el calcul intern de l'estat d'una recollida (6.7)" },
+];
+const SORTIDES_EXTERN: Check[] = [
+  ...SORTIDES_INTERNES,
+  { tabla: "entrades_sortides", op: "rpc", esperado: "denegar", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "NO veu les entrades i sortides (es de l'equip) (6.7)" },
+  { tabla: "entrades_sortides_resum", op: "rpc", esperado: "denegar", args: { p_per: "ofertant" }, descripcion: "NO veu el resum d'entrades i sortides (es de l'equip) (6.7)" },
+];
+const SORTIDES_EQUIP: Check[] = [
+  ...SORTIDES_INTERNES,
+  { tabla: "entrades_sortides", op: "rpc", esperado: "permitir", args: { p_limit: 25, p_offset: 0 }, descripcion: "veu les entrades i sortides de tota la base (6.7)", requiereFixture: "alguna canalització" },
+  { tabla: "entrades_sortides_resum", op: "rpc", esperado: "permitir", args: { p_per: "ofertant" }, descripcion: "veu el resum d'entrades i sortides per ofertant (6.7)", requiereFixture: "alguna canalització" },
+  { tabla: "entrades_sortides", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_limit: 0 }, descripcion: "un limit fora de rang es 22023 (autoritza; limit_invalid) (6.7)" },
+  { tabla: "entrades_sortides", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_desde: "2026-12-31", p_hasta: "2026-01-01" }, descripcion: "un periode al reves es 22023 (autoritza; periode_invalid) (6.7)" },
+  { tabla: "entrades_sortides_resum", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_per: "no_existeix" }, descripcion: "una agrupacio desconeguda es 22023 (autoritza; agrupacio_invalida) (6.7)" },
+];
+
 // El bloque documental de CUALQUIER cuenta que no sea del equipo, sea cual sea su tipo.
 // Se escribe una vez y se reparte a los cinco perfiles externos: es literalmente la misma
 // afirmación en todos («nada del sistema documental es suyo salvo el nomenclátor»), y
@@ -1549,6 +1579,8 @@ const DOCUMENTAL_EXTERN: Check[] = [
   ...CANALITZACIO_PONT_ALIE,
   // Proponer cambios y origen de la recogida (fase 5 de los puntos 4-6): ver `PROPOSTA_SENSE_APROVAR`.
   ...PROPOSTA_SENSE_APROVAR,
+  // «Entrades i sortides» (20270612100000, 6.7): ver `SORTIDES_EXTERN`.
+  ...SORTIDES_EXTERN,
 ];
 
 // Lo que CADA rol debe poder hacer. Es la especificación ejecutable de AGENTS.md §4:
@@ -1832,6 +1864,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     ...CANALITZACIO_PONT_ALIE,
     // Proponer cambios (fase 5 de los puntos 4-6): el técnico no tiene `pot_aprovar()`.
     ...PROPOSTA_SENSE_APROVAR,
+    // «Entrades i sortides» (20270612100000, 6.7): de todo el equipo, también el técnico.
+    ...SORTIDES_EQUIP,
     {
       tabla: "costes_producto",
       op: "leer",
@@ -2512,6 +2546,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     ...CANALITZACIO_PONT_ALIE,
     // Proponer cambios y origen de la recogida (fase 5 de los puntos 4-6).
     ...PROPOSTA_SUPER,
+    // «Entrades i sortides» (20270612100000, 6.7).
+    ...SORTIDES_EQUIP,
     // --- La via assistida (20270328100200 / 20270328100300 / 20270328100400) ---
     // ⚠️ Los tres «permitir» se llaman con un uuid INEXISTENTE a propósito, igual que los
     //    del ciclo de cierre: lo que se afirma es que la guarda de ROL deja pasar, no que

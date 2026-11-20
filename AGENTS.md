@@ -314,7 +314,7 @@ Catálogos por migración (`20260721120300_seed_catalogos.sql`). Fichas, dos ví
 🔴 **Vaciado (fase 6, `context/06`)**: `reiniciar_dades_operatives(p_executar)` (solo `service_role`; con algo real se
 niega: `22023 hi_ha_dades_reals`) vía `scripts/reiniciar-dades.ts` (dry-run por defecto) borra la operativa y **todas** las fichas, conserva
 catálogos, configuración y cuentas, y reinicia las series; `scripts/sembrar-entitats-ficticies.ts` siembra 7 fichas
-`es_test` con el tipo en el nombre (TEST-PENDENT-ARNES, **no aprobar nunca**). Clon y producción: hecho (20-11).
+`es_test` con el tipo en el nombre (sin la pendiente, `context/09`). Clon y producción: hecho (20-11).
 
 ## 6bis. Intake conversacional (detalle en `context/06bis-…md`)
 
@@ -486,8 +486,8 @@ correo; sin ninguno, `cap`. `canal_preferido` se respeta si es viable. Lo decide
 - **Firma electrónica simple en todos los documentos**: el servidor compone y hashea lo firmado
   (`409 document_canviat`), nombre, cargo y DNI, trazo PNG ≤1 MB, IP y UA en `evidencias`; vías correo,
   asistida y panel. `pujar-document-signat`: formato por **bytes** (`_shared/pujada.ts`), permiso antes de leer.
-- Cuentas de prueba (fase 6): 7 fichas ficticias, 9 cuentas del arnés + la de doble rol; `pendent-arnes`
-  (**pendiente, no aprobar**) y `senserol-arnes`; credenciales en `scripts/data/cuentas-prueba.json` (`context/09`).
+- Cuentas de prueba (fase 6): 6 fichas ficticias, 7 cuentas del arnés + la de doble rol (botón en `/login`);
+  `pendent-arnes`/`senserol-arnes` borradas (20-11); credenciales en `scripts/data/cuentas-prueba.json` (`context/09`).
 - ⚠️ **Nunca `supabase config push`** (apagaría el login por email y subiría el Auth local); los
   flags de Auth van por Management API.
 
@@ -563,7 +563,7 @@ Decisiones de negocio pendientes (en `context/12`): **69**, **131**, **132** (el
    **Referencia: 2.235 de Vitest (104 ficheros, 1 saltada) + 60 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 3.021/3.021 y 47 sin datos; producción 2.926/2.926 y 142 (20-11-2026).** Cifra
+   **Referencia: clon 2.362/2.362 y 47 sin datos; producción 2.926/2.926 y 142 (20-11-2026).** Cifra
    que cambia sin checks nuevos = cambio de **datos**. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).
 5. Publicar con `/publicar` (base → funciones → frontend).

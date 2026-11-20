@@ -24,8 +24,8 @@ salió **669/669 + 13**, exactamente la referencia de §13, que es lo que demues
 coherente.
 
 ⚠️ **Dos filas se quedaron a propósito y no son un descuido:**
-- La ficha **«Compte de proves de l'arnes»** (`TEST-PENDENT-ARNES`), que es `es_test = false` pero
-  cubre el bloque `pendent` del arnés: borrarla apaga **73 comprobaciones en silencio** (§9).
+- ~~La ficha «Compte de proves de l'arnes» (`TEST-PENDENT-ARNES`)~~: **borrada el 20-11-2026** a petición de Carles
+  (el arnés ya no recorre el bloque `pendent`; `context/09`).
 - `email_test_recipients` conserva **`tecnologia@espigoladors.com`** sin ficha detrás: es el correo
   propietario de la cuenta de Resend (§12.33). Y `wa_contacts` conserva `34636977820` («Laura
   Masdeu», 0 mensajes), que ya estaba sin ficha antes del borrado porque su ficha no tiene teléfono.
@@ -450,8 +450,8 @@ CONV y PLA siempre se emiten en `modo='real'`, por eso el criterio no es «todo 
   ofertant de prova» (TEST-PROD-2, Mollerussa) → `productor-altre`; «Entitat social receptora de prova» (TEST-ENT-SOCIAL)
   → `receptor-social`; «Empresa receptora de prova» (TEST-ENT-COMERCIAL, empresa: solo compra y maquila) →
   `receptor-comercial`; «Obrador de prova (maquila)» (TEST-ENT-OBRADOR, Sabadell, transformador) → `receptor-carles`;
-  «Doble rol de prova» (TEST-DOBLE-PROD/TEST-DOBLE-ENT, Vic) → `hola+productor-receptor@`; TEST-PENDENT-ARNES (pendiente,
-  **no aprobar nunca**) → `pendent-arnes`. Lugares de recogida en los ofertantes y el doble rol; diagnóstico y perfil
+  «Doble rol de prova» (TEST-DOBLE-PROD/TEST-DOBLE-ENT, Vic) → `hola+productor-receptor@`; (TEST-PENDENT-ARNES, retirada
+  el 20-11). Lugares de recogida en los ofertantes y el doble rol; diagnóstico y perfil
   vacíos. Una cuenta del equipo no puede tener membresías (`trg_membresia_no_equip`), por eso el doble rol va a una
   cuenta de pruebas y no a la de Carles. La siembra añade los correos de las cuentas de prueba a `email_test_recipients`.
 - **Clon (19-11-2026)**: 734 organizaciones (720 del ARA) y 6.398 filas operativas → 0; 662 ficheros borrados; series a
