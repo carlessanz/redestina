@@ -808,8 +808,11 @@ canalización y su estado.
   los tres atajos de `OfferDetail`** que rompían la paridad (deuda 109): marcar una respuesta «acceptada» a mano,
   el alta directa de canalizaciones y teclear los kilos reales. Lo aprobado se enseña con `kg_aprovats`.
 - ✅ **Fase 4, mensajes en los tres paneles**: `hooks/useMissatgesOferta` (con `avisos_de_oferta()`) y
-  `components/MissatgesDelPunt`. En `OfferDetail`, «Missatges de l’oferta (n)», plegado salvo que alguno no haya
-  salido, con «Copia el WhatsApp» y el correo plegado. En el panel del ofertante (detalle de su oferta) y de la
+  `components/MissatgesDelPunt`. En `OfferDetail`, «Missatges de l’oferta (n)», plegado, con «Copia el WhatsApp» y el correo
+  plegado. 🔴 **Desde el 23-11-2026 (petición de la Fundació para la demo) solo enseña DOS**: la oferta para
+  compartir (`oferta`, una vez) y RECOLLIDA CONFIRMADA con el enlace para registrar los kg (`recollida_grup`)
+  —`missatgesFitxaOferta()`/`CLAUS_MISSATGES_FITXA_OFERTA`—; se retiró el contador «n sense enviar». Los demás
+  mensajes del ciclo (alta, respuestas del bot, avisos) siguen paso a paso en el ciclo guiado y en los paneles externos. En el panel del ofertante (detalle de su oferta) y de la
   receptora (ficha de la operación y diálogo del interés), **solo los avisos y solo en lectura** («El que t’hem
   dit»): el `texto_oferta` lleva «PRODUCTOR: …» (D3) y el agradecimiento del alta el código `E-…`, que ellos no
   ven, así que el hook ni los pide fuera del equipo (`perspectiva`). La campana marca en ámbar los avisos que no

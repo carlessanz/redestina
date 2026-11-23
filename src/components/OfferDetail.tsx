@@ -16,7 +16,7 @@ import Desplegable from './Desplegable'
 import { useT } from '../lib/i18n'
 import { textError } from '../lib/textError'
 import { useConfirma } from './DialegConfirma'
-import { textRecollidaGrup } from '../lib/missatgesOferta'
+import { missatgesFitxaOferta, textRecollidaGrup } from '../lib/missatgesOferta'
 import { useMissatgesOferta } from '../hooks/useMissatgesOferta'
 import { useDialegPerUrl } from '../hooks/useDialegPerUrl'
 import { enllacInteresOferta, textOfertaPerCopiar } from '../lib/enllacosDirectes'
@@ -694,8 +694,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     ...respuestas.map((r) => `${r.id}:${r.estado}:${r.aprovacio}`),
     ...canalizaciones.map((c) => `${c.id}:${c.estado}:${c.data_hora_recollida ?? ''}:${c.kg_confirmados ?? ''}`),
   ].join('|')
-  const { missatges } = useMissatgesOferta(exc.id, firmaMissatges)
-  const perEnviar = missatges.filter((m) => m.estat === 'no_enviat' || m.estat === 'pendent').length
+  // Solo la oferta y RECOLLIDA CONFIRMADA (23-11-2026): los demás pasos, en el ciclo guiado.
+  const { missatges: totsMissatges } = useMissatgesOferta(exc.id, firmaMissatges)
+  const missatges = useMemo(() => missatgesFitxaOferta(totsMissatges), [totsMissatges])
 
   // Dónde está la oferta y qué toca. Lo decide `procesOferta.ts`, el mismo módulo que lo
   // cuenta en el panel del productor: las dos pantallas no pueden discrepar sobre el punto
@@ -887,17 +888,14 @@ export default function OfferDetail({ excedente, onBack }: Props) {
         </CardContent>
       </Card>
 
-      {/* Los mensajes de la oferta, con el texto exacto para copiar. Plegados: abiertos solo
-          si alguno no ha salido, que es cuando hay que avisar a mano. */}
+      {/* Los dos mensajes que se copian (23-11-2026): la oferta para compartir y RECOLLIDA
+          CONFIRMADA con el enlace para registrar los kg. Plegados: son de consulta. */}
       {missatges.length > 0 && (
         <Card>
           <CardContent className="pt-6">
-            <details open={perEnviar > 0}>
+            <details data-testid="od-missatges">
               <summary className="cursor-pointer font-titulos text-base font-semibold">
                 {t('msg.titol_oferta', { n: missatges.length })}
-                {perEnviar > 0 && (
-                  <span className="ml-2 text-sm font-normal text-aviso">{t('msg.per_enviar', { n: perEnviar })}</span>
-                )}
               </summary>
               <p className="mt-1 text-xs text-muted-foreground">{t('msg.ajuda')}</p>
               <div className="mt-3">

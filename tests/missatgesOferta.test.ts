@@ -6,7 +6,8 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  FASE_AVIS, missatgeDAvis, missatgesDeLOferta, textRecollidaGrup,
+  CLAUS_MISSATGES_FITXA_OFERTA, FASE_AVIS, missatgeDAvis, missatgesDeLOferta, missatgesFitxaOferta,
+  textRecollidaGrup,
 } from '../src/lib/missatgesOferta'
 import type { AvisMissatge, FetsMissatges } from '../src/lib/missatgesOferta'
 import {
@@ -165,6 +166,31 @@ describe('los mensajes de una oferta', () => {
   it('el correo de la oferta enlaza directo a ella en el Mercat', () => {
     const m = missatgesDeLOferta(BASE, OPC).find((x) => x.clau === 'oferta')!
     expect(m.correu!.text.endsWith(`${APP}/receptor/mercat?oferta=exc-1&accio=interes`)).toBe(true)
+  })
+})
+
+describe('«Missatges de l’oferta» en la ficha del equipo (23-11-2026)', () => {
+  const tots = missatgesDeLOferta({
+    ...BASE,
+    respostes: [{ id: 'r1', entidad_id: 'ent-1', canal: 'whatsapp', estado: 'acceptada', kg_solicitados: 50 }],
+    canalitzacions: [{ id: 'c1', entidad_id: 'ent-1', kg_confirmados: 50, data_hora_recollida: '2026-10-28T08:00:00Z', estado: 'confirmada' }],
+    avisos: [avis('oferta_validada'), avis('oferta_enviada', { destinatari_tipo: 'entidad', destinatari_id: 'ent-1' }),
+      avis('interes_aprovat', { destinatari_tipo: 'entidad', destinatari_id: 'ent-1' })],
+    entitats: { 'ent-1': 'Banc d’Aliments' },
+  }, OPC)
+
+  it('deja solo la oferta y RECOLLIDA CONFIRMADA, en ese orden y una vez cada uno', () => {
+    expect(tots.length).toBeGreaterThan(2)
+    const fitxa = missatgesFitxaOferta([...tots, ...tots])
+    expect(fitxa.map((m) => m.clau)).toEqual([...CLAUS_MISSATGES_FITXA_OFERTA])
+    expect(fitxa[1].whatsapp).toContain('RECOLLIDA CONFIRMADA')
+    expect(fitxa[1].whatsapp).toContain(APP)
+  })
+
+  it('sin entregas, solo la oferta; sin texto de oferta, nada', () => {
+    expect(missatgesFitxaOferta(missatgesDeLOferta(BASE, OPC)).map((m) => m.clau)).toEqual(['oferta'])
+    expect(missatgesFitxaOferta(missatgesDeLOferta({ ...BASE, oferta: { ...BASE.oferta, texto_oferta: null } }, OPC)))
+      .toEqual([])
   })
 })
 

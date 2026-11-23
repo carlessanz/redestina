@@ -76,16 +76,18 @@ test.describe('amb les notificacions apagades', () => {
          or objecte_id in (select id from canalizaciones where excedente_id = '${ofertaId}')`)
     await expect.poll(tipus, { timeout: 60_000 }).toBe('interes_aprovat:cap,sortida_trobada:cap')
 
-    // El equipo: el bloque abierto, con el aviso de que no ha salido y su botón de copiar.
+    // El equipo, en la ficha de la oferta: solo la oferta y RECOLLIDA CONFIRMADA (23-11-2026);
+    // los avisos sin enviar se copian desde el ciclo guiado, paso a paso.
     await context.grantPermissions(['clipboard-read', 'clipboard-write'])
     await entra(page, 'super_admin')
     await page.goto(`/equip/ofertes/${ofertaId}`)
-    await expect(page.getByText(/Missatges de l’oferta|Mensajes de la oferta/)).toBeVisible()
-    await expect(page.getByText(/2 sense enviar|2 sin enviar/)).toBeVisible()
-    await expect(page.getByText(/No s’ha enviat: cal avisar a mà|No se ha enviado: hay que avisar a mano/).first()).toBeVisible()
-    await page.locator('[data-testid="missatge"][data-clau="interes_aprovat"]')
+    const bloc = page.getByTestId('od-missatges')
+    await bloc.getByText(/Missatges de l’oferta \(2\)|Mensajes de la oferta \(2\)/).click()
+    await expect(bloc.locator('[data-testid="missatge"]')).toHaveCount(2)
+    await expect(bloc.locator('[data-testid="missatge"][data-clau="interes_aprovat"]')).toHaveCount(0)
+    await bloc.locator('[data-testid="missatge"][data-clau="recollida_grup"]')
       .getByRole('button', { name: /Copia el WhatsApp|Copiar el WhatsApp/ }).click()
-    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toMatch(/^\*/)
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('RECOLLIDA CONFIRMADA')
 
     // La productora: el texto íntegro de su aviso, sin el código de la oferta.
     await surt(page, context)

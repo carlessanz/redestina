@@ -278,3 +278,23 @@ export function missatgesDeLOferta(f: FetsMissatges, o: OpcionsMissatges): Missa
     ORDRE_FASE.indexOf(a.fase) - ORDRE_FASE.indexOf(b.fase)
     || (a.at ?? '').localeCompare(b.at ?? ''))
 }
+
+/**
+ * Lo que se enseña en «Missatges de l'oferta» de la ficha de la oferta del equipo
+ * (23-11-2026, petición de la Fundació para la demo): SOLO los dos mensajes que se consultan
+ * y se copian —la oferta para compartir y RECOLLIDA CONFIRMADA con el enlace para registrar
+ * los kg—. El resto del ciclo sigue en el ciclo guiado (`/equip/canalitzacio/:id`, paso a paso)
+ * y en los paneles externos.
+ */
+export const CLAUS_MISSATGES_FITXA_OFERTA = ['oferta', 'recollida_grup'] as const
+
+/** Los mensajes de la ficha de la oferta: los de `CLAUS_MISSATGES_FITXA_OFERTA`, uno de cada. */
+export function missatgesFitxaOferta(missatges: readonly Missatge[]): Missatge[] {
+  const vistes = new Set<string>()
+  return CLAUS_MISSATGES_FITXA_OFERTA.flatMap((clau) => {
+    const m = missatges.find((x) => x.clau === clau)
+    if (!m || vistes.has(clau)) return []
+    vistes.add(clau)
+    return [m]
+  })
+}

@@ -357,8 +357,8 @@ Lo que manda hoy, en una línea cada uno:
 - **Productes** (D1-D2, `context/06ter`): Catàleg (precio vigente: último mes validado, si no el manual) · Preus de referència · Càrregues.
 - **Entrades i sortides** (6.7, `context/06ter`): una fila por salida (canalización), filtros, «Resum» agrupado
   (`?per=`) y Excel (`lib/sortides.ts`); la fila abre `FitxaOperacio` (`?canalitzacio=`).
-- **Ofertes del equipo** (`context/06ter`): columnas Data (ordena) · Ofertant · Producte (+kg oferts) · Progrés (kg con
-  salida y pendientes) · Estat, **sin receptores** (van al detalle); pestañas Per validar · Actives · Esborranys ·
+- **Ofertes del equipo** (`context/06ter`): columnas Data (ordena) · Ofertant · Producte (+kg oferts) · Progrés · Estat,
+  **sin receptores** (al detalle); Missatges: solo oferta y RECOLLIDA CONFIRMADA; pestañas Per validar · Actives · Esborranys ·
   **Històric** (servidor; `?tab=`); paso del proceso bajo el badge (`lib/llistatOfertes.ts`). Canalització, sin cerradas.
   **Selectores predictivos** (`SelectorEntitat`) y buscador en Aprovacions, Tancament y Plans; «Transformació en obrador» = `maquila`.
 - **Super_admin autónomo**: convenio **declarado**, **asignación en un acto** (el técnico solo registra interés),
@@ -557,7 +557,7 @@ Decisiones de negocio pendientes (en `context/12`): **69**, **131**, **132** (el
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.277 de Vitest (105 ficheros, 1 saltada) + 60 de Deno.**
+   **Referencia: 2.279 de Vitest (105 ficheros, 1 saltada) + 60 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
    **Referencia: clon 2.401/2.401 y 42 sin datos; producción 2.301/2.301 y 142 (20-11-2026).** `prueba-numeracion.ts` si toca la numeración.
