@@ -340,7 +340,7 @@ test('la oferta nueva pide confirmar el lugar habitual o cambiarlo', async ({ pa
 })
 
 // Lo mismo desde el panel del equipo: la oferta asistida («Nova oferta» en Ofertes) usa el mismo
-// formulario. Se prueba con el super_admin y con la cuenta del equipo (técnico): el servidor da
+// formulario. Se prueba con el super_admin y con la cuenta del equipo (Dinamitzadora): el servidor da
 // los lugares a cualquier cuenta interna, y la pantalla no mira el rol.
 for (const rol of ['superadmin', 'equip'] as const) {
   test(`el equipo (${rol}) también confirma el lugar habitual o lo cambia en la oferta asistida`, async ({ page }) => {

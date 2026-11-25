@@ -47,7 +47,7 @@ test('el super_admin assigna una donació en un acte, la modifica i l’anul·la
     // 1. En un acto, desde la cabecera de la ficha.
     const form = page.locator('#od-interes')
     await expect(form.getByRole('button', { name: BOTO_ASSIGNAR })).toBeVisible({ timeout: 30_000 })
-    // El técnico registra el interés; quien puede aprobar, no: ese botón no está.
+    // Quien puede aprobar (todo el equipo desde el 25-11-2026) asigna en un acto: «Registra l'interès» no está.
     await expect(form.getByRole('button', { name: /Registra l’interès|Registra el interés/ })).toHaveCount(0)
     await triaCercador(form.locator('#od-interes-entitat'), sql(`select nombre from entidades where id = '${ent}'`), ent)
     await form.locator('#od-interes-kg').fill('50')

@@ -16,7 +16,7 @@
 //      organización y sus fichas en UNA transacción (P2) y devuelve la organización, cuya
 //      ficha se abre. Nace activa: NIF válido y razón social obligatorios.
 //
-// Activar y añadir un papel son de `pot_aprovar()` (1A): a un técnico se le enseñan grises con
+// Activar y añadir un papel son de `pot_aprovar()` (1A): a quien no puede aprobar se le enseñan grises con
 // el motivo. Dar de alta, como antes de 1B, lo puede cualquiera del equipo. La casilla «Dona-li
 // accés a la plataforma ara» (1D) solo la ve quien puede aprobar: tras el alta llama a
 // `donar-acces` con el correo del contacto; si falla, el alta queda hecha y se dice.

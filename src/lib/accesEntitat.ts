@@ -7,7 +7,7 @@ export type EstatAcces = 'sense' | 'pendent' | 'enviat' | 'actiu' | 'desactivat'
 
 export interface CondicionsAcces {
   estat: EstatAcces
-  /** admin o super_admin: el `tecnic` ve el estado pero no quita acceso. */
+  /** `pot_aprovar()`: Dinamitzador o Superadmin (el `tecnic`, que no podía, se retiró el 25-11-2026). */
   potAprovar: boolean
   /**
    * Solo el super_admin INVITA (manda el correo de acceso), 20-11-2026: ningún correo de acceso

@@ -112,6 +112,29 @@ export async function embeberTrazo(doc: PDFDocument, s: SignaturaDocument): Prom
   }
 }
 
+/**
+ * Una imagen de firma guardada por una persona del equipo (`firma-equip`: PNG o JPG, el
+ * formato decidido por sus bytes al subirla), embebida en este PDF, o null. Igual que el
+ * trazo: una imagen ilegible no impide emitir, se avisa y queda la caja sin imagen.
+ */
+export async function embeberImatgeFirma(
+  doc: PDFDocument,
+  bytes: Uint8Array | null | undefined,
+): Promise<PDFImage | null> {
+  if (!bytes || bytes.length < 4) return null;
+  try {
+    const png = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+    const jpg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+    if (png) return await doc.embedPng(bytes);
+    if (jpg) return await doc.embedJpg(bytes);
+    console.warn("signatura: firma de l'equip en un format desconegut");
+    return null;
+  } catch (e) {
+    console.warn("signatura: firma de l'equip no embebible:", e instanceof Error ? e.message : String(e));
+    return null;
+  }
+}
+
 const ALTO_TRAZO = 50;
 const ANCHO_MAX_TRAZO = 200;
 

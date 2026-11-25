@@ -129,3 +129,4 @@ se va solo **cómo se llegó hasta aquí**.
 | 139 | El REC de una oferta mixta (donación y venta) se repartía solo entre las donaciones e inflaba el certificado | `20270509100000` + `20270509100700` (05-11-2026) |
 | 85 | El CT no tenía prueba end-to-end | 05-11-2026: el CT se retiró (`20270509100400`) |
 | 194 | Dos recogidas registradas sin `recollida_registrada_per` se quedaban con `recollida_origen` a null | 20-11-2026 (vaciado de producción, fase 6) |
+| 132 | Un `tecnic` se saltaba las puertas `pot_aprovar()` escribiendo directo en las tablas | 25-11-2026: rol `tecnic` retirado (`20270615100000`, plan DIC 26 fase 0) |

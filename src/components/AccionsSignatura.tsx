@@ -3,8 +3,8 @@
 // equipo (`AccionsCertificat`, `AlbaraDetall`) y lo monta cada uno con su propio diálogo.
 //
 // ⚠️ QUÉ BOTÓN SALE LO DECIDE `accionsSignatura()` (`lib/signatures.ts`), no este fichero.
-//    Aquí solo se averigua QUIÉN mira (`rolSignatura`: super_admin, resto del equipo, titular
-//    u operador de la organización que firma) y se pinta lo que diga.
+//    Aquí solo se averigua QUIÉN mira (`rolSignatura`: Superadmin, Dinamitzador, resto del
+//    equipo, titular u operador de la organización que firma) y se pinta lo que diga.
 //
 // Dos formas de pintarse: `botons` (con texto, en una ficha) e `icones` (`BotoIcona`, en la
 // columna de acciones de una tabla, donde no cabe texto a 360 px).
@@ -60,6 +60,7 @@ export function useRolSignatura(sig: Pick<SignaturaFila, 'tipo_org' | 'org_id'> 
   return rolSignatura({
     esIntern: ctx?.esIntern ?? false,
     esSuperAdmin: ctx?.esSuperAdmin ?? false,
+    potAprovar: ctx?.potAprovar ?? false,
     titular,
   })
 }

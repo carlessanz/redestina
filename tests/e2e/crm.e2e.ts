@@ -3,14 +3,14 @@
 // `borrar_ficha_completa()` (las notas se van con la organización: `on delete cascade`).
 //
 // Lo que se afirma, en orden (modo serie):
-//   1. El técnico añade dos notas desde «Gestió interna» —una de hace tres días por WhatsApp y
+//   1. La Dinamitzadora (cuenta `equip`) añade dos notas desde «Gestió interna» —una de hace tres días por WhatsApp y
 //      otra de hoy por teléfono— y el hilo las pinta con lo más reciente arriba, con su nombre.
 //      No ve el botón de borrar (es del super_admin).
 //   2. El listado «Entitats» enseña el «Darrer contacte» de la nota más reciente.
 //   3. La cuenta de una entidad NO ve las notas: ni el bloque en «La meva organització», ni por
 //      API (`select` vacío, sin error), ni el último contacto en `v_entitats_llistat`.
 //   4. El super_admin borra una nota y el hilo se queda con la otra.
-//   5. (Taula mestra 1.5, 04-11-2026) El técnico apunta una interacción con tipo y próxima
+//   5. (Taula mestra 1.5, 04-11-2026) La Dinamitzadora apunta una interacción con tipo y próxima
 //      acción; con otra ya vencida, el resumen las ordena, el listado marca «vençut» y «Fet» la
 //      cierra.
 //   6. El estado GLOBAL de la entidad, en «Gestió interna»: el super_admin la desactiva entera
@@ -81,7 +81,7 @@ test.afterAll(() => {
   sql(`delete from notes_internes where text like 'E2E 1F ${marca}%'`)
 })
 
-test('el tècnic afegeix dues notes i el fil les ordena', async ({ page }) => {
+test('la Dinamitzadora afegeix dues notes i el fil les ordena', async ({ page }) => {
   await entra(page, 'equip')
   await page.goto(`/equip/entitats/${org}?pestanya=intern`)
   const bloc = page.getByTestId('notes-internes')

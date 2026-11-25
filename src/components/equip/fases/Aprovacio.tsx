@@ -110,7 +110,6 @@ export default function FaseAprovacio({ c }: { c: ContextFase }) {
                   nom={r.entitat}
                   conveni={cv}
                   tipusCal={conveniQueCalRebre(extra.oferta.modalitat)}
-                  potAprovar={c.potAprovar}
                   esSuperAdmin={c.esSuperAdmin}
                   onCanvi={c.onCanvi}
                   petit

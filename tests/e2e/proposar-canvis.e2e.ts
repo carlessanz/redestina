@@ -5,7 +5,7 @@
 //       directo `/receptor/interessos?resposta=<id>` y la acepta → canalización confirmada.
 //   (b) Propone → la entidad la rechaza con motivo → el interés vuelve a la cola de Aprovacions
 //       con el motivo a la vista.
-//   (c) El técnico ve la cola pero no «Proposa canvis».
+//   (c) La Dinamitzadora (cuenta `equip`) también ve «Proposa canvis» (el `tecnic` se retiró el 25-11-2026).
 //   (d) El badge de Aprovacions sube sin navegar cuando entra un interés nuevo (Realtime).
 //   (e) A 360 px: el diálogo de la propuesta, la ficha de la oferta y la tarjeta y el diálogo de
 //       la entidad no desbordan.
@@ -163,16 +163,14 @@ test('(b) torna a la cua d’Aprovacions amb el motiu a la vista', async ({ page
   await expect(fila.locator(`[id="appr-${resposta}-kg"]`)).toHaveValue('80')
 })
 
-test('(c) el tècnic no veu «Proposa canvis»', async ({ page }) => {
+// Hasta el 25-11-2026 se comprobaba que el `tecnic` no lo veía. El rol se retiró (proceso 0.1): la
+// cuenta `equip` es una Dinamitzadora, que aprueba y, por tanto, propone cambios.
+test('(c) la Dinamitzadora també veu «Proposa canvis»', async ({ page }) => {
   test.skip(!estat.b, 'depèn de la prova (b): l’interès torna a ser a la cua')
   const { ref, resposta } = estat.b!
   await entra(page, 'equip')
   const fila = await filaAprovacio(page, ref, resposta)
-  await expect(fila.getByRole('button', { name: /^Proposa canvis$|^Propón cambios$/ })).toHaveCount(0)
-  // Y en la ficha de la oferta, tampoco.
-  await page.goto(`/equip/ofertes/${estat.b!.oferta}`)
-  await expect(page.getByText(/Avellana/).first()).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByRole('button', { name: /^Proposa canvis$|^Propón cambios$/ })).toHaveCount(0)
+  await expect(fila.getByRole('button', { name: /^Proposa canvis$|^Propón cambios$/ })).toBeVisible()
 })
 
 test('(d) el badge d’Aprovacions puja sense navegar (Realtime)', async ({ page }) => {

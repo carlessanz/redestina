@@ -11,7 +11,7 @@
 // de la fase 6 ya no son los de antes) y la fila no le cambia nada; la dudosa comparte el correo
 // de `TEST-ENT-OBRADOR` (también leído) y se resuelve «crea'n una de nova», así que tampoco se toca.
 //
-// Plan 2 B3 (10-11-2026): la cuenta `equip` (un `tecnic`) exporta a Excel las fichas `TEST-IMP`
+// Plan 2 B3 (10-11-2026): la cuenta `equip` (un Dinamitzador desde el 25-11-2026) exporta a Excel las fichas `TEST-IMP`
 // de esta pasada desde Entitats (formato de la plantilla, desplegables, «ID Redestina»); el
 // super_admin vuelve a subir ese fichero tal cual y todo sale «sense canvis».
 //
@@ -290,8 +290,8 @@ test('la plantilla descarregada, pujada tal qual, es reconeix sencera', async ({
   await expect(page.getByTestId('ie-nfiles')).toHaveText(/^0 /)
 })
 
-test('B3: el tècnic exporta les files visibles amb el format de la plantilla (desplegables i «ID Redestina»)', async ({ page }) => {
-  await entra(page, 'equip') // `tecnic` al clon: exporta (D10) però no importa
+test('B3: la Dinamitzadora exporta les files visibles amb el format de la plantilla (desplegables i «ID Redestina»)', async ({ page }) => {
+  await entra(page, 'equip') // Dinamitzador al clon: exporta (D10) però no importa
   await page.goto('/equip/entitats')
   await expect(page.getByTestId('el-exporta')).toBeVisible()
   await expect(page.getByTestId('el-importa')).toHaveCount(0)

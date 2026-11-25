@@ -21,7 +21,7 @@
 //      vuelve a registrar y el admin la valida con motivo: albaranes por lo real, conciliados.
 
 import { expect, test } from '@playwright/test'
-import { compte, entidadDe, entra, motiuSaltClon, productorDe, sql, sqlCom } from './ajuda'
+import { entidadDe, entra, motiuSaltClon, productorDe, sql, sqlCom } from './ajuda'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -221,15 +221,14 @@ test('la receptora registra menos kilos: sin números, pendiente de validar', as
   expect(sql(`select coalesce(kg_declarats::text, '') from canalizaciones where excedente_id = '${oferta3}'`)).toBe('35.00')
 })
 
-test('validar con diferencia sin motivo se rechaza, y un técnico no puede validar', () => {
+test('validar con diferencia sin motivo se rechaza', () => {
   const canal = sql(`select id from canalizaciones where excedente_id = '${oferta3}'`)
   expect(() => sqlCom('super_admin', `select validar_recollida('${canal}', null, null)`))
     .toThrow(/cal_motiu_validacio/)
   // Sigue sin albaranes: el rechazo no ha gastado ningún número.
   expect(sql(`select count(*) from albaranes where excedente_id = '${oferta3}' and numero_completo is not null`)).toBe('0')
-  if (compte('equip')) {
-    expect(() => sqlCom('equip', `select validar_recollida('${canal}', null, 'prova')`)).toThrow(/42501|no_autoritzat|permission|permís|admin/i)
-  }
+  // (Aquí se comprobaba que un `tecnic` no podía validar. El rol se retiró el 25-11-2026: la cuenta
+  // `equip` es un Dinamitzador, que valida recogidas, y lo haría de verdad. Se quita.)
 })
 
 test('el admin la retorna con motivo y la receptora la vuelve a registrar', async ({ page }) => {

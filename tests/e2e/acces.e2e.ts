@@ -5,7 +5,7 @@
 // acabar con `borrar_ficha_completa()`, y la cuenta creada con ella.
 //
 // Lo que se afirma, en orden (modo serie):
-//   1. La función rechaza sin sesión (401), a un externo y al técnico (403).
+//   1. La función rechaza sin sesión (401), a un externo y a la Dinamitzadora (403).
 //   2. Con el correo apagado (§8) responde 409 `correu_desactivat` y NO crea la cuenta.
 //   3. Con el modo test, una entidad que no es de prueba → 403 `no_test_user`, sin cuenta.
 //   4. Camino feliz: «Nova entitat» con «Dona-li accés» → «Accés enviat» en la ficha → el
@@ -125,7 +125,7 @@ test.afterAll(async () => {
   await fetch(`${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`, { method: 'DELETE' }).catch(() => null)
 })
 
-test('la función rechaza sin sesión, a un externo y al técnico', async () => {
+test('la función rechaza sin sesión, a un externo y a la Dinamitzadora', async () => {
   expect((await donarAcces(null, orgReal)).status).toBe(401)
   expect(await donarAcces(await jwt('productor'), orgReal)).toEqual({ status: 403, code: 'forbidden' })
   expect(await donarAcces(await jwt('equip'), orgReal)).toEqual({ status: 403, code: 'forbidden' })

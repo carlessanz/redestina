@@ -80,8 +80,8 @@ test('el super_admin desactiva una entidad: queda en el historial con su autor',
   const n = sql(`select count(*) from fitxa_estat_hist where entidad_id = '${social}'`)
   expect(sqlCom('super_admin', `select desactivar_fitxa('entidad', '${social}')->>'canviat'`)).toBe('false')
   expect(sql(`select count(*) from fitxa_estat_hist where entidad_id = '${social}'`)).toBe(n)
-  // Un técnico no puede activarla.
-  expect(() => sqlCom('equip', `select activar_fitxa('entidad', '${social}')`)).toThrow(/Nomes l'equip pot activar/)
+  // (Aquí se comprobaba que un `tecnic` no podía activarla: el rol se retiró el 25-11-2026 y la
+  // cuenta `equip` es un Dinamitzador, que sí puede. La activaría de verdad: se quita.)
 })
 
 // Lo que deja de ver es la rama del Mercat (`modalitats_compatibles_meves()` vacía): las
@@ -161,14 +161,13 @@ test('B1 · «En desenvolupament» saca a la entidad del Mercat y del interés; 
   expect(sqlCom(SOCIAL, `select count(*) from excedentes where id = '${ofertaId}'`)).toBe('1')
 })
 
-test('B1 · Actiu sin NIF → falta_nif; el camino legado (desactivar_fitxa) deja Inactiu; el técnico no puede', () => {
+test('B1 · Actiu sin NIF → falta_nif; el camino legado (desactivar_fitxa) deja Inactiu', () => {
   // Desactivar por la RPC de siempre: el trigger lo traduce a `inactiu` (estaba `actiu`).
   sqlCom('super_admin', `select desactivar_fitxa('entidad', '${comercial}')`)
   expect(sql(`select estat_crm || '|' || activo from entidades where id = '${comercial}'`)).toBe('inactiu|false')
   sql(`update entidades set nif = null where id = '${comercial}'`)
   expect(() => sqlCom('super_admin', `select fixar_estat_crm('entidad', '${comercial}', 'actiu')`)).toThrow(/falta_nif/)
   expect(sql(`select estat_crm || '|' || activo from entidades where id = '${comercial}'`)).toBe('inactiu|false')
-  expect(() => sqlCom('equip', `select fixar_estat_crm('entidad', '${comercial}', 'potencial')`)).toThrow(/Nomes admin o super_admin/)
   expect(() => sqlCom('super_admin', `select fixar_estat_crm('entidad', '${comercial}', 'activa')`)).toThrow(/estat_desconegut/)
   reactivaSenseTrigger(comercial, nifComercial)
   expect(sql(`select estat_crm || '|' || activo from entidades where id = '${comercial}'`)).toBe('actiu|true')

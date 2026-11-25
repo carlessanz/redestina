@@ -19,8 +19,9 @@
 // admin o super_admin) registra y confirma en UN acto con `assignar_directe()`: el botón dice
 // «Registrar i confirmar recollida» y no queda nada en Aprovacions. En VENTA pide además el
 // precio ACORDADO y que el ofertante lo ha aceptado (los dos obligatorios, la base también
-// los exige); en maquila y donación no hay precio. El técnico conserva el flujo de siempre:
-// «Registra l'interès» → `manifestar_interes_assistit()` → lo aprueba un admin (nivel 2).
+// los exige); en maquila y donación no hay precio. Sin `pot_aprovar()` (el `tecnic`,
+// retirado el 25-11-2026) queda el flujo de siempre: «Registra l'interès» →
+// `manifestar_interes_assistit()` → lo aprueba otro del equipo (nivel 2).
 
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'

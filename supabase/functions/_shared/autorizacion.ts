@@ -16,7 +16,11 @@
 // deno-lint-ignore no-explicit-any
 type Cliente = any;
 
-export type RolPlataforma = "super_admin" | "admin" | "tecnic";
+// Dos roles desde la fase 0 del plan de diciembre de 2026: `super_admin` («Superadmin») y
+// `admin` («Dinamitzador»). El `tecnic` se retiró (la migración pasa sus filas a `admin` y el
+// CHECK de `usuario_roles` ya no lo admite); una fila `tecnic` que quedara por error NO da
+// pertenencia al equipo: falla cerrado.
+export type RolPlataforma = "super_admin" | "admin";
 
 export interface Contexto {
   userId: string;
@@ -84,8 +88,6 @@ export async function contextoUsuario(
     ? "super_admin"
     : nombres.includes("admin")
     ? "admin"
-    : nombres.includes("tecnic")
-    ? "tecnic"
     : null;
 
   return {

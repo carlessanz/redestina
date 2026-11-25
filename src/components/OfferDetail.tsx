@@ -126,8 +126,8 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // Los interruptores de notificaciones (§8): un canal apagado deja su botón gris con el motivo.
   const canals = useCanals()
   const motiuEmail = motiuCanal(canals, 'email')
-  // Aprobar y rechazar un interés exigen `pot_aprovar()` (§4bis): a un técnico se le dejan
-  // grises con el motivo, como en Aprovacions, en vez de dejarle chocar contra un 42501.
+  // Aprobar y rechazar un interés exigen `pot_aprovar()` (§4bis): a quien no puede aprobar
+  // (el `tecnic`, retirado el 25-11-2026) se le dejarían grises con el motivo, como en Aprovacions, en vez de dejarle chocar contra un 42501.
   const potAprovar = ctx?.potAprovar ?? false
   const [exc, setExc] = useState<Excedente>(excedente)
   const [canalizaciones, setCanalizaciones] = useState<Canalizacion[]>([])
@@ -824,7 +824,8 @@ export default function OfferDetail({ excedente, onBack }: Props) {
 
           {/* Asignar es «lo que toca ahora» mientras la oferta está abierta: va aquí arriba, no al
               final de la ficha (puntos 4-6, fase 2). Quien puede aprobar asigna en un acto
-              (`assignar_directe`); el técnico registra el interés y lo aprueba un admin. Mismas
+              (`assignar_directe`; desde el 25-11-2026 es todo el equipo). Sin `pot_aprovar()` se registraría
+              el interés y lo aprobaría otro (nivel 2). Mismas
               guardas que el Mercat (§12.109). */}
           {ofertaOberta && (
             <div id="od-interes" className="scroll-mt-20">

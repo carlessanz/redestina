@@ -14,12 +14,19 @@
 //   -> 413 { code: 'massa_gran' }   415 { code: 'mime_no_acceptat' }
 //
 // QUÉ PASA DESPUÉS lo decide `registrar_document_signat()`, no esta función:
-//   · si sube el **super_admin** (vía `correu`: lo mandó por correo, se lo devolvieron
-//     firmado y lo sube), la firma se cierra al momento: nace la versión n+1 `signat`
-//     `emitido` cuyo fichero ES el subido (`ruta` = la de aquí), sin pasar por
-//     `generar-documento`;
-//   · si sube la **organización** (vía `pujat`), queda `signat` en la cola «Signatures per
-//     tancar» hasta que el super_admin la revisa (`tancar_signatura` / `rebutjar_signatura`).
+//   · si sube **quien puede cerrar la firma** (vía `correu`: lo mandó por correo, se lo
+//     devolvieron firmado y lo sube), la firma se cierra al momento: nace la versión n+1
+//     `signat` `emitido` cuyo fichero ES el subido (`ruta` = la de aquí), sin pasar por
+//     `generar-documento`. Quién puede cerrarla depende del documento (fase 0, dic. 2026):
+//       – ALBARANES (REC, ENT, OPE): cualquiera del equipo que pueda aprobar (`potAprovar`:
+//         Superadmin o Dinamitzador);
+//       – CONV, CD, CDP, CR: solo el **Superadmin** (son la firma institucional);
+//   · si sube la **organización** (vía `pujat`) —o alguien del equipo que no puede cerrar ese
+//     tipo—, queda `signat` en la cola «Signatures per tancar» hasta que lo revisa quien sí
+//     puede (`tancar_signatura` / `rebutjar_signatura`).
+// Esta función NO repite la regla: si la aplicara aquí y SQL otra cosa, el papel diría una y
+// la base haría otra. Solo la anota en el log (`tanca_directe_esperat`) para poder casar lo
+// que se esperaba con la vía que devolvió la RPC.
 // El fichero se guarda TAL CUAL: lo firmado son esos bytes y no se estampa nada encima.
 //
 // Molde: `subir-documento-externo`. Lo común (formato por cabecera mágica, tope y huella)
@@ -224,6 +231,10 @@ Deno.serve(async (req) => {
     mime,
     bytes: bytes.length,
     intern: ctx.esIntern,
+    rol: ctx.rol,
+    // Lo que se ESPERA de `registrar_document_signat()` según el tipo (ver cabecera); el
+    // tipo no se conoce aquí sin otra consulta, así que se anota la capacidad de la cuenta.
+    tanca_directe_esperat: ctx.rol === "super_admin" ? "tots" : ctx.potAprovar ? "albarans" : "cap",
     ms_subida: Number(msSubida.toFixed(1)),
     ms_total: Number((performance.now() - t0).toFixed(1)),
   }));

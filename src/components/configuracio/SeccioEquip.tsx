@@ -1,6 +1,6 @@
 // Configuració › Equip (09-11-2026, solo super_admin): las cuentas con rol de plataforma
-// —`super_admin`, `admin`, `tecnic`—, aparte de los usuarios de las organizaciones, y el cambio
-// de rol. Antes subir a alguien a super_admin era SQL a mano con la service key.
+// —`super_admin` («Superadmin») y `admin` («Dinamitzador»); el `tecnic` se retiró el 25-11-2026—,
+// aparte de los usuarios de las organizaciones, y el cambio de rol. Antes subir a alguien a super_admin era SQL a mano con la service key.
 //
 // Por cuenta: cambiar el rol, editar nombre y teléfono, activar/desactivar y borrar (20270514100000).
 // Desactivar y borrar preguntan antes qué se hace con lo que esa cuenta ha hecho (`DialegTraspasMembre`).
@@ -23,7 +23,7 @@ import { cn } from '../../lib/utils'
 import { dataCurta } from '../../lib/format'
 import { faTemps } from '../../lib/notesInternes'
 import {
-  accionsMembre, clauErrorEquip, esBaixada, filtraEquip, ordenaEquip, recompteRols, ROLS_EQUIP,
+  accionsMembre, clauErrorEquip, clauRol, esBaixada, filtraEquip, ordenaEquip, recompteRols, ROLS_EQUIP,
   type MembreEquip, type RolAAssignar, type RolEquip,
 } from '../../lib/equip'
 import { useConfirma } from '../DialegConfirma'
@@ -42,7 +42,6 @@ type Traductor = (clau: string, params?: Record<string, string | number>) => str
 const COLOR_ROL: Record<RolEquip, string> = {
   super_admin: 'bg-coral-suave text-coral-texto',
   admin: 'bg-muted text-foreground',
-  tecnic: 'bg-muted text-muted-foreground',
 }
 
 function FilaMembre({ m, membres, ocupat, onCanvia, onEdita, onActiva, onDesactiva, onEsborra, t }: {
@@ -78,7 +77,7 @@ function FilaMembre({ m, membres, ocupat, onCanvia, onEdita, onActiva, onDesacti
       <div className="min-w-0 flex-1 basis-56 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="min-w-0 font-medium [overflow-wrap:anywhere]">{qui}</span>
-          <Badge className={COLOR_ROL[m.rol]} data-testid="eq-rol">{t(`eq.rol_${m.rol}`)}</Badge>
+          <Badge className={COLOR_ROL[m.rol] ?? COLOR_ROL.admin} data-testid="eq-rol">{t(clauRol(m.rol))}</Badge>
           {m.es_tu && <Badge variant="outline">{t('eq.tu')}</Badge>}
           {!m.actiu && <Badge className="bg-error-fondo text-error" data-testid="eq-inactiu">{t('eq.inactiu')}</Badge>}
         </div>
@@ -245,7 +244,7 @@ export default function SeccioEquip() {
               </TabsList>
               <TabsContent value="actius" className="space-y-2">
                 <p className="text-sm text-muted-foreground" data-testid="eq-resum">
-                  {t('eq.resum', { sa: recompte.super_admin, a: recompte.admin, t: recompte.tecnic })}
+                  {t('eq.resum', { sa: recompte.super_admin, a: recompte.admin })}
                 </p>
                 {llista(actius, 'eq.buit_actius')}
               </TabsContent>

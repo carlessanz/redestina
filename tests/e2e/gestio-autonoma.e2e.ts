@@ -7,7 +7,7 @@
 // `scripts/local/cargar-local.sh` devuelve el clon a la copia de producción.
 
 import { expect, test } from '@playwright/test'
-import { asseguraConveniVigent, entidadDe, entra, motiuSaltClon, productorDe, resolConveniVigent, sql, triaCercador } from './ajuda'
+import { asseguraConveniVigent, entidadDe, entra, motiuSaltClon, productorDe, resolConveniVigent, sql, sqlCom } from './ajuda'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -83,20 +83,17 @@ test('des del detall de l’oferta: copia i marca enviada, registra l’interès
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText()))
     .toMatch(/^\[E2E\] Avellana\n\n✅ Si t'interessa, (obre l'enllaç|respon aquest missatge)/)
 
-  // «Registra l'interès» (nivel 2): lo hace el TÉCNICO, en su propia sesión. Quien puede aprobar
-  // ya no ve este botón sino «Registrar i confirmar recollida», que asigna en un acto
-  // (`assignacio-directa.e2e.ts`). El mismo formulario y las mismas guardas que el Mercat.
+  // «Registra l'interès» (nivel 2). Hasta el 25-11-2026 lo hacía el TÉCNICO en su sesión; el rol
+  // se retiró (proceso 0.1) y todo el equipo puede aprobar, así que en la pantalla ya solo sale
+  // «Assigna» en un acto (`assignacio-directa.e2e.ts`). La Dinamitzadora (`equip`) lo ve así:
   const ctxTec = await browser.newContext({ baseURL: test.info().project.use.baseURL })
   const tec = await ctxTec.newPage()
   await entra(tec, 'equip')
   await tec.goto(`/equip/ofertes/${oferta}`)
-  const form = tec.locator('#od-interes')
-  // Un buscador (19-11-2026): se escribe el nombre y se toca la sugerencia de esa entidad.
-  await triaCercador(form.locator('#od-interes-entitat'), sql(`select nombre from entidades where id = '${ent}'`), ent)
-  await form.locator('#od-interes-kg').fill('50')
-  await form.getByRole('button', { name: /Registra l’interès|Registra el interés/ }).click()
-  await expect(tec.getByText(/Interès registrat|Interés registrado/)).toBeVisible()
+  await expect(tec.locator('#od-interes').getByRole('button', { name: /Registra l’interès|Registra el interés/ })).toHaveCount(0)
   await ctxTec.close()
+  // El nivel 2 sigue existiendo en la base (la misma RPC y guardas que el Mercat): se registra por ella.
+  sqlCom('equip', `select manifestar_interes_assistit('${oferta}', '${ent}', 50)`)
   await expect.poll(() => sql(`select canal || ':' || estado || ':' || aprovacio || ':' || (kg_solicitados = 50)
     from oferta_respuestas where excedente_id = '${oferta}' and entidad_id = '${ent}'`)).toBe('asistido:acceptada:pendent:true')
 

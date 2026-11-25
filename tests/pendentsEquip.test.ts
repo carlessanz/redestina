@@ -59,7 +59,7 @@ describe('pendents_equip · claves compuestas de «Pendent de l’equip»', () =
       for (const cua of AMB_SUB) expect(dict[`pe.${cua}_sub`], `pe.${cua}_sub (${idioma})`).toBeTruthy()
     })
     it(`las claves fijas de la tarjeta existen en ${idioma}`, () => {
-      for (const k of ['pe.title', 'pe.subtitle', 'pe.empty', 'pe.only_admin', 'pe.mode_prova', 'pe.mode_real', 'pe.err_generic']) {
+      for (const k of ['pe.title', 'pe.subtitle', 'pe.empty', 'pe.mode_prova', 'pe.mode_real', 'pe.err_generic']) {
         expect(dict[k], `${k} (${idioma})`).toBeTruthy()
       }
     })

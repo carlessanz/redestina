@@ -162,6 +162,14 @@ export interface OpcionesAlbaran {
    * lee `generar-documento` de `firmes_document` y `evidencias`, como las confirmaciones.
    */
   signatura?: SignaturaDocument | null;
+  /**
+   * La imagen (PNG o JPG) de la firma de la persona del EQUIPO que validó o emitió el
+   * albarán (fase 0, dic. 2026). La ruta va congelada en el snapshot
+   * (`datos.signant_equip.firma_ruta`, bucket privado `activos`) y la descarga
+   * `generar-documento`: el renderizador sigue sin hablar con Storage. Solo la pinta el
+   * albarán de una página, dentro de la caja «Per Espigoladors»; null = caja sin imagen.
+   */
+  firmaEquipBytes?: Uint8Array | null;
 }
 
 /** Un espacio de firma: su rótulo y, si se sabe, de qué parte del albarán es. */

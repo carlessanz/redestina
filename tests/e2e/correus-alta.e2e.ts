@@ -181,7 +181,8 @@ test('3. tampoc després: els jobs que envien no escriuen a cap de les tres', as
 
 test('3b. un admin no pot convidar: el botó surt gris i donar-acces li respon 403', async ({ page }) => {
   test.skip(!orgAlta, 'depèn del pas 2')
-  // La cuenta `equip` del arnés es `tecnic`; durante esta prueba se hace `admin` y se devuelve.
+  // La cuenta `equip` del arnés es un Dinamitzador (`admin`) desde el 25-11-2026; el `update` se
+  // queda por si un clon viejo la tuviera con otro rol, y se devuelve al acabar.
   const correuEquip = compte('equip')!.email.replace(/'/g, "''")
   const uid = sql(`select id from auth.users where email = '${correuEquip}'`)
   const rolAbans = sql(`select rol from usuario_roles where user_id = '${uid}'`)
@@ -194,7 +195,7 @@ test('3b. un admin no pot convidar: el botó surt gris i donar-acces li respon 4
     const boto = page.getByTestId('acces-convida')
     await expect(boto).toBeVisible({ timeout: 30_000 })
     await expect(boto).toBeDisabled()
-    await expect(page.getByTestId('acces-motiu')).toContainText(/només ho pot fer el super_admin|solo lo puede hacer el super_admin/)
+    await expect(page.getByTestId('acces-motiu')).toContainText(/només ho pot fer el Superadmin|solo lo puede hacer el Superadmin/)
     // Y el alta tampoco ofrece la casilla.
     await page.goto('/equip/entitats/nova')
     await expect(page.getByRole('heading').first()).toBeVisible({ timeout: 30_000 })

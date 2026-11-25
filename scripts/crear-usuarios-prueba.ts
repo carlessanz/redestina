@@ -81,7 +81,7 @@ interface Cuenta {
   email: string;
   nombre: string;
   /** Rol de plataforma; null = usuario externo (su acceso sale de la membresía). */
-  rol: "super_admin" | "admin" | "tecnic" | null;
+  rol: "super_admin" | "admin" | null;
   org?: { codigo: string; rolOrg: "titular" };
   para: string;
 }
@@ -94,7 +94,10 @@ interface Cuenta {
 // que no probara una.
 const CUENTAS: Cuenta[] = [
   { email: correo("superadmin"), nombre: "Super Admin Redestina", rol: "super_admin", para: "Aprueba, canaliza y toca la configuración" },
-  { email: correo("equip"), nombre: "Tècnic Redestina", rol: "tecnic", para: "Opera el día a día; NO aprueba ni cambia el modo test" },
+  // Desde 20270615100000 no hay `tecnic`: la cuenta `equip` es el Dinamitzador (`admin`). Opera y
+  // firma albaranes; la firma institucional (contrafirma, certificados reales) y la configuración
+  // son del super_admin.
+  { email: correo("equip"), nombre: "Dinamitzador Redestina", rol: "admin", para: "Opera el día a día y firma albaranes; NO firma por la Fundació ni toca la configuración" },
   { email: correo("prodowner-masprova"), nombre: "Productor Mas de Prova", rol: null, org: { codigo: "TEST-PROD-1", rolOrg: "titular" }, para: "Publica ofertas y edita la ficha de su organización" },
   { email: correo("prodowner-hortaprova"), nombre: "Productor Horta de Prova", rol: null, org: { codigo: "TEST-PROD-2", rolOrg: "titular" }, para: "Control de fuga: no debe ver nada de TEST-PROD-1" },
   { email: correo("recowner-social"), nombre: "Receptor Menjador Social", rol: null, org: { codigo: "TEST-ENT-SOCIAL", rolOrg: "titular" }, para: "Entidad social: mercado de donaciones, interés e histórico" },

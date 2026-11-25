@@ -160,7 +160,9 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
     { que: 'enviar-albara resultat', prefijo: 'alb.env_r_', valores: ['enviat', 'enviat_sense_adjunt', 'simulat', 'desactivat', 'no_test_user', 'fora_llista_test', 'error'] },
     { que: 'enviar-albara code', prefijo: 'alb.env_e_', valores: ['albara_no_emes', 'sense_fitxer', 'sense_destinatari', 'enviat_fa_poc', 'error'] },
     // El equipo (09-11-2026): el rol de `usuario_roles` y los códigos de `canviar_rol_equip()`.
-    { que: 'usuario_roles.rol', prefijo: 'eq.rol_', valores: ['super_admin', 'admin', 'tecnic'] },
+    // Desde el 25-11-2026 (proceso 0.1) solo dos; el `tecnic` de la historia va por `eq.rol_retirat_`.
+    { que: 'usuario_roles.rol', prefijo: 'eq.rol_', valores: ['super_admin', 'admin'] },
+    { que: 'equip_rols_hist (roles retirados, clauRol)', prefijo: 'eq.rol_retirat_', valores: ['tecnic'] },
     { que: 'RPC del equip codi', prefijo: 'eq.e_', valores: ['rol_invalid', 'no_et_pots_canviar', 'usuari_inexistent', 'no_es_de_lequip', 'ultim_super_admin', 'no_et_pots_tocar', 'cal_desti', 'desti_igual', 'desti_no_equip', 'telefon_invalid', 'nom_massa_llarg', 'compte_equip', 'te_membresies', 'error'] },
     { que: 'equip_rols_hist.accio', prefijo: 'eq.h_', valores: ['rol', 'activa', 'desactiva', 'edita', 'esborra', 'traspas'] },
     { que: 'equip_auditoria().accio (mou_accions)', prefijo: 'eq.h_', valores: ['mou_accions'] },

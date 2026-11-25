@@ -3,8 +3,13 @@
 // «Salir» está TAMBIÉN en el pie del menú lateral desde el 14-09-2026, a petición de uso:
 // cruzar toda la pantalla hasta el avatar para cerrar sesión es incómodo, y es la única
 // acción que se repite a propósito. El idioma y la ficha siguen viviendo solo aquí.
+//
+// «La meva signatura» (25-11-2026, proceso 0.1): solo las cuentas del equipo. Es la firma propia
+// que se estampa en los albaranes que validan o emiten (`DialegMevaSignatura`). El diálogo vive
+// FUERA del menú: el contenido del desplegable se desmonta al cerrarse.
 
-import { LogOut, User } from 'lucide-react'
+import { useState } from 'react'
+import { LogOut, PenLine, User } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
@@ -13,7 +18,8 @@ import { useAppContext, useCanals } from '../hooks/useAppContext'
 import { useCanalPropi } from '../hooks/useCanalPropi'
 import type { TriaCanal } from '../hooks/useCanalPropi'
 import { cn } from '../lib/utils'
-import { rolEquipDe } from '../lib/equip'
+import { clauRol, rolEquipDe } from '../lib/equip'
+import DialegMevaSignatura from '../components/DialegMevaSignatura'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem,
@@ -34,6 +40,8 @@ export default function UserMenu() {
   // solo, no hay nada que elegir; con ninguno, la sección no se pinta.
   const canals = useCanals()
   const dosCanals = canals.email && canals.whatsapp
+  const [signatura, setSignatura] = useState(false)
+  const rolEquip = rolEquipDe(ctx?.rol)
 
   // ── Las notificaciones, como DOS casillas y no como una lista de tres ──
   //
@@ -70,6 +78,7 @@ export default function UserMenu() {
   }
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="size-9 rounded-full" aria-label={t('nav.profile')}>
@@ -93,12 +102,20 @@ export default function UserMenu() {
             <div className="truncate text-xs text-muted-foreground">{organitzacio.nombre}</div>
           )}
           {/* El rol de plataforma, para saber con qué permisos has entrado (09-11-2026). */}
-          {rolEquipDe(ctx?.rol) && (
+          {rolEquip && (
             <div className="truncate text-xs font-medium text-muted-foreground" data-testid="menu-rol-equip">
-              {t('eq.el_teu_rol', { rol: t(`eq.rol_${rolEquipDe(ctx?.rol)}`) })}
+              {t('eq.el_teu_rol', { rol: t(clauRol(rolEquip)) })}
             </div>
           )}
         </DropdownMenuLabel>
+        {ctx?.esIntern && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => setSignatura(true)} data-testid="menu-meva-signatura">
+              <PenLine className="size-4" /> {t('fe.menu')}
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
           {t('set.language')}
@@ -156,5 +173,7 @@ export default function UserMenu() {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    {ctx?.esIntern && <DialegMevaSignatura obert={signatura} onTancar={() => setSignatura(false)} />}
+    </>
   )
 }

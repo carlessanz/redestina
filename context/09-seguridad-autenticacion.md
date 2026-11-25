@@ -876,3 +876,16 @@ encendido); en la ficha, «Dona-li accés» y «Torna a enviar» salen grises pa
 `acc.m_nomes_super_admin` (`lib/accesEntitat.ts`, `potConvidar`), aunque **desactivar** el acceso sigue siendo de
 `pot_aprovar`; y el alta (`NovaEntitat`) solo enseña la casilla al super_admin. El E2E (`3b`) hace `admin` por un
 momento la cuenta `equip` del arnés y comprueba el botón gris, la casilla ausente y el 403 de la función.
+
+### Firma propia del equipo (25-11-2026, plan DIC 26 fase 0)
+
+`firma-equip` (JWT, `exigirEquipo` y `esIntern` siempre, también con `roles_activos` apagado; el uid sale del JWT):
+`GET` → `{ruta, url, actualitzada_at}` (URL firmada de 10 min); `POST {imatge: "data:<mime>;base64,…"}` — el formato lo
+deciden los **bytes** (`validaBytes` de `_shared/pujada.ts`), solo PNG o JPG, ≤1 MB (`400 format_invalid`, `413
+massa_gran`) — sube a `activos/equip/<uid>/firma-<ts>.<png|jpg>` y llama a `fixar_firma_equip()`; `DELETE` la borra.
+**El fichero anterior solo se borra si ningún `documentos.datos->signant_equip->>firma_ruta` lo cita** (el PDF de un
+albarán emitido se regenera: versión `signat`, reintentos). `generar-documento` estampa la ruta **congelada** en el
+snapshot, nunca la firma de hoy, y solo descarga rutas que empiezan por `equip/` sin `..` (un snapshot no puede
+estampar la firma de la apoderada). En `albara1p`, con `signant_equip` el pie es la caja «Per Espigoladors» /
+«Por Espigoladors» (firma, nombre, identidad de la Fundació; el rol no se imprime); sin él, el pie de siempre.
+La firma de la apoderada solo la estampa el Superadmin (`context/04bis`). Deuda 205: PNG huérfano al borrar la cuenta.

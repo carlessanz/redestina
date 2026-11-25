@@ -18,7 +18,7 @@
 //
 // Y una tercera vía, «Proposa canvis» (fase 5 de los puntos 4-6, nivel 2): otros kilos, otra
 // modalidad u otra hora, con motivo, que la entidad acepta o rechaza desde su panel
-// (`PropostaCanvis.tsx`). Solo quien puede aprobar la ve; el técnico, no.
+// (`PropostaCanvis.tsx`). Solo quien puede aprobar la ve (hoy, todo el equipo).
 //
 // ⚠️ `text-base md:text-sm` en todo control (§2, regla 1) y botones a 44 px en móvil.
 
@@ -218,7 +218,7 @@ export default function FormulariAprovacio({
         onClick={() => setRebutjant(true)}>
         {t('od.reject_appr')}
       </BotoAmbMotiu>
-      {/* Solo quien puede aprobar propone: el técnico no lo ve (la base lo vuelve a mirar). */}
+      {/* Solo quien puede aprobar propone: quien no puede, no lo ve (la base lo vuelve a mirar). */}
       {potAprovar && (
         <Button size="sm" variant="outline" className="h-11 whitespace-normal md:h-8" disabled={ocupat}
           onClick={() => setProposant(true)}>

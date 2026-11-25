@@ -12,14 +12,18 @@
 //
 // LOS TRES ESTADOS (`v_signatura_document`, «pendent» no se guarda, se deriva):
 //   pendent  falta la firma;
-//   signat   la contraparte ha SUBIDO el fichero firmado y espera al super_admin;
-//   tancat   cerrado: firmado con trazo (se cierra solo), subido por el super_admin o
-//            revisado y cerrado por él. La versión firmada es la vigente.
+//   signat   la contraparte ha SUBIDO el fichero firmado y espera al equipo;
+//   tancat   cerrado: firmado con trazo (se cierra solo), subido por el equipo o revisado
+//            y cerrado por él. La versión firmada es la vigente.
+//
+// QUIÉN DEL EQUIPO (proceso 0.1, 25-11-2026): la firma de un ALBARÁN (REC/ENT/OPE) la cierra,
+// la rechaza o la sube también el Dinamitzador (`pot_aprovar()`); la de un CONV, CD, CDP o CR
+// sigue siendo solo del Superadmin, porque va con la firma institucional de la Fundació.
 //
 // ⚠️ `accionsSignatura()` ES EL ÚNICO SITIO QUE DECIDE QUÉ BOTÓN SALE. Los componentes
 //    (`AccionsSignatura`, «Pendent de tu», la cola de Aprovacions) le preguntan y pintan lo
 //    que diga. Repartir la regla por cinco pantallas es como un CONV acaba ofreciendo «Signa»
-//    a quien no puede firmarlo por aquí, o un técnico ve un «Tanca» que la base rechaza.
+//    a quien no puede firmarlo por aquí, o un Dinamitzador ve un «Tanca» que la base rechaza.
 //
 // Sin dependencias de Supabase ni de React: se prueba en `tests/signatures.test.ts`.
 
@@ -46,6 +50,22 @@ export function esSignableCanvas(tipo: string | null | undefined): boolean {
 
 export function esPujable(tipo: string | null | undefined): boolean {
   return (TIPUS_PUJABLES as readonly string[]).includes(tipo ?? '')
+}
+
+/** Los albaranes: su firma la gestiona también el Dinamitzador (25-11-2026). */
+export const TIPUS_ALBARA: readonly string[] = ['REC', 'ENT', 'OPE']
+
+export function esTipusAlbara(tipo: string | null | undefined): boolean {
+  return TIPUS_ALBARA.includes(tipo ?? '')
+}
+
+/**
+ * ¿Puede esta cuenta del equipo cerrar, rechazar o subir la firma de un documento de este tipo?
+ * El Superadmin, siempre; el Dinamitzador (`pot_aprovar()`), solo la de un albarán. Es la misma
+ * regla que `tancar_signatura`/`rebutjar_signatura` y `pujar-document-signat` en el servidor.
+ */
+export function potGestionarSignatura(c: { tipo: string | null | undefined; esSuperAdmin: boolean; potAprovar: boolean }): boolean {
+  return c.esSuperAdmin || (c.potAprovar && esTipusAlbara(c.tipo))
 }
 
 /** Dónde firma la organización desde su panel: «Els meus documents» de su papel. */
@@ -92,12 +112,16 @@ export function clauVia(via: ViaSignatura): string {
   return `sgn.via_${via}`
 }
 
-/** Quién mira, a efectos de firma. Lo deriva `rolSignatura()` del contexto de sesión. */
-export type RolSignatura = 'titular' | 'operador' | 'super_admin' | 'equip'
+/**
+ * Quién mira, a efectos de firma. Lo deriva `rolSignatura()` del contexto de sesión.
+ * `dinamitzador` = equipo con `pot_aprovar()` sin ser Superadmin; `equip`, el resto del equipo
+ * (hoy nadie: el `tecnic` se retiró, pero un contexto sin `potAprovar` no concede nada).
+ */
+export type RolSignatura = 'titular' | 'operador' | 'super_admin' | 'dinamitzador' | 'equip'
 
-export function rolSignatura(c: { esIntern: boolean; esSuperAdmin: boolean; titular: boolean }): RolSignatura {
+export function rolSignatura(c: { esIntern: boolean; esSuperAdmin: boolean; potAprovar?: boolean; titular: boolean }): RolSignatura {
   if (c.esSuperAdmin) return 'super_admin'
-  if (c.esIntern) return 'equip'
+  if (c.esIntern) return c.potAprovar === true ? 'dinamitzador' : 'equip'
   return c.titular ? 'titular' : 'operador'
 }
 
@@ -105,7 +129,8 @@ export function rolSignatura(c: { esIntern: boolean; esSuperAdmin: boolean; titu
  * Las acciones posibles, en el orden en que se pintan:
  *   signa        firmar con el trazo (abre «Signa aquí»);
  *   puja         la organización sube su fichero firmado (queda `signat`);
- *   puja_equip   el super_admin sube el que le devolvieron (queda `tancat`);
+ *   puja_equip   el equipo sube el que le devolvieron (queda `tancat`): el Superadmin
+ *                cualquiera; el Dinamitzador, solo el de un albarán;
  *   veure_fitxer revisar el fichero subido antes de cerrar;
  *   tanca        darlo por bueno;
  *   rebutja      devolverlo a «pendent», con motivo.
@@ -131,13 +156,13 @@ export function accionsSignatura(a: {
     return ['signa', 'puja']
   }
 
-  if (a.rol === 'super_admin') {
+  if (a.rol === 'super_admin' || (a.rol === 'dinamitzador' && esTipusAlbara(a.tipo))) {
     if (a.estat === 'pendent') return ['puja_equip']
     return a.ambPdf ? ['veure_fitxer', 'tanca', 'rebutja'] : ['tanca', 'rebutja']
   }
 
-  // El operador ve el documento pero no lo firma (como el convenio), y el resto del equipo
-  // no cierra ni sube por la vía de correo: es cosa del super_admin.
+  // El operador ve el documento pero no lo firma (como el convenio). El Dinamitzador no cierra
+  // ni sube la firma de un CONV, CD o CR (es del Superadmin), y el resto del equipo, nada.
   return []
 }
 

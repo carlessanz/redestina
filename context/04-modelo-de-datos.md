@@ -2069,3 +2069,12 @@ Quien da de alta la oferta eligió «Espigolada». No es una modalidad (no entra
 `modalitat_receptor_compat`): es una petición de destino. Con origen `panel`/`intake`, `trg_excedentes_validacio` la
 manda a `pendent_validacio` aunque `validacio_ofertes` esté apagada; el equipo la convierte con `crear_espigolada()`
 (si la crea el equipo, `crear-oferta` la convierte en el acto). `producte_al_camp` la acompaña siempre.
+
+### Quién firma el albarán por Espigoladors (25-11-2026, plan DIC 26 fase 0, `20270615100200`)
+
+`albaranes.signant_equip jsonb` `{nom, rol, firma_ruta}` se congela en el `update` de `emitir_albaran` (lo llaman
+también `validar_recollida` y `rectificar_albaran` con la misma sesión) con la cuenta del equipo que emite o valida;
+`albaran_datos()` lo copia a la raíz de `documentos.datos` (las versiones `conciliat` y `signat` llevan el de la
+emisión) y `trg_albaranes_inmutable` lo protege. Si emite el servidor o un job, la clave no existe y el PDF `albara1p`
+conserva el pie «Atentament, Equip de Redestina»; si existe, el pie es la caja «Per Espigoladors» con la firma propia
+(`perfiles.firma_ruta`, `context/09`). Lo emitido antes no se tocó (sin backfill).

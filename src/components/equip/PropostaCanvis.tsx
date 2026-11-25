@@ -10,7 +10,7 @@
 //   · `AvisPropostaResposta` — la cola de Aprovacions cuando el interés ha vuelto: la entidad la
 //     rechazó (y por qué) o la aceptó en una venta y falta el precio.
 //
-// Solo `pot_aprovar()`: el técnico no ve «Proposa canvis» (lo decide quien llama), y la base
+// Solo `pot_aprovar()`: quien no puede aprobar no ve «Proposa canvis» (lo decide quien llama), y la base
 // lo vuelve a comprobar (42501).
 //
 // ⚠️ La hora propuesta NO se limita a la franja de la oferta: el equipo puede haberlo hablado

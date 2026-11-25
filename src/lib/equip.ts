@@ -1,5 +1,7 @@
-// El equipo de Redestina (09-11-2026): las cuentas con rol de plataforma —`super_admin`, `admin`,
-// `tecnic`—, que NO son los usuarios de las organizaciones. Vocabulario y cálculos de la pantalla
+// El equipo de Redestina (09-11-2026): las cuentas con rol de plataforma —`super_admin`
+// («Superadmin») y `admin` («Dinamitzador»)—, que NO son los usuarios de las organizaciones.
+// El `tecnic` se retiró el 25-11-2026 (proceso 0.1): la base lo pasó a `admin` y ya no lo admite,
+// pero la historia (`equip_rols_hist`, la auditoría) lo conserva, y por eso existe `RolHistoric`. Vocabulario y cálculos de la pantalla
 // «Configuració › Equip», sin React ni Supabase (prueba en `tests/equip.test.ts`).
 //
 // Las escribe `canviar_rol_equip()` (`20270513100000`) y, desde `20270514100000`, editar, activar,
@@ -13,8 +15,20 @@
 //   · aquí no se dan de alta cuentas ni se convierte una externa en equipo.
 
 /** El CHECK de `usuario_roles.rol`, del que más permisos tiene al que menos. */
-export const ROLS_EQUIP = ['super_admin', 'admin', 'tecnic'] as const
+export const ROLS_EQUIP = ['super_admin', 'admin'] as const
 export type RolEquip = (typeof ROLS_EQUIP)[number]
+
+/** Lo que puede salir en la historia: los roles de hoy y los retirados (el `tecnic`). */
+export type RolHistoric = RolEquip | 'tecnic'
+
+/**
+ * La clave i18n de un rol, también de uno retirado: `eq.rol_<rol>` para los vigentes y
+ * `eq.rol_retirat_<rol>` para los de antes (la auditoría no se reescribe). Un valor que nadie
+ * conoce cae en el retirado genérico del técnico: mejor eso que la clave cruda.
+ */
+export function clauRol(rol: RolHistoric | string): string {
+  return (ROLS_EQUIP as readonly string[]).includes(rol) ? `eq.rol_${rol}` : 'eq.rol_retirat_tecnic'
+}
 
 /** Lo que se manda a `canviar_rol_equip`: un rol o `cap` (sacar la cuenta del equipo). */
 export type RolAAssignar = RolEquip | 'cap'
@@ -43,8 +57,8 @@ export type AccioHist = (typeof ACCIONS_HIST)[number]
 export interface CanviRol {
   id: string
   email: string | null
-  rol_abans: RolEquip | null
-  rol_despres: RolEquip | null
+  rol_abans: RolHistoric | null
+  rol_despres: RolHistoric | null
   accio: AccioHist
   detall: { traspassades?: number; desti_email?: string | null; total?: number } | null
   per_email: string | null
@@ -66,8 +80,8 @@ export interface ApuntAuditoria {
   email: string | null
   nom: string | null
   esborrat: boolean
-  rol_abans: RolEquip | null
-  rol_despres: RolEquip | null
+  rol_abans: RolHistoric | null
+  rol_despres: RolHistoric | null
   desti_email: string | null
   desti_nom: string | null
   total: number | null
@@ -159,18 +173,19 @@ export function telefonValid(s: string): boolean {
   return t === '' || /^[1-9][0-9]{7,14}$/.test(t)
 }
 
-const ORDRE: Record<RolEquip, number> = { super_admin: 0, admin: 1, tecnic: 2 }
+const ORDRE: Record<RolEquip, number> = { super_admin: 0, admin: 1 }
 
 /** El equipo ordenado: primero el rol con más permisos, y dentro de cada rol por correo. */
 export function ordenaEquip(membres: readonly MembreEquip[]): MembreEquip[] {
   return [...membres].sort((a, b) =>
-    ORDRE[a.rol] - ORDRE[b.rol] || (a.email ?? '').localeCompare(b.email ?? ''))
+    (ORDRE[a.rol] ?? 9) - (ORDRE[b.rol] ?? 9) || (a.email ?? '').localeCompare(b.email ?? ''))
 }
 
 /** Cuántos hay de cada rol (para la cabecera). */
 export function recompteRols(membres: readonly MembreEquip[]): Record<RolEquip, number> {
-  const r: Record<RolEquip, number> = { super_admin: 0, admin: 0, tecnic: 0 }
-  for (const m of membres) r[m.rol] += 1
+  const r: Record<RolEquip, number> = { super_admin: 0, admin: 0 }
+  // Un rol que la pantalla no conoce (una base por delante o por detrás) no suma NaN.
+  for (const m of membres) if (m.rol in r) r[m.rol] += 1
   return r
 }
 
@@ -248,7 +263,7 @@ export function filtraEquip(membres: readonly MembreEquip[], pestanya: 'actius' 
  */
 export function esBaixada(abans: RolEquip, despres: RolAAssignar): boolean {
   if (despres === 'cap') return true
-  return ORDRE[despres] > ORDRE[abans]
+  return ORDRE[despres] > (ORDRE[abans] ?? 9)
 }
 
 /** Los códigos que levanta `canviar_rol_equip()` y que la pantalla sabe explicar. */

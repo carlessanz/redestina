@@ -35,7 +35,7 @@ import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import AvisCorreuDesactivat from '../../components/AvisCorreuDesactivat'
-import { textError } from '../../lib/textError'
+import { textError, textErrorInstitucional } from '../../lib/textError'
 import { useAppContext } from '../../hooks/useAppContext'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { kg } from '../../lib/albarans'
@@ -434,7 +434,9 @@ export default function TancamentDetall() {
     ? t('tan.why_close_first')
     : bloquejaProvisionals(provisionals, cap?.modo)
       ? t('tan.why_provisional')
-      : totals.pendentsCert === 0 ? t('tan.why_no_cert_candidates') : undefined
+      : totals.pendentsCert === 0 ? t('tan.why_no_cert_candidates')
+        // En real, la firma institucional: solo el Superadmin (25-11-2026).
+        : !esProva && !esSuperAdmin ? t('tan.why_super_admin') : undefined
 
   // 🔴 «Marca com a declarat» estaba habilitado con el ejercicio abierto: se podía dar por
   // presentado ante Hacienda un cierre que ni siquiera se había calculado. La base lo
@@ -667,7 +669,7 @@ export default function TancamentDetall() {
     const res = await emetreCertificatsTancament(id, { dataExpedicio, annex })
     setOcupat(false)
     setExpedicio(null)
-    if (!res.ok) { toast.error(textError(t, res)); return }
+    if (!res.ok) { toast.error(textErrorInstitucional(t, res)); return }
     setResultatMassiu({
       emesos: res.data.emesos,
       ja_tenien: res.data.ja_tenien,
@@ -686,7 +688,7 @@ export default function TancamentDetall() {
     const res = await emetreCertificat(d.id, { dataExpedicio, annex })
     setOcupat(false)
     setExpedicio(null)
-    if (!res.ok) { toast.error(textError(t, res)); return }
+    if (!res.ok) { toast.error(textErrorInstitucional(t, res)); return }
     toast.success(t('tan.cert_done', { num: res.data.numero ?? '' }))
     void refrescaComptadors()
     await refresca()
@@ -712,7 +714,7 @@ export default function TancamentDetall() {
     const res = await rectificarCertificat(rectifica.id, motiu)
     setOcupat(false)
     setRectifica(null)
-    if (!res.ok) { toast.error(textError(t, res)); return }
+    if (!res.ok) { toast.error(textErrorInstitucional(t, res)); return }
     toast.success(t('tan.cert_rectified', { num: res.data.numero ?? '' }))
     void refrescaComptadors()
     await refresca()
@@ -818,7 +820,7 @@ export default function TancamentDetall() {
                   className="h-11 whitespace-normal md:h-8"
                   disabled={ocupat || cap?.estado !== 'tancat'
                     || bloquejaProvisionals(provisionals, cap?.modo)
-                    || totals.pendentsCert === 0}
+                    || totals.pendentsCert === 0 || (!esProva && !esSuperAdmin)}
                   motiu={motiuCertificatsTots}
                   onClick={() => setExpedicio('tots')}
                 >
@@ -1321,10 +1323,12 @@ function FilaDonant({
             )}
             {teCertificat && (
               <>
+                {/* Rectificar un certificado real vuelve a estampar la firma institucional. */}
                 <BotoIcona
                   icona={RotateCcw}
                   etiqueta={t('tan.a_rectify')}
-                  disabled={ocupat}
+                  disabled={ocupat || (!esProva && !esSuperAdmin)}
+                  motiu={!esProva && !esSuperAdmin ? t('tan.why_super_admin') : undefined}
                   onClick={onRectifica}
                 />
                 {d.enviado_at === null && (

@@ -12,7 +12,7 @@
 //     `fixar_preu_acordat()`.
 //
 // Los grises anticipan lo que la base rechazaría; la autoridad sigue siendo la RPC. Todo exige
-// `pot_aprovar()`: a un técnico se le dejan grises con el motivo, como en Aprovacions.
+// `pot_aprovar()`: a quien no puede aprobar se le dejan grises con el motivo, como en Aprovacions.
 
 import { useEffect, useState } from 'react'
 import { Ban, Euro, Pencil } from 'lucide-react'

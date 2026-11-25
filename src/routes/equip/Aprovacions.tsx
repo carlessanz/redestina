@@ -51,7 +51,7 @@ import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
-import { textError } from '../../lib/textError'
+import { textError, textErrorInstitucional } from '../../lib/textError'
 import { useAppContext, useCanals } from '../../hooks/useAppContext'
 import { motiuCanal } from '../../lib/canals'
 import { useCerca } from '../../hooks/useCerca'
@@ -64,6 +64,7 @@ import { enviarAcces } from '../../lib/acces'
 import type { Convenio, Membresia, OfertaRespuesta } from '../../types'
 import DialegMotiu from '../../components/DialegMotiu'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
+import AvisSignaturaInstitucional from '../../components/AvisSignaturaInstitucional'
 import { useConfirma } from '../../components/DialegConfirma'
 import EnllacOrganitzacio from '../../components/EnllacOrganitzacio'
 import CuaSignatures from '../../components/equip/CuaSignatures'
@@ -307,6 +308,8 @@ export default function Aprovacions() {
   // Sin contexto, no: los permisos se conceden explícitamente o no se conceden (fail-cerrado,
   // 07-10-2026). La RPC revalida de todas formas y devuelve 42501.
   const potAprovar = ctx?.potAprovar ?? false
+  // Contrafirmar (la firma institucional) es solo del Superadmin desde el 25-11-2026.
+  const esSuperAdmin = ctx?.esSuperAdmin ?? false
   const { cerca, setCerca, q } = useCerca()
 
   const carrega = useCallback(async () => {
@@ -585,7 +588,7 @@ export default function Aprovacions() {
     setOcupat(c.id)
     const res = await contrafirmarConveni(c.id)
     setOcupat(null)
-    if (!res.ok) { toast.error(textError(t, res)); return }
+    if (!res.ok) { toast.error(textErrorInstitucional(t, res)); return }
     toast.success(t('conv.countersigned'))
     void carregaConvenis()
   }
@@ -874,12 +877,12 @@ export default function Aprovacions() {
                     <Button asChild size="sm" variant="outline">
                       <Link to={`/equip/convenis/${c.id}`}>{t('c.detail')}</Link>
                     </Button>
-                    <BotoAmbMotiu size="sm" className="whitespace-normal"
-                      disabled={!potAprovar || ocupat === c.id}
-                      motiu={potAprovar ? undefined : t('conv.need_approver')}
-                      onClick={() => void contrafirmar(c)}>
-                      {t('appr.conv_countersign')}
-                    </BotoAmbMotiu>
+                    {esSuperAdmin ? (
+                      <Button size="sm" className="whitespace-normal" disabled={ocupat === c.id}
+                        data-testid="conv-contrasigna" onClick={() => void contrafirmar(c)}>
+                        {t('appr.conv_countersign')}
+                      </Button>
+                    ) : <AvisSignaturaInstitucional />}
                     <BotoAmbMotiu size="sm" variant="outline" disabled={!potAprovar || ocupat === c.id}
                       motiu={potAprovar ? undefined : t('conv.need_approver')}
                       onClick={() => setMotiuDe({ tipus: 'conveni', conveni: c })}>

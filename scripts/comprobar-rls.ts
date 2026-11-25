@@ -78,8 +78,8 @@
 //         ve su fila de `documentos`, así que con el GRANT por tabla leía el token en
 //         claro de su propio enlace de subida de factura. En las otras cuatro la tabla
 //         entera ya le está negada.
-//   2. **Escribir el texto de un documento legal es `pot_aprovar()`, no ser del equipo.**
-//      El técnico lee las plantillas y no las toca; el super_admin sí.
+//   2. **Escribir el texto de un documento legal es del super_admin, no del equipo.**
+//      El Dinamitzador (`admin`) lee las plantillas y no las toca (20270615100100).
 //   3. **El nomenclátor es catálogo, no dato.** `municipios` la lee cualquier cuenta con
 //      sesión, como `productos`: la necesita el formulario de ubicación de un productor.
 //
@@ -158,7 +158,7 @@
 //   · `pendents_equip()` es de dentro. Cuenta registros pendientes, respuestas por
 //     aprobar, albaranes, productos sin coste del ejercicio y el estado del cierre
 //     abierto: cifras internas, aunque sean solo cifras. La comprueban en positivo el
-//     técnico y el super_admin, y en negativo los CINCO perfiles externos (va en
+//     Dinamitzador (`equip`) y el super_admin, y en negativo los CINCO perfiles externos (va en
 //     `DOCUMENTAL_EXTERN`), incluidos `sense_rol` y `pendent`, que desde el 14-09-2026
 //     vuelven a tener cuenta y por tanto dejan de ser bloques sin recorrer (§12.32).
 //   · `progres_meves_ofertes()` es del generador: cuántas entidades han recibido, aceptado
@@ -423,6 +423,33 @@ interface Check {
 // por qué eso es seguro (p. ej. una consulta pública de solo lectura que valida un token).
 const PERMITIDAS_ABIERTAS: readonly string[] = [];
 
+// PERFILES DEL EQUIPO (20270615100000–100200, proceso 0.1). Desde la retirada de `tecnic`,
+// la cuenta `equip` es el **Dinamitzador** (`admin`): tiene `pot_aprovar()`, así que todo lo
+// que antes se le negaba por esa guarda (asignar, validar, cierres, convenios, precios…) es
+// ahora «permitir» con uuid inventado (solo vale un error de negocio). Lo que se le sigue
+// negando es lo del super_admin: la firma institucional (contrafirmar un convenio; emitir y
+// rectificar certificados REALES —esto último lo prueba `scripts/sql/prova-signatura-
+// institucional.sql`, porque exige una fila en modo real que el arnés no puede crear—), la
+// configuración (whitelists, plantillas, notificaciones…) y la gestión del equipo. Y la firma
+// propia: `la_meva_firma()` es del equipo, `fixar_firma_equip()` solo del servidor y
+// `perfiles.firma_ruta`/`firma_actualitzada_at` no se leen desde el navegador.
+const FIRMA_EQUIP_INTERNES: Check[] = [
+  { tabla: "fixar_firma_equip", op: "rpc", esperado: "denegar", args: { p_user: "00000000-0000-0000-0000-000000000000", p_ruta: null }, descripcion: "NO fixa la signatura de ningu (nomes el servidor, firma-equip)" },
+  { tabla: "signant_equip_actual", op: "rpc", esperado: "denegar", descripcion: "NO crida la funcio interna del signant de l'albara" },
+  { tabla: "perfiles", op: "leer", esperado: "denegar", columnas: "id, firma_ruta", descripcion: "NO llegeix la ruta de la signatura propia (GRANT per columnes)" },
+  { tabla: "perfiles", op: "leer", esperado: "denegar", columnas: "id, firma_actualitzada_at", descripcion: "NO llegeix quan es va fixar la signatura (GRANT per columnes)" },
+  // La contraparte: las columnas de siempre se siguen leyendo (el perfil propio siempre se ve).
+  { tabla: "perfiles", op: "leer", esperado: "permitir", columnas: "id, email, nombre, telefono, idioma, vista_defecto, activo, created_at, updated_at, mercat_vist_at", descripcion: "llegeix les columnes de sempre del perfil (GRANT per columnes)" },
+];
+const FIRMA_EQUIP_EXTERN: Check[] = [
+  ...FIRMA_EQUIP_INTERNES,
+  { tabla: "la_meva_firma", op: "rpc", esperado: "denegar", descripcion: "NO te signatura propia (es de l'equip)" },
+];
+const FIRMA_EQUIP_EQUIP: Check[] = [
+  ...FIRMA_EQUIP_INTERNES,
+  { tabla: "la_meva_firma", op: "rpc", esperado: "permitir", descripcion: "llegeix la seva signatura propia (ruta i data, o null)" },
+];
+
 // CIRCUITO DE FIRMA (20270510100000–100200). Lo que el arnés afirma:
 //
 //   · `firmes_document` no se escribe desde el navegador, ni siendo del equipo: todo entra
@@ -432,8 +459,9 @@ const PERMITIDAS_ABIERTAS: readonly string[] = [];
 //     las tres internas (`document_emet_versio_signada`, `document_part_signant_intern`,
 //     `document_signatura_comprova`) dan 42501 a CUALQUIER sesión: las primeras por su
 //     guarda (`auth.uid() is not null`), las internas porque no tienen EXECUTE;
-//   · cerrar y rechazar una firma es `es_super_admin()`: el super_admin con un uuid
-//     inventado recibe 22023 (autoriza) y el resto 42501;
+//   · cerrar y rechazar una firma es del EQUIPO si el documento es un albarán y del
+//     super_admin si es CONV/CD/CR (20270615100100): con un uuid inventado el equipo recibe
+//     22023 (autoriza) y los externos 42501;
 //   · una cuenta externa no acuña un enlace de firma sobre un documento que no es suyo
 //     (42501 con uuid inventado: permiso antes que existencia) y ve 0 filas en la bandeja.
 //
@@ -522,14 +550,14 @@ const FIRMA_EXTERN: Check[] = [
     op: "rpc",
     esperado: "denegar",
     args: { p_firma: "00000000-0000-0000-0000-000000000000" },
-    descripcion: "NO tanca cap signatura (es del super_admin)",
+    descripcion: "NO tanca cap signatura (es de l'equip)",
   },
   {
     tabla: "rebutjar_signatura",
     op: "rpc",
     esperado: "denegar",
     args: { p_firma: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" },
-    descripcion: "NO rebutja cap signatura (es del super_admin)",
+    descripcion: "NO rebutja cap signatura (es de l'equip)",
   },
   {
     tabla: "acunar_enllac_propi",
@@ -542,12 +570,14 @@ const FIRMA_EXTERN: Check[] = [
     },
     descripcion: "NO encunya un enllac de signatura d'un document que no es seu",
   },
+  // La firma propia del equipo (20270615100200).
+  ...FIRMA_EQUIP_EXTERN,
 ];
 
 // IMPORTADOR DE ENTIDADES (20270511100000). Lo que el arnés afirma:
 //
-//   · previsualizar e importar son SOLO del super_admin (`es_super_admin()`): el técnico, el
-//     admin y cualquier externo reciben 42501 antes de que se mire el payload; el super_admin,
+//   · previsualizar e importar son SOLO del super_admin (`es_super_admin()`): el
+//     Dinamitzador (`admin`) y cualquier externo reciben 42501 antes de que se mire el payload; el super_admin,
 //     con un payload inválido, 22023 `dades_invalides` (autoriza y no escribe nada);
 //   · el registro (`importacions_entitats`, `importacions_entitats_files`) lo lee el equipo y
 //     nadie lo escribe directo (sin GRANT de escritura: lo escribe la RPC);
@@ -777,28 +807,6 @@ const PREUS_EXTERN: Check[] = [
   { tabla: "preus_canalitzacions_mes", op: "rpc", esperado: "denegar", args: { p_exercici: 2026, p_mes: 9 }, descripcion: "NO llegeix les canalitzacions que esperen preu (D2)" },
 ];
 
-// El técnico: lee todo y la propuesta, pero no valida ni da de alta (es de `pot_aprovar()`).
-const PREUS_TECNIC: Check[] = [
-  ...PREUS_INTERNES,
-  { tabla: "preus_fonts_estat", op: "leer", esperado: "permitir", descripcion: "veu les fonts de preus (D1)" },
-  { tabla: "productes_fonts", op: "leer", esperado: "permitir", descripcion: "veu les equivalencies de preus (D1)" },
-  { tabla: "preus_carregues", op: "leer", esperado: "permitir", descripcion: "veu les carregues de preus (D1)", requiereFixture: "alguna carrega (job preus-gencat o «Actualitza ara»)" },
-  { tabla: "preus_observats", op: "leer", esperado: "permitir", descripcion: "veu els preus observats (D1)", requiereFixture: "alguna carrega amb files" },
-  { tabla: "preus_referencia", op: "leer", esperado: "permitir", descripcion: "veu els preus de referencia validats (D1)", requiereFixture: "algun mes validat (validar_preus_mes)" },
-  { tabla: "preus_proposta_mes", op: "rpc", esperado: "permitir", args: { p_exercici: 2026, p_mes: 9 }, descripcion: "llegeix la proposta de preus d'un mes (D1)" },
-  { tabla: "noms_fonts_preus", op: "rpc", esperado: "permitir", descripcion: "llegeix els noms de les fonts (D1)" },
-  { tabla: "validar_preus_mes", op: "rpc", esperado: "denegar", args: { p_exercici: 2025, p_mes: 13 }, descripcion: "NO valida cap mes (es de pot_aprovar) (D1)" },
-  { tabla: "validar_preus_periode", op: "rpc", esperado: "denegar", args: { p_des_exercici: 2026, p_des_mes: 5, p_fins_exercici: 2026, p_fins_mes: 1 }, descripcion: "NO valida en bloc (D1)" },
-  { tabla: "fixar_preu_referencia", op: "rpc", esperado: "denegar", args: { p_producto: "TEST-ARNES-INEXISTENT", p_exercici: 2025, p_mes: 1, p_font: "manual", p_eur_kg: 1, p_motiu: "" }, descripcion: "NO fixa cap preu de referencia (D1)" },
-  { tabla: "crear_producte", op: "rpc", esperado: "denegar", args: { p_nombre: "", p_familia: "x" }, descripcion: "NO dona d'alta productes (D1)" },
-  { tabla: "afegir_equivalencia_preu", op: "rpc", esperado: "denegar", args: { p_producto: "TEST-ARNES-INEXISTENT", p_font: "x", p_nom_font: "" }, descripcion: "NO afegeix equivalencies (D1)" },
-  { tabla: "treure_equivalencia_preu", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO treu equivalencies (D1)" },
-  { tabla: "fixar_preu_manual", op: "rpc", esperado: "denegar", args: { p_producto: "TEST-ARNES-INEXISTENT", p_manual: false }, descripcion: "NO marca preu manual (D1)" },
-  { tabla: "marcar_carrega_preus", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_estat: "descartada", p_motiu: "arnes" }, descripcion: "NO descarta carregues (D1)" },
-  { tabla: "fixar_font_preus", op: "rpc", esperado: "denegar", args: { p_font: "x", p_automatic: null }, descripcion: "NO toca les fonts (es del super_admin) (D1)" },
-  { tabla: "canalizaciones_preu_hist", op: "leer", esperado: "permitir", descripcion: "veu el rastre dels preus de les canalitzacions (D2)", requiereFixture: "alguna canalitzacio ajustada en validar un mes" },
-  { tabla: "preus_canalitzacions_mes", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_exercici: 2026, p_mes: 13 }, descripcion: "llegeix les canalitzacions que esperen preu (autoritza; 22023 mes_invalid) (D2)" },
-];
 
 // El super_admin (y, por `pot_aprovar()`, un admin): todo, con argumentos que cortan en 22023.
 const PREUS_SUPER: Check[] = [
@@ -821,13 +829,23 @@ const PREUS_SUPER: Check[] = [
   { tabla: "preus_canalitzacions_mes", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_exercici: 2026, p_mes: 13 }, descripcion: "llegeix les canalitzacions que esperen preu (autoritza; 22023 mes_invalid) (D2)" },
 ];
 
+// El Dinamitzador (`admin`, cuenta `equip`; 20270615100000): lo mismo que el super_admin por
+// `pot_aprovar()`, salvo configurar las fuentes, que es del super_admin.
+const PREUS_DINAMITZADOR: Check[] = [
+  ...PREUS_SUPER.filter((c) => c.tabla !== "fixar_font_preus"),
+  { tabla: "preus_observats", op: "leer", esperado: "permitir", descripcion: "veu els preus observats (D1)", requiereFixture: "alguna carrega amb files" },
+  { tabla: "preus_referencia", op: "leer", esperado: "permitir", descripcion: "veu els preus de referencia validats (D1)", requiereFixture: "algun mes validat (validar_preus_mes)" },
+  { tabla: "noms_fonts_preus", op: "rpc", esperado: "permitir", descripcion: "llegeix els noms de les fonts (D1)" },
+  { tabla: "fixar_font_preus", op: "rpc", esperado: "denegar", args: { p_font: "x", p_automatic: null }, descripcion: "NO toca les fonts (es del super_admin) (D1)" },
+];
+
 // ASIGNACIÓN DIRECTA, MODIFICAR Y ANULAR (fase 2 de los puntos 4-6; 20270606100000,
 // 20270606100100, 20270607100000). Lo que el arnés afirma:
 //
 //   · las tres funciones internas (`recalcula_estat_excedent`, `aprova_resposta_intern`,
 //     `anula_canalitzacio`) no tienen EXECUTE para ninguna sesión (42501 a todos);
 //   · las cuatro RPC (`assignar_directe`, `modificar_assignacio`, `anular_assignacio`,
-//     `fixar_preu_acordat`) son de `pot_aprovar()`: externos y técnico, 42501; el super_admin con
+//     `fixar_preu_acordat`) son de `pot_aprovar()`: externos, 42501; el equipo (admin y super_admin) con
 //     uuid inventado, 22023 (autoriza y corta por existencia);
 //   · `aprovar_resposta` sigue resolviendo con los SEIS argumentos con nombre del frontend
 //     publicado aunque la firma tenga siete (el último con default): 22023 «no es pot aprovar».
@@ -837,7 +855,7 @@ const ASSIGNACIO_INTERNES: Check[] = [
   { tabla: "anula_canalitzacio", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "NO crida l'anul.lacio interna (B2)" },
 ];
 
-// Externos (en `DOCUMENTAL_EXTERN`) y técnico: nada de asignar, modificar, anular ni fijar precio.
+// Externos (en `DOCUMENTAL_EXTERN`): nada de asignar, modificar, anular ni fijar precio.
 const ASSIGNACIO_SENSE_APROVAR: Check[] = [
   ...ASSIGNACIO_INTERNES,
   { tabla: "assignar_directe", op: "rpc", esperado: "denegar", args: { p_excedente: "00000000-0000-0000-0000-000000000000", p_entidad: "00000000-0000-0000-0000-000000000000", p_kg: 1 }, descripcion: "NO assigna directament (es de pot_aprovar) (A1)" },
@@ -846,13 +864,7 @@ const ASSIGNACIO_SENSE_APROVAR: Check[] = [
   { tabla: "fixar_preu_acordat", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_preu: 1, p_acceptat: true }, descripcion: "NO fixa el preu acordat d'una venda (A1)" },
 ];
 
-// El técnico, además: tampoco aprueba (con los seis argumentos con nombre del frontend publicado).
-const ASSIGNACIO_TECNIC: Check[] = [
-  ...ASSIGNACIO_SENSE_APROVAR,
-  { tabla: "aprovar_resposta", op: "rpc", esperado: "denegar", args: { p_resposta: "00000000-0000-0000-0000-000000000000", p_kg: 1, p_preu: null, p_motiu: null, p_modalitat: null, p_recollida: null }, descripcion: "NO aprova cap resposta (es de pot_aprovar) (A1)" },
-];
-
-// El super_admin (y, por `pot_aprovar()`, un admin): autoriza y corta en 22023 por existencia.
+// El super_admin y el Dinamitzador (`admin`, por `pot_aprovar()`): autoriza y corta en 22023 por existencia.
 const ASSIGNACIO_SUPER: Check[] = [
   ...ASSIGNACIO_INTERNES,
   { tabla: "assignar_directe", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_excedente: "00000000-0000-0000-0000-000000000000", p_entidad: "00000000-0000-0000-0000-000000000000", p_kg: 1 }, descripcion: "pot assignar directament (autoritza; 22023 oferta no disponible) (A1)" },
@@ -899,12 +911,12 @@ const CANALITZACIO_EXTERNS_PART: Check[] = [
 // Lo que el arnés afirma (el ciclo —proponer, aceptar, rechazar, venta— no es de permisos y se
 // probó con transacciones en el clon):
 //
-//   · `proposar_canvis` es de `pot_aprovar()`: externos y técnico, 42501; el super_admin con uuid
+//   · `proposar_canvis` es de `pot_aprovar()`: externos, 42501; el equipo con uuid
 //     inventado, 22023 `resposta_inexistent` (autoriza y corta por existencia);
 //   · `respondre_proposta` es de la ENTIDAD de la respuesta o de `pot_aprovar()` (vía asistida). El
 //     permiso va antes que la existencia: con un uuid inventado, cualquier externo —también el
-//     receptor, que no es dueño de una respuesta que no existe— y el técnico reciben 42501; el
-//     super_admin, 22023 `resposta_inexistent`;
+//     receptor, que no es dueño de una respuesta que no existe— reciben 42501; el equipo,
+//     22023 `resposta_inexistent`;
 //   · `albarans_recollida` es interna (la llama el servidor): 42501 a toda sesión;
 //   · las columnas nuevas se leen: `proposta_*` de las respuestas de su entidad (receptor) y
 //     `recollida_origen` de sus canalizaciones (las dos partes).
@@ -932,7 +944,7 @@ const PROPOSTA_LECTURA_RECEPTOR: Check[] = [
 ];
 
 // «Entrades i sortides» (20270612100000, punto 6.7): una fila por salida, solo lectura y solo
-// del equipo (también `tecnic`).
+// del equipo.
 //   · `sortides_base` (la fila y los filtros) y `estat_recollida_canalitzacio` (el `case` del
 //     estado que comparte con `operacio_detall`) son internas: 42501 a toda sesión;
 //   · las dos públicas ponen la guarda antes que la validación: un externo, 42501; el equipo,
@@ -1280,7 +1292,7 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // Plan 1, rebanada 1D (20270501500000): dar y quitar acceso es del equipo, y el estado de la
   // cuenta solo lo lee el equipo. Las dos del servidor no las ejecuta ninguna sesión.
   { tabla: "estat_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO veu l'estat d'accés d'una entitat" },
-  // Plan 2, B3 (20270518110000): la exportación a Excel es del equipo (también `tecnic`).
+  // Plan 2, B3 (20270518110000): la exportación a Excel es del equipo.
   { tabla: "exportar_entitats", op: "rpc", esperado: "denegar", args: { p_ids: null }, descripcion: "NO exporta les entitats a Excel (és de l'equip)" },
   { tabla: "desactivar_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO treu l'accés a cap entitat" },
   { tabla: "concedir_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_user: "00000000-0000-0000-0000-000000000000", p_email: "arnes@exemple.cat", p_per: null }, descripcion: "NO dona accés per la porta del servidor (només service_role)" },
@@ -1667,12 +1679,17 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "documentos", op: "actualizar", esperado: "denegar", columnas: "id, intentos", descripcion: "NO edita un documento emitido" },
     { tabla: "siguiente_numero", op: "rpc", esperado: "denegar", args: { p_serie: "PROVA", p_ejercicio: 1999 }, descripcion: "NO quema números de una serie legal" },
     { tabla: "emitir_documento_prova", op: "rpc", esperado: "denegar", args: { p_fallar: false }, descripcion: "NO emite documentos de prueba (es del super_admin)" },
-    // Plantillas: el técnico las LEE (necesita saber con qué texto se emite) pero no las
-    // escribe. Escribir el texto de un documento legal es `pot_aprovar()`, como aprobar
-    // una canalización.
+    // Plantillas: el Dinamitzador las LEE (necesita saber con qué texto se emite) pero no las
+    // escribe. Escribir el texto de un documento legal es configuración: super_admin.
     { tabla: "plantillas_documento", op: "leer", esperado: "permitir", descripcion: "ve las plantillas de documento" },
-    { tabla: "plantillas_documento", op: "insertar", esperado: "denegar", descripcion: "NO publica plantillas (es de pot_aprovar)" },
-    { tabla: "plantillas_documento", op: "actualizar", esperado: "denegar", descripcion: "NO edita plantillas (es de pot_aprovar)" },
+    { tabla: "plantillas_documento", op: "insertar", esperado: "denegar", descripcion: "NO publica plantillas (es del super_admin, 20270615100100)" },
+    { tabla: "plantillas_documento", op: "actualizar", esperado: "denegar", descripcion: "NO edita plantillas (es del super_admin, 20270615100100)" },
+    // Las listas de prueba de WhatsApp y correo son configuración: las lee el equipo y solo las
+    // escribe el super_admin (20270615100100). Se reescribe `etiqueta` con su propio valor.
+    { tabla: "meta_test_recipients", op: "leer", esperado: "permitir", descripcion: "veu la llista de proves de WhatsApp", requiereFixture: "algun numero a meta_test_recipients" },
+    { tabla: "meta_test_recipients", op: "actualizar", esperado: "denegar", descripcion: "NO toca la llista de proves de WhatsApp (es del super_admin)" },
+    { tabla: "email_test_recipients", op: "leer", esperado: "permitir", descripcion: "veu la llista de proves de correu", requiereFixture: "algun correu a email_test_recipients" },
+    { tabla: "email_test_recipients", op: "actualizar", esperado: "denegar", descripcion: "NO toca la llista de proves de correu (es del super_admin)" },
     // Parámetros: se leen todos MENOS el DNI de la apoderada, y no los toca nadie que no
     // sea super_admin (cambian lo que dirán todos los documentos futuros).
     {
@@ -1805,7 +1822,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       args: { p_espigolada: "00000000-0000-0000-0000-000000000000" },
       descripcion: "NO obre ni tanca espigolades a mà (ho fa el trigger)",
     },
-    // --- Certificat de recepcio (CR): el equipo LEE, y escribir es de `pot_aprovar()` ---
+    // --- Certificat de recepcio (CR): el equipo calcula y emite en PRUEBA (`pot_aprovar()`);
+    //     en REAL, solo el super_admin (20270615100100; lo prueba la SQL de firma institucional) ---
     {
       tabla: "cierres_receptor",
       op: "leer",
@@ -1821,8 +1839,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       requiereFixture: "algún certificado de recepción calculado (calcular_certificat_recepcio)",
     },
     { tabla: "cierres_receptor", op: "insertar", esperado: "denegar", descripcion: "NO crea certificats de recepcio a ma (van per RPC)" },
-    { tabla: "calcular_certificat_recepcio", op: "rpc", esperado: "denegar", args: { p_entidad: "00000000-0000-0000-0000-000000000000", p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba" }, descripcion: "NO calcula un certificat de recepcio (es de pot_aprovar)" },
-    { tabla: "emetre_certificat_recepcio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet un certificat de recepcio (es de pot_aprovar)" },
+    { tabla: "calcular_certificat_recepcio", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_entidad: "00000000-0000-0000-0000-000000000000", p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba" }, descripcion: "pot calcular un certificat de recepcio (autoritza; l'entitat no existeix)" },
+    { tabla: "emetre_certificat_recepcio", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "passa la guarda d'emetre un CR (autoritza; el periode no existeix)" },
+    { tabla: "rectificar_certificat_recepcio", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "00000000-0000-0000-0000-000000000000", p_motiu: "Comprovacio de l'arnes de RLS" }, descripcion: "passa la guarda de rectificar un CR (autoritza; el periode no existeix)" },
     // Las LECTURAS sí son del equipo: son lo que hace auditable la cifra del certificado.
     { tabla: "cierre_base_recepcio", op: "rpc", esperado: "permitir", args: { p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba" }, descripcion: "pot llegir la base de calcul d'un certificat de recepcio" },
     { tabla: "cierre_pendents_recepcio", op: "rpc", esperado: "permitir", args: { p_desde: "1999-01-01", p_hasta: "1999-12-31" }, descripcion: "pot llegir els lliuraments pendents de conciliar" },
@@ -1856,15 +1875,17 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "fixar_lloc_principal", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_lloc: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot triar el lloc principal de qualsevol productor (autoritza; 22023 lloc_inexistent) (A4)" },
     // --- Excedentes del diagnóstico (A3, 20270522100000): ver `DIAGNOSTIC_EXCEDENTS_EQUIP` ---
     ...DIAGNOSTIC_EXCEDENTS_EQUIP,
-    // --- Precios de referencia por mes (D1, 20270531100000): ver `PREUS_TECNIC` ---
-    ...PREUS_TECNIC,
-    // Asignación directa, modificar y anular (fase 2 de los puntos 4-6): el técnico no tiene `pot_aprovar()`.
-    ...ASSIGNACIO_TECNIC,
+    // --- Precios de referencia por mes (D1, 20270531100000): ver `PREUS_DINAMITZADOR` ---
+    ...PREUS_DINAMITZADOR,
+    // Asignación directa, modificar y anular (fase 2 de los puntos 4-6): el Dinamitzador tiene `pot_aprovar()`.
+    ...ASSIGNACIO_SUPER,
     // Recogida, albaranes y ventas (fase 3 de los puntos 4-6): ver `CANALITZACIO_PONT_ALIE`.
     ...CANALITZACIO_PONT_ALIE,
-    // Proponer cambios (fase 5 de los puntos 4-6): el técnico no tiene `pot_aprovar()`.
-    ...PROPOSTA_SENSE_APROVAR,
-    // «Entrades i sortides» (20270612100000, 6.7): de todo el equipo, también el técnico.
+    // Proponer cambios (fase 5 de los puntos 4-6): el Dinamitzador tiene `pot_aprovar()`.
+    ...PROPOSTA_SUPER,
+    // «Entrades i sortides» (20270612100000, 6.7): de todo el equipo.
+    // La firma propia (20270615100200): `la_meva_firma` sí; las columnas y la escritura, no.
+    ...FIRMA_EQUIP_EQUIP,
     ...SORTIDES_EQUIP,
     {
       tabla: "costes_producto",
@@ -1906,21 +1927,23 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "albaranes", op: "insertar", esperado: "denegar", descripcion: "NO crea albaranes a mano (van por RPC)" },
     { tabla: "espigoladas", op: "insertar", esperado: "denegar", descripcion: "NO crea espigoladas a mano (van por RPC)" },
     { tabla: "costes_producto", op: "insertar", esperado: "denegar", descripcion: "NO escribe costes a mano" },
-    // Fijar el coste por kilo es `pot_aprovar()`, no ser del equipo: es una decisión
-    // económica, como aprobar una canalización.
+    // Fijar el coste por kilo es `pot_aprovar()`: el Dinamitzador lo tiene. Sobre un producto
+    // inexistente, la guarda deja pasar y la validación corta con 22023 (no escribe nada).
     {
       tabla: "fijar_coste_producto",
       op: "rpc",
-      esperado: "denegar",
+      esperado: "permitir",
+      errorExigit: "23503",
       args: { p_producto: "TEST-ARNES-INEXISTENT", p_coste: 1, p_motivo: "arnes" },
-      descripcion: "NO fija el coste por kilo (es de pot_aprovar)",
+      descripcion: "pot fixar el cost per quilo (autoritza; el producte no existeix → 23503)",
     },
     {
       tabla: "fixar_origen_cost_producte",
       op: "rpc",
-      esperado: "denegar",
+      esperado: "permitir",
+      errorExigit: "22023",
       args: { p_producto: "TEST-ARNES-INEXISTENT", p_criteri: "fixat_equip" },
-      descripcion: "NO fija el origen de un precio manual (es de pot_aprovar)",
+      descripcion: "pot fixar l'origen d'un preu manual (autoritza; sense cost, no escriu)",
     },
     // El destino final lo registra también el equipo, en nombre del productor (modelo
     // asistido). Con un id inventado, la guarda de rol deja pasar y corta la existencia.
@@ -1935,21 +1958,21 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // Revisar los cambios de una oferta es del equipo (id inventado: autoriza y no toca nada).
     { tabla: "marcar_canvis_revisats", op: "rpc", esperado: "permitir", args: { p_excedente: "00000000-0000-0000-0000-000000000000" }, descripcion: "marca com a revisats els canvis d'una oferta" },
     // «Confirma la recollida» y validar/retornar la del receptor son de un ADMIN desde
-    // 20270428100000 (`pot_aprovar()`): un técnico, no. El permiso va antes que la existencia.
-    { tabla: "confirmar_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg_reals: 1 }, descripcion: "NO confirma cap recollida (és d'un admin des de 20270428100000)" },
-    { tabla: "validar_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO valida cap recollida (és d'un admin)" },
-    { tabla: "retornar_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "NO retorna cap recollida (és d'un admin)" },
+    // 20270428100000 (`pot_aprovar()`): el Dinamitzador lo es (uuid inventado → 22023).
+    { tabla: "confirmar_recollida", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg_reals: 1 }, descripcion: "confirma una recollida en nom de les parts (id inventat → 22023)" },
+    { tabla: "validar_recollida", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000" }, descripcion: "valida una recollida (id inventat → 22023)" },
+    { tabla: "retornar_recollida", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "retorna una recollida al receptor (id inventat → 22023)" },
     // El registro del receptor NO es del equipo: el equipo tiene «Confirma la recollida».
     { tabla: "registrar_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_resultat: "coincideix" }, descripcion: "NO registra la recollida en nom del receptor (té «Confirma la recollida»)" },
     { tabla: "confirmar_part_declarada", op: "rpc", esperado: "denegar", args: { p_albaran: "00000000-0000-0000-0000-000000000000", p_rol: "recibe", p_kg: 1, p_user: "00000000-0000-0000-0000-000000000000", p_nom: "arnes", p_carrec: "arnes", p_data: null, p_incidencia: null, p_extra: null }, descripcion: "NO confirma cap part per declaració (funció interna)" },
-    // Aprobar un certificado en nombre del donante es de `pot_aprovar()`: un técnico, no.
-    { tabla: "aprovar_certificat_equip", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_tipus: "anual", p_nota: "arnes" }, descripcion: "NO aprova certificats en nom del donant (és de pot_aprovar)" },
+    // Aprobar un certificado en nombre del donante es de `pot_aprovar()`: el Dinamitzador, sí.
+    { tabla: "aprovar_certificat_equip", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "00000000-0000-0000-0000-000000000000", p_tipus: "anual", p_nota: "arnes" }, descripcion: "aprova un certificat en nom del donant (id inventat → 22023)" },
     { tabla: "repartir_kg_linies", op: "rpc", esperado: "denegar", args: { p_albaran: "00000000-0000-0000-0000-000000000000", p_kg: 1 }, descripcion: "NO executa el repartiment intern de quilos" },
-    // Gestión autónoma (20270430100000…100200). El convenio declarado es del super_admin y la
-    // recogida en nombre del receptor de un admin: un técnico, no. El envío manual y la hora
-    // de recogida, sí (id inventado: la guarda deja pasar y corta la existencia, 22023).
+    // Gestión autónoma (20270430100000…100200). El convenio declarado es del super_admin; la
+    // recogida en nombre del receptor, de un admin (el Dinamitzador lo es). El envío manual y la
+    // hora de recogida, de todo el equipo (id inventado: la guarda deja pasar, 22023).
     { tabla: "declarar_conveni", op: "rpc", esperado: "denegar", args: { p_tipo_org: "entidad", p_org: "00000000-0000-0000-0000-000000000000", p_tipo: "col_receptor", p_signant_nom: "arnes", p_signant_carrec: "arnes" }, descripcion: "NO dona per vigent cap conveni (només super_admin)" },
-    { tabla: "registrar_recollida_assistida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_resultat: "coincideix" }, descripcion: "NO registra recollides en nom del receptor (és d'un admin)" },
+    { tabla: "registrar_recollida_assistida", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_resultat: "coincideix" }, descripcion: "registra una recollida en nom del receptor (id inventat → 22023)" },
     { tabla: "registrar_envio_manual", op: "rpc", esperado: "permitir", args: { p_excedente: "00000000-0000-0000-0000-000000000000", p_entidad: "00000000-0000-0000-0000-000000000000" }, descripcion: "registra un enviament manual (oferta inventada → 22023)" },
     { tabla: "fixar_hora_recollida", op: "rpc", esperado: "permitir", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_quan: "2030-01-01T10:00:00Z" }, descripcion: "fixa l'hora d'una recollida (id inventat → 22023)" },
     { tabla: "comprova_interes", op: "rpc", esperado: "denegar", args: { p_excedente: "00000000-0000-0000-0000-000000000000", p_entidad: "00000000-0000-0000-0000-000000000000", p_kg: 1, p_preu: null, p_modalitat: null, p_recollida: null }, descripcion: "NO executa la comprovació interna d'un interès" },
@@ -1958,29 +1981,29 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // se ejecutan con sesión, tampoco del equipo: «permission denied for function».
     { tabla: "desar_contacte_org", op: "rpc", esperado: "denegar", args: { p_id: null, p_organizacion: "00000000-0000-0000-0000-000000000000", p_dades: { nom: "arnes" } }, descripcion: "NO afegeix contactes (retirats, D3)" },
     { tabla: "esborrar_contacte_org", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO esborra contactes (retirats, D3)" },
-    // Plan 1, 1A: el técnico BUSCA (antes de dar de alta) y ve el historial de estados, pero
-    // activar, desactivar y añadir un papel son de `pot_aprovar()` (admin en adelante).
+    // Plan 1, 1A: el equipo BUSCA (antes de dar de alta) y ve el historial de estados; activar,
+    // desactivar y añadir un papel son de `pot_aprovar()`, que el Dinamitzador tiene.
     { tabla: "cerca_entitats", op: "rpc", esperado: "permitir", args: { p_q: "B0000" }, descripcion: "cerca entitats per NIF", requiereFixture: "fitxes amb NIF B0000… (fitxes de prova)" },
     { tabla: "fitxa_estat_hist", op: "leer", esperado: "permitir", descripcion: "veu l'historial d'estats de les fitxes", requiereFixture: "algun canvi d'estat d'una fitxa (activar/desactivar)" },
     // Plan 1, 1C (20270501200000): el listado «Entitats», una fila por organización.
     { tabla: "v_entitats_llistat", op: "leer", esperado: "permitir", descripcion: "veu el llistat d'entitats (totes)", requiereFixture: "alguna organització amb fitxa" },
     { tabla: "fitxa_estat_hist", op: "insertar", esperado: "denegar", descripcion: "NO escriu l'historial directament (només el trigger)" },
-    { tabla: "activar_fitxa", op: "rpc", esperado: "denegar", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO activa fitxes (és de l'admin)" },
-    { tabla: "desactivar_fitxa", op: "rpc", esperado: "denegar", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO desactiva fitxes (és de l'admin)" },
-    // Plan 2, B1 (20270518100000): el técnico no cambia el estado CRM (como activar/desactivar).
-    { tabla: "fixar_estat_crm", op: "rpc", esperado: "denegar", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000", p_estat: "actiu" }, descripcion: "NO canvia l'estat CRM (és de l'admin)" },
-    { tabla: "desactivar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO desactiva organitzacions (és de l'admin)" },
-    { tabla: "afegir_paper_org_equip", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_paper: "entidad" }, descripcion: "NO afegeix papers en nom d'una organització (és de l'admin)" },
-    // Plan 1, 1B (20270501300000): el técnico SÍ da de alta (como el alta directa de antes).
+    { tabla: "activar_fitxa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot activar una fitxa (22023 si no existeix)" },
+    { tabla: "desactivar_fitxa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot desactivar una fitxa (22023 si no existeix)" },
+    // Plan 2, B1 (20270518100000): el estado CRM, como activar/desactivar.
+    { tabla: "fixar_estat_crm", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000", p_estat: "actiu" }, descripcion: "pot canviar l'estat CRM d'una fitxa (22023 si no existeix)" },
+    { tabla: "desactivar_organitzacio", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot desactivar una organització (22023 si no existeix)" },
+    { tabla: "afegir_paper_org_equip", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_paper: "entidad" }, descripcion: "pot afegir un paper a una organització (22023 si no existeix)" },
+    // Plan 1, 1B (20270501300000): el equipo da de alta (como el alta directa de antes).
     // Sin papeles, la guarda deja pasar y la RPC corta con 22023 `cal_paper` sin escribir nada.
     { tabla: "crear_entitat", op: "rpc", esperado: "permitir", args: { p_dades: { rols: [] } }, descripcion: "pot donar d'alta una entitat (22023 sense papers)" },
     // Deuda 150 (20270501400000): ni el equipo inserta fichas directo; solo `crear_entitat()`.
     { tabla: "productores", op: "insertar", esperado: "denegar", descripcion: "NO dona d'alta fitxes directament (només crear_entitat)" },
     { tabla: "entidades", op: "insertar", esperado: "denegar", descripcion: "NO dona d'alta fitxes directament (només crear_entitat)" },
-    // Plan 1, 1D (20270501500000): el técnico ve el estado de la cuenta, pero dar y quitar
-    // acceso es de `pot_aprovar()` (crear una cuenta aprobada es aprobar un alta).
+    // Plan 1, 1D (20270501500000): el equipo ve el estado de la cuenta; quitar acceso es de
+    // `pot_aprovar()` (el Dinamitzador); invitar (`donar-acces`) sigue siendo del super_admin.
     { tabla: "estat_acces_org", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "veu l'estat d'accés d'una entitat (22023 si no existeix)" },
-    // Plan 2, B3 (20270518110000): todo el equipo exporta (D10), también `tecnic`.
+    // Plan 2, B3 (20270518110000): todo el equipo exporta (D10).
     { tabla: "exportar_entitats", op: "rpc", esperado: "permitir", args: { p_ids: null }, descripcion: "exporta les entitats a Excel (D10, tot l'equip)" },
     // Plan 2, A5 (20270523100000): todo el equipo confirma la naturalesa (`es_intern()`); con un
     // uuid inventado, 22023 `organitzacio_inexistent`; con un valor raro, 22023 antes de escribir.
@@ -1989,17 +2012,17 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     ...REINICI_COMUNS,
     { tabla: "fixar_naturalesa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "empresa" }, descripcion: "pot fixar la naturalesa de qualsevol organitzacio (autoritza; 22023 organitzacio_inexistent) (A5)" },
     { tabla: "fixar_naturalesa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "no_existeix" }, descripcion: "una naturalesa desconeguda es 22023 (A5)" },
-    { tabla: "desactivar_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO treu l'accés (és de l'admin)" },
+    { tabla: "desactivar_acces_org", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot treure l'accés a una entitat (22023 si no existeix)" },
     { tabla: "concedir_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_user: "00000000-0000-0000-0000-000000000000", p_email: "arnes@exemple.cat", p_per: null }, descripcion: "NO dona accés per la porta del servidor (només service_role)" },
     { tabla: "revertir_acces_org", op: "rpc", esperado: "denegar", args: { p_foto: {} }, descripcion: "NO reverteix accessos (només service_role)" },
-    // Plan 1, 1F (20270502100000): el técnico lee y AÑADE notas internas (uuid inventado →
+    // Plan 1, 1F (20270502100000): el Dinamitzador lee y AÑADE notas internas (uuid inventado →
     // 22023 `organitzacio_inexistent`: la guarda dejó pasar), pero no las borra ni escribe directo.
     { tabla: "notes_internes", op: "leer", esperado: "permitir", descripcion: "veu les notes internes", requiereFixture: "alguna nota interna (afegir_nota_interna)" },
     { tabla: "notes_internes", op: "insertar", esperado: "denegar", descripcion: "NO escriu notes directament (només afegir_nota_interna)" },
     { tabla: "afegir_nota_interna", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000", p_canal: "telefon", p_text: "arnes" }, descripcion: "pot afegir una nota interna (22023 si l'organització no existeix)" },
     { tabla: "esborrar_nota_interna", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO esborra notes internes (és del super_admin)" },
-    // 1.5 (20270504100000): el técnico cierra seguimientos (uuid inventado → 22023
-    // `nota_inexistent`), pero activar la organización entera es del admin.
+    // 1.5 (20270504100000): el equipo cierra seguimientos (uuid inventado → 22023
+    // `nota_inexistent`).
     { tabla: "tancar_seguiment", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot tancar un seguiment (22023 si la nota no existeix)" },
     // Consentimiento por enlace (20270506100000): pedirlo y listar es del equipo; guardarlo,
     // solo del servidor (`enlace-publico`).
@@ -2046,21 +2069,21 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // Cua de fitxers orfes de Storage (20270526100000): sense GRANT per a ningú; la buida el job diari.
     { tabla: "fitxers_orfes", op: "leer", esperado: "denegar", descripcion: "NO llegeix la cua de fitxers orfes (sense GRANT)" },
     { tabla: "fitxers_orfes", op: "insertar", esperado: "denegar", descripcion: "NO escriu a la cua de fitxers orfes" },
-    { tabla: "activar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO activa organitzacions (és de l'admin)" },
+    { tabla: "activar_organitzacio", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot activar una organització (22023 si no existeix)" },
     { tabla: "kpis_equip", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu els indicadors del període" },
     { tabla: "impacte_global", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu l'impacte de tota la plataforma" },
     { tabla: "factors_impacte", op: "leer", esperado: "permitir", descripcion: "veu els factors d'impacte", requiereFixture: "els factors sembrats (20270424100000)" },
-    // Fijar un factor es del super_admin: un técnico, no.
+    // Fijar un factor es del super_admin: el Dinamitzador, no.
     { tabla: "fixar_factor_impacte", op: "rpc", esperado: "denegar", args: { p_codi: "x", p_valor: 1 }, descripcion: "NO fixa els factors d'impacte (super_admin)" },
     { tabla: "fixar_notificacions", op: "rpc", esperado: "denegar", args: { p_actives: true }, descripcion: "NO toca l'interruptor general (és del super_admin)" },
     { tabla: "fixar_canal_notificacio", op: "rpc", esperado: "denegar", args: { p_canal: "email", p_actiu: true }, descripcion: "NO toca cap canal (és del super_admin)" },
     { tabla: "consentiments", op: "insertar", esperado: "denegar", descripcion: "NO escriu consentiments directament" },
     // El expediente: el día a día es del equipo (uuid inventado → 22023); abrir, verificar y
-    // exportar es de `pot_aprovar()`, así que un técnico no.
+    // exportar es de `pot_aprovar()`, que el Dinamitzador tiene.
     { tabla: "desar_element_expedient", op: "rpc", esperado: "permitir", args: { p_taula: "pla_visites", p_expedient: "00000000-0000-0000-0000-000000000000", p_id: null, p_dades: {} }, descripcion: "pot escriure els elements d'un expedient (22023 si no existeix)" },
     { tabla: "volcar_quantificacio_redestina", op: "rpc", esperado: "permitir", args: { p_expedient: "00000000-0000-0000-0000-000000000000", p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "pot importar la quantificacio de Redestina (22023 si no existeix)" },
-    { tabla: "obrir_expedient", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO obre expedients (es de l'admin)" },
-    { tabla: "exportar_expedient", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO exporta el pla (es de l'admin)" },
+    { tabla: "obrir_expedient", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot obrir un expedient (22023 si la fitxa no existeix)" },
+    { tabla: "exportar_expedient", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot exportar el pla (22023 si no existeix)" },
     { tabla: "expedients_prevencion", op: "leer", esperado: "permitir", descripcion: "veu els expedients de prevencio", requiereFixture: "algun expedient obert (fase 11)" },
     // Un papel nuevo lo pide el TITULAR; el equipo, no (lo aprueba después).
     { tabla: "afegir_paper_organitzacio", op: "rpc", esperado: "denegar", args: { p_tipo_actual: "productor", p_id_actual: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO afegeix papers en nom d'una organització" },
@@ -2074,12 +2097,16 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       args: { p_producto: "TEST-ARNES-INEXISTENT", p_foto: null, p_foto_mini: null },
       descripcion: "NO canvia la foto d'un producte (només super_admin)",
     },
+    // La tara de un envase es de `pot_aprovar()`. ⚠️ En «permitir» con una tara NEGATIVA: la
+    //    guarda deja pasar y la validación corta con 22023 ANTES del `insert … on conflict`
+    //    (con una tara válida escribiría la fila `TEST-ARNES` en el catálogo).
     {
       tabla: "fijar_tipo_caja",
       op: "rpc",
-      esperado: "denegar",
-      args: { p_codigo: "TEST-ARNES", p_tara: 1 },
-      descripcion: "NO fija la tara de un envase (es de pot_aprovar)",
+      esperado: "permitir",
+      errorExigit: "22023",
+      args: { p_codigo: "TEST-ARNES", p_tara: -1 },
+      descripcion: "pot fixar la tara d'un envàs (autoritza; tara negativa → 22023, no escriu)",
     },
     // Cierre anual (fase 4). El equipo lo LEE todo y no escribe ninguna de las tres
     // tablas: los kilos y el importe de un certificado nacen dentro de una RPC o no nacen.
@@ -2106,29 +2133,30 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     },
     { tabla: "cierres_ejercicio", op: "insertar", esperado: "denegar", descripcion: "NO abre cierres a mano (van por RPC)" },
     { tabla: "cierres_donante", op: "insertar", esperado: "denegar", descripcion: "NO toca el acumulado de un donante" },
-    // El técnico no puede aprobar, así que ninguna acción del cierre es suya. La de `real`
-    // además es del super_admin: es la que consume las series legales del año.
+    // El cierre es de `pot_aprovar()` (el Dinamitzador; uuid inventado → 22023). Abrir el `real`
+    // es del super_admin: es la que consume las series legales del año.
     { tabla: "abrir_cierre", op: "rpc", esperado: "denegar", args: { p_ejercicio: 2020, p_modo: "real" }, descripcion: "NO obre el tancament REAL (és del super_admin)" },
-    { tabla: "calcular_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO calcula un cierre (es de pot_aprovar)" },
-    // El botón «Tanca l'exercici» tampoco es del técnico: cerrar emite los resúmenes
-    // definitivos y congela el cálculo. Mismo `pot_aprovar()` que calcular.
-    { tabla: "cerrar_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO tanca un exercici (és de pot_aprovar)" },
-    { tabla: "emitir_certificado", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000", p_data_expedicio: "1999-12-31", p_annex: false }, descripcion: "NO emet certificats (és de pot_aprovar)" },
-    // Emitir en bloque tampoco: es `pot_aprovar()`, la misma guarda que emitir uno a uno.
-    // Si algún día la de la tanda se relajara sin tocar la individual, este check es el
-    // único sitio donde se vería —desde el panel las dos se ven igual de grises—.
-    { tabla: "emitir_certificados_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000", p_data_expedicio: "1999-12-31", p_annex: false }, descripcion: "NO emet en bloc els certificats d'un tancament (és de pot_aprovar)" },
-    { tabla: "emitir_certificados_transaccion_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet en bloc els certificats de transacció (és de pot_aprovar)" },
+    { tabla: "calcular_cierre", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot calcular un tancament (autoritza; el tancament no existeix)" },
+    // «Tanca l'exercici»: cerrar emite los resúmenes definitivos y congela el cálculo. Mismo
+    // `pot_aprovar()` que calcular; el cierre REAL exige además super_admin (SQL de 20261109100300).
+    { tabla: "cerrar_cierre", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot tancar un exercici (autoritza; el tancament no existeix)" },
+    // Emitir un CD: la guarda de `pot_aprovar()` deja pasar; en REAL firma solo el super_admin
+    // (eso exige una fila real y lo cubre la SQL de firma institucional).
+    { tabla: "emitir_certificado", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_cd: "00000000-0000-0000-0000-000000000000", p_data_expedicio: "1999-12-31", p_annex: false }, descripcion: "passa la guarda d'emetre un CD (autoritza; l'acumulat no existeix)" },
+    { tabla: "rectificar_certificado", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_cd: "00000000-0000-0000-0000-000000000000", p_motivo: "Comprovacio de l'arnes de RLS" }, descripcion: "passa la guarda de rectificar un CD (autoritza; l'acumulat no existeix)" },
+    // Emitir en bloque: la misma guarda que emitir uno a uno.
+    { tabla: "emitir_certificados_cierre", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_cierre: "00000000-0000-0000-0000-000000000000", p_data_expedicio: "1999-12-31", p_annex: false }, descripcion: "pot emetre en bloc els certificats (autoritza; el tancament no existeix)" },
+    { tabla: "emitir_certificados_transaccion_cierre", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "passa la guarda de la tanda de CT (autoritza; retirat → 22023)" },
     // Interno de la conciliación en cascada (20270414100100): ni el equipo lo llama.
     { tabla: "albarans_germans_rec", op: "rpc", esperado: "denegar", args: { p_rec: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO consulta els germans d'un albarà (intern)" },
-    { tabla: "conciliacion_retroactiva", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg: 1, p_motivo: "arnes" }, descripcion: "NO concilia a posteriori (és de pot_aprovar)" },
+    { tabla: "conciliacion_retroactiva", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg: 1, p_motivo: "arnes" }, descripcion: "pot conciliar a posteriori (autoritza; la canalitzacio no existeix)" },
     // Consultar los datos del 182 sí: es una lectura, y la hace el equipo con la gestoría.
     { tabla: "datos_182", op: "rpc", esperado: "permitir", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot consultar les dades del 182" },
-    // Certificado de transacción (fase 5): calcular y emitir son de `pot_aprovar()`, igual
-    // que en el circuito de donación. El técnico ve las filas y no mueve ninguna.
-    { tabla: "calcular_cierre_transacciones", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO calcula les transaccions (és de pot_aprovar)" },
-    { tabla: "emitir_certificado_transaccion", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet certificats de transaccio (és de pot_aprovar)" },
-    { tabla: "rectificar_certificado_transaccion", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000", p_motivo: "arnes" }, descripcion: "NO rectifica un certificat de transaccio (és de pot_aprovar)" },
+    // Certificado de transacción (fase 5; RETIRADO en 20270509100400): la guarda de
+    // `pot_aprovar()` deja pasar al Dinamitzador y la función responde «retirat» sin escribir.
+    { tabla: "calcular_cierre_transacciones", op: "rpc", esperado: "permitir", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot cridar el càlcul de transaccions (autoritza; retirat: no escriu res)" },
+    { tabla: "emitir_certificado_transaccion", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_cd: "00000000-0000-0000-0000-000000000000" }, descripcion: "passa la guarda d'emetre un CT (autoritza; retirat → 22023)" },
+    { tabla: "rectificar_certificado_transaccion", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_cd: "00000000-0000-0000-0000-000000000000", p_motivo: "arnes" }, descripcion: "passa la guarda de rectificar un CT (autoritza; retirat → 22023)" },
     // La base de cálculo SÍ es del equipo: es una lectura, y es lo que hace auditable la
     // cifra de un certificado. Sobre el ejercicio 1999 no devuelve nada, así que lo que
     // se mide es la autorización y no los datos.
@@ -2154,9 +2182,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "ruta_documento", op: "rpc", esperado: "denegar", args: { p_objeto_tipo: "prova", p_objeto_id: null, p_tipo: "PROVA", p_numero_completo: "PROVA-1999-0001", p_version: 1, p_modo: "prueba", p_ejercicio: 1999 }, descripcion: "NO compon rutes de documents (nomes servidor)" },
     { tabla: "disparar_recordatorios_intake", op: "rpc", esperado: "denegar", descripcion: "NO dispara els recordatoris d'intake (nomes pg_cron)" },
     { tabla: "marcar_excedentes_vencidos", op: "rpc", esperado: "denegar", descripcion: "NO marca ofertes vençudes (nomes pg_cron)" },
-    // Certificado a demanda (CDP): el equipo lo LEE y no escribe nada. Calcular y emitir
-    // son de `pot_aprovar()`, igual que en el cierre anual —y por el mismo motivo: los
-    // dos documentos tienen el mismo efecto fiscal sobre el periodo que cubren—.
+    // Certificado a demanda (CDP): calcular y emitir son de `pot_aprovar()` (el Dinamitzador),
+    // igual que en el cierre anual; en REAL firma solo el super_admin (SQL de firma institucional).
     {
       tabla: "cierres_periodo",
       op: "leer",
@@ -2165,8 +2192,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       requiereFixture: "algún certificado a demanda calculado (calcular_certificado_periodo con una cuenta que pueda aprobar)",
     },
     { tabla: "cierres_periodo", op: "insertar", esperado: "denegar", descripcion: "NO crea certificats a demanda a mà (van per RPC)" },
-    { tabla: "calcular_certificado_periodo", op: "rpc", esperado: "denegar", args: { p_productor: "00000000-0000-0000-0000-000000000000", p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba", p_excedente: null }, descripcion: "NO calcula un certificat a demanda (és de pot_aprovar)" },
-    { tabla: "emitir_certificado_periodo", op: "rpc", esperado: "denegar", args: { p_periodo: "00000000-0000-0000-0000-000000000000", p_data_expedicio: "1999-12-31", p_annex: false, p_excedente: null }, descripcion: "NO emet un certificat a demanda (és de pot_aprovar)" },
+    { tabla: "calcular_certificado_periodo", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_productor: "00000000-0000-0000-0000-000000000000", p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba", p_excedente: null }, descripcion: "pot calcular un certificat a demanda (autoritza; el donant no existeix)" },
+    { tabla: "emitir_certificado_periodo", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_periodo: "00000000-0000-0000-0000-000000000000", p_data_expedicio: "1999-12-31", p_annex: false, p_excedente: null }, descripcion: "passa la guarda d'emetre un CDP (autoritza; el periode no existeix)" },
+    { tabla: "rectificar_certificado_periodo", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_periodo: "00000000-0000-0000-0000-000000000000", p_motivo: "Comprovacio de l'arnes de RLS" }, descripcion: "passa la guarda de rectificar un CDP (autoritza; el periode no existeix)" },
     // Plan de prevención (fase 5). El equipo lo ve todo y **sí** puede contestar el
     // cuestionario de cualquier organización: el diagnóstico es un servicio asistido. Lo
     // que se comprueba es la autorización (`puc_gestionar_pla`), no el guardado: guardar
@@ -2186,9 +2214,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" },
       descripcion: "pot contestar el qüestionari de qualsevol organitzacio (model assistit)",
     },
-    // Convenios (fase 2). El equipo lo LEE todo, prepara y envía; **contrasignar, retornar
-    // y resolver son de `pot_aprovar()`**, como aprobar una canalización: es el punto de
-    // control humano del circuito de firma, no una tarea del día a día.
+    // Convenios (fase 2). El equipo lo LEE todo, prepara, envía, retorna y resuelve
+    // (`pot_aprovar()`); **contrasignar es del super_admin** (20270615100100): estampa la firma
+    // y el sello de la apoderada en un documento real.
     {
       tabla: "convenios",
       op: "leer",
@@ -2222,10 +2250,10 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_tipo: "don_gen" },
       descripcion: "pot preparar un conveni (autoritza; l'organització no existeix)",
     },
-    { tabla: "contrafirmar_convenio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO contrasigna (és de pot_aprovar)" },
-    { tabla: "retornar_convenio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "NO retorna un conveni (és de pot_aprovar)" },
-    { tabla: "descartar_convenio_esborrany", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO descarta un conveni (és de pot_aprovar)" },
-    { tabla: "validar_oferta", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO valida una oferta (és de pot_aprovar)" },
+    { tabla: "contrafirmar_convenio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO contrasigna (signatura institucional: només super_admin, 20270615100100)" },
+    { tabla: "retornar_convenio", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "pot retornar un conveni (autoritza; el conveni no existeix)" },
+    { tabla: "descartar_convenio_esborrany", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot descartar un esborrany (autoritza; el conveni no existeix)" },
+    { tabla: "validar_oferta", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot validar una oferta (autoritza; l'oferta no existeix)" },
     { tabla: "editar_oferta", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_canvis: {}, p_texto: "", p_actor: "00000000-0000-0000-0000-000000000000" }, descripcion: "NI l'equip edita per RPC (només el servidor)" },
     // Esborranys (fase C del punto 3, 20270530100000): el equipo los ve y los borra (uuid
     // inventado → 22023 `oferta_inexistent`, autoriza), pero ni él borra una publicada.
@@ -2238,7 +2266,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "esborrar_esborrany_oferta", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot esborrar esborranys (autoritza; l'oferta no existeix)" },
     { tabla: "esborrar_esborrany_oferta", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "@meva_oferta_publicada" }, descripcion: "NI l'equip esborra una oferta publicada (22023 no_es_esborrany)" },
     { tabla: "programar_albarans_recollida", op: "rpc", esperado: "denegar", descripcion: "NI l'equip emet albarans programats (només el servidor)" },
-    { tabla: "resolver_convenio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "NO resol un conveni (és de pot_aprovar)" },
+    { tabla: "resolver_convenio", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "pot resoldre un conveni (autoritza; el conveni no existeix)" },
     // Y NI EL EQUIPO firma por nadie: `firmar_convenio_por_enlace` y `validar_codi_firma`
     // son solo de `service_role`. Es lo que hace que una firma acredite algo: si el equipo
     // pudiera invocarla, el registro de evidencias no distinguiría a quien firmó de quien
@@ -2255,10 +2283,10 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // La cola de trabajo consolidada (20270323100000). Devuelve SIEMPRE una fila por cola
     // —doce— aunque todas valgan 0, así que aquí no cabe ninguna saltada: si alguna vez
     // volviera vacía, es que la función ha dejado de cumplir su contrato y eso sí es un
-    // fallo. `security invoker`, o sea que lo que cuenta es lo que este técnico ya podía
+    // fallo. `security invoker`, o sea que lo que cuenta es lo que esta cuenta ya podía
     // leer; lo que se comprueba es que la guarda le deja pasar.
     { tabla: "pendents_equip", op: "rpc", esperado: "permitir", filasExactas: 19, descripcion: "consulta la cua de treball de l'equip (19 cues: +recollides_equip, fase 3)" },
-    // Borrado de una ficha (20270328100100, deuda §12.108). El técnico SÍ puede preguntar
+    // Borrado de una ficha (20270328100100, deuda §12.108). El Dinamitzador SÍ puede preguntar
     // qué bloquea un borrado —es una pregunta del día a día, y sin ella el panel no podría
     // explicar por qué el botón no va a funcionar— y NO puede borrar: eso sigue siendo del
     // super_admin, igual que las políticas `productores: baixa super_admin` y
@@ -2304,21 +2332,25 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "veu la safata de signatures",
       requiereFixture: "algun document signable vigent (albarà confirmat/conciliat, certificat emès o conveni)",
     },
-    // El tècnic no tanca ni rebutja: és del super_admin. La guarda va abans de buscar la
-    // signatura, així que el uuid inventat dona 42501.
+    // 20270615100100: el Dinamitzador tanca i rebutja les signatures dels ALBARANS (les de
+    // CONV/CD/CR, institucionals, segueixen sent del super_admin: ho prova la SQL de signatura
+    // institucional). La guarda d'equip va abans de buscar la signatura: amb el uuid inventat,
+    // 22023 `estat_incorrecte`.
     {
       tabla: "tancar_signatura",
       op: "rpc",
-      esperado: "denegar",
+      esperado: "permitir",
+      errorExigit: "22023",
       args: { p_firma: "00000000-0000-0000-0000-000000000000" },
-      descripcion: "NO tanca cap signatura (es del super_admin)",
+      descripcion: "pot tancar una signatura d'albara (autoritza; la signatura no existeix)",
     },
     {
       tabla: "rebutjar_signatura",
       op: "rpc",
-      esperado: "denegar",
+      esperado: "permitir",
+      errorExigit: "22023",
       args: { p_firma: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" },
-      descripcion: "NO rebutja cap signatura (es del super_admin)",
+      descripcion: "pot rebutjar una signatura d'albara (autoritza; la signatura no existeix)",
     },
     // Sin organización propia, el equipo no acuña enlaces de firma de panel (eso es de la
     // persona titular): 42501 antes de mirar si el documento existe.
@@ -2334,7 +2366,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "NO encunya un enllac de signatura de panell (no te organitzacio)",
     },
     // --- Importador de entidades (20270511100000) ---
-    // El técnico lee el registro, pero importar es del super_admin: 42501 antes del payload.
+    // El Dinamitzador lee el registro, pero importar es del super_admin: 42501 antes del payload.
     ...IMPORTACIO_INTERNES,
     { tabla: "previsualitzar_importacio_entitats", op: "rpc", esperado: "denegar", args: { p_files: [] }, descripcion: "NO previsualitza importacions (es del super_admin)" },
     { tabla: "importar_entitats", op: "rpc", esperado: "denegar", args: { p_fitxer: {}, p_files: [] }, descripcion: "NO importa entitats (es del super_admin)" },
@@ -2358,7 +2390,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "entidades", op: "insertar", esperado: "denegar", descripcion: "NO dona d'alta fitxes directament (només crear_entitat)" },
     // Plan 1, 1D (20270501500000): con un id inventado, 22023 `organitzacio_inexistent`.
     { tabla: "estat_acces_org", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "veu l'estat d'accés d'una entitat (22023 si no existeix)" },
-    // Plan 2, B3 (20270518110000): todo el equipo exporta (D10), también `tecnic`.
+    // Plan 2, B3 (20270518110000): todo el equipo exporta (D10).
     { tabla: "exportar_entitats", op: "rpc", esperado: "permitir", args: { p_ids: null }, descripcion: "exporta les entitats a Excel (D10, tot l'equip)" },
     // Plan 2, A5 (20270523100000): todo el equipo confirma la naturalesa (`es_intern()`); con un
     // uuid inventado, 22023 `organitzacio_inexistent`; con un valor raro, 22023 antes de escribir.
@@ -2602,10 +2634,14 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     },
     { tabla: "siguiente_numero", op: "rpc", esperado: "denegar", args: { p_serie: "PROVA", p_ejercicio: 1999 }, descripcion: "NI el super_admin quema números a mano" },
     { tabla: "plantillas_documento", op: "leer", esperado: "permitir", descripcion: "ve las plantillas de documento" },
-    // La contraparte del «denegar» del técnico: alguien tiene que poder tocarlas, y es
-    // quien puede aprobar. Se reescribe `vigente` con su propio valor, así que la
-    // plantilla queda exactamente igual.
+    // La contraparte del «denegar» del Dinamitzador: el super_admin (configuración,
+    // 20270615100100). Se reescribe `vigente` con su propio valor: la plantilla queda igual.
     { tabla: "plantillas_documento", op: "actualizar", esperado: "permitir", descripcion: "puede retirar o publicar plantillas" },
+    // Las listas de prueba: solo el super_admin las escribe (se reescribe `etiqueta` igual).
+    { tabla: "meta_test_recipients", op: "actualizar", esperado: "permitir", descripcion: "pot tocar la llista de proves de WhatsApp (mateix valor)" },
+    { tabla: "email_test_recipients", op: "actualizar", esperado: "permitir", descripcion: "pot tocar la llista de proves de correu (mateix valor)" },
+    // La firma propia (20270615100200): `la_meva_firma` sí; las columnas y la escritura, no.
+    ...FIRMA_EQUIP_EQUIP,
     {
       tabla: "parametros_documentales",
       op: "actualizar",
@@ -2613,7 +2649,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       columnas: "id, caducidad_enlace_dias",
       descripcion: "puede tocar los parámetros documentales",
     },
-    // La contraparte del «denegar» del técnico, SIN ESCRIBIR NADA. Hasta el 27-09-2026 se
+    // La contraparte del antiguo «denegar» del técnico, SIN ESCRIBIR NADA. Hasta el 27-09-2026 se
     // fijaba un coste de Tomàquet en el «ejercicio 1999» y se borraba después; con un solo
     // coste por producto (20270405100200) eso SOBRESCRIBIRÍA y BORRARÍA el coste real de
     // Tomàquet. Ahora: un coste 0 pasa la guarda de rol y lo rechaza la validación (22023).
@@ -2685,7 +2721,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "ve el acumulado anual de todos los donantes",
       requiereFixture: "un cierre de prueba calculado (scripts/crear-datos-documentales-prueba.ts)",
     },
-    // Certificado de transacción (fase 5): la contraparte de los dos «denegar» del
+    // Certificado de transacción (fase 5): la contraparte de los antiguos «denegar» del
     // técnico. RETIRADO en 20270509100400: la autorización pasa y la función responde
     // `22023 certificat_transaccio_retirat` (calcular devuelve `{retirat: true}` sin
     // escribir). Lo que se mide sigue siendo que la guarda de rol va primero.
@@ -2822,7 +2858,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "ve els plans de prevencio",
       requiereFixture: "algún plan emitido (scripts/crear-datos-documentales-prueba.ts)",
     },
-    // Convenios (fase 2): la contraparte de los tres «denegar» del técnico. Sobre un uuid
+    // Convenios (fase 2): contrasignar es SOLO del super_admin (20270615100100). Sobre un uuid
     // inventado la autorización pasa y la función falla después con 22023 («aquest conveni
     // no existeix»), sin dejar rastro: contrafirmar uno de verdad emitiría un documento con
     // número, que es exactamente lo que un arnés no debe crear.
@@ -2864,7 +2900,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     },
     // ── Borrado de una ficha (20270328100100, deuda §12.108) ───────────────────
     //
-    // La contraparte del «denegar» del técnico: el super_admin SÍ pasa la guarda. Sobre el
+    // La contraparte del «denegar» del Dinamitzador: el super_admin SÍ pasa la guarda. Sobre el
     // uuid nulo la autorización pasa y la función falla después con `22023
     // fitxa_no_trobada`, que es lo que el arnés lee como «dejó pasar» — el mismo patrón que
     // `contrafirmar_convenio` y `cerrar_cierre`, y por el mismo motivo: ejercitarla contra
@@ -2921,7 +2957,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       requiereFixture: "un expediente de prevención numerado",
     },
     // --- Circuito de firma (20270510100000–100200) ---
-    // Cerrar y rechazar son del super_admin: con un uuid inventado la guarda deja pasar y la
+    // Cerrar y rechazar (todo tipo de documento): con un uuid inventado la guarda deja pasar y la
     // existencia corta con 22023 (`estat_incorrecte`); sin motivo, `cal_motiu`. No escribe nada.
     ...FIRMA_SERVIDOR,
     {
@@ -3694,13 +3730,17 @@ const COLUMNA_INOCUA: Record<string, string> = {
   organizaciones: "naturalesa",
   // Fase B del punto 3 (20270529100000): catálogo sin GRANT de UPDATE (42501 antes de mirar filas).
   subcausas: "nombre",
+  // 20270615100100: las listas de prueba (configuración). Se reescribe la etiqueta con su valor:
+  // el super_admin actualiza, el Dinamitzador ve 0 filas afectadas (la política filtra).
+  meta_test_recipients: "etiqueta",
+  email_test_recipients: "etiqueta",
 };
 
 /**
  * Columna con la que se identifica la fila en el UPDATE de `COLUMNA_INOCUA`, cuando no es
  * `id` (la tuvo `mesures_prevencio`, con `codi`, hasta que la deuda 175 retiró la tabla).
  */
-const CLAVE_FILA: Record<string, string> = { subcausas: "codigo" };
+const CLAVE_FILA: Record<string, string> = { subcausas: "codigo", meta_test_recipients: "phone", email_test_recipients: "email" };
 
 // ---------------------------------------------------------------------------
 // Ejecución

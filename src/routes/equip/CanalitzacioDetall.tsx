@@ -78,7 +78,7 @@ export default function CanalitzacioDetall() {
   const { id } = useParams<{ id: string }>()
   const { ctx } = useAppContext()
   // Contrasignar, aprobar, registrar la recogida y fijar costes exigen `pot_aprovar()`
-  // (§4bis): a un técnico se le dejan grises CON el motivo, en vez de chocar con un 42501.
+  // (§4bis): a quien no puede aprobar se le dejan grises CON el motivo, en vez de chocar con un 42501.
   const potAprovar = ctx?.potAprovar ?? false
   const esSuperAdmin = ctx?.esSuperAdmin ?? false
 

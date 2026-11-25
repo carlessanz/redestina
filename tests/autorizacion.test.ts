@@ -15,12 +15,24 @@ import type { BaseFalsa, Tabla } from './soporte/clienteFalso.ts'
 const EXTERN = 'u-extern'
 const EQUIP = 'u-equip'
 
+// Fase 0 (diciembre de 2026): dos roles, `super_admin` y `admin` («Dinamitzador»).
+// `RESIDU` conserva una fila `tecnic` que la migración debería haber convertido: no es equipo.
+const SUPER = 'u-super'
+const RESIDU = 'u-residu-tecnic'
+
 function cliente(appSettings: Tabla, usuari = EXTERN) {
   const base: BaseFalsa = {
     app_settings: appSettings,
-    usuario_roles: [{ user_id: EQUIP, rol: 'tecnic' }],
+    usuario_roles: [
+      { user_id: EQUIP, rol: 'admin' },
+      { user_id: SUPER, rol: 'super_admin' },
+      { user_id: RESIDU, rol: 'tecnic' },
+    ],
     membresias: [{ user_id: EXTERN, productor_id: 'p1', entidad_id: null, activo: true }],
-    perfiles: [{ id: EXTERN, activo: true }, { id: EQUIP, activo: true }],
+    perfiles: [
+      { id: EXTERN, activo: true }, { id: EQUIP, activo: true },
+      { id: SUPER, activo: true }, { id: RESIDU, activo: true },
+    ],
   }
   const { cliente } = crearCliente(base)
   cliente.auth = {
@@ -80,5 +92,26 @@ describe('exigirEquipo', () => {
   it("con el interruptor apagado explícitamente, la cuenta externa pasa (fail-open de §4bis)", async () => {
     const r = await exigirEquipo(cliente([{ key: 'roles_activos', value: 'false' }]), req())
     expect('ctx' in r).toBe(true)
+  })
+})
+
+describe('los dos roles del equipo (fase 0)', () => {
+  const encès = [{ key: 'roles_activos', value: 'true' }]
+
+  it('el Dinamitzador (`admin`) es equipo y puede aprobar', async () => {
+    const r = await exigirEquipo(cliente(encès, EQUIP), req())
+    expect('ctx' in r && r.ctx.rol).toBe('admin')
+    expect('ctx' in r && r.ctx.potAprovar).toBe(true)
+  })
+
+  it('el Superadmin es equipo y puede aprobar', async () => {
+    const r = await exigirEquipo(cliente(encès, SUPER), req())
+    expect('ctx' in r && r.ctx.rol).toBe('super_admin')
+    expect('ctx' in r && r.ctx.potAprovar).toBe(true)
+  })
+
+  it('una fila `tecnic` residual NO da pertenencia al equipo: 403', async () => {
+    const r = await exigirEquipo(cliente(encès, RESIDU), req())
+    expect('rechazo' in r && r.rechazo.status).toBe(403)
   })
 })

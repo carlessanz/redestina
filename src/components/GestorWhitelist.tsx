@@ -29,9 +29,10 @@ export default function GestorWhitelist({
   /** Etiqueta accesible del aspa de cada fila (ya traducida). */
   deleteLabel: string
   /**
-   * Si viene, la lista es de solo lectura y esto dice por qué (ya traducido). Escribir exige
-   * `pot_aprovar()` (§4bis): un técnico la ve, pero sus altas y bajas las rechaza la base —
-   * las altas con un error y las bajas en silencio, con cero filas borradas—.
+   * Si viene, la lista es de solo lectura y esto dice por qué (ya traducido). Escribir las de
+   * prueba exige `es_super_admin()` desde el 25-11-2026 (antes `pot_aprovar()`): a otra cuenta
+   * la base le rechaza las altas con un error y las bajas en silencio, con cero filas borradas.
+   * Configuració › Notificacions ya ni siquiera se las enseña al Dinamitzador.
    */
   motiuBloqueig?: string
   /** Devuelven el mensaje de error ya traducido, o `null` si fue bien. */

@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { dataHora } from '../../lib/format'
-import { persona, personesAuditoria, type ApuntAuditoria, type RolEquip } from '../../lib/equip'
+import { clauRol, persona, personesAuditoria, type ApuntAuditoria, type RolHistoric } from '../../lib/equip'
 import Desplegable from '../Desplegable'
 import CarregantSeccio from '../CarregantSeccio'
 import { Badge } from '@/components/ui/badge'
@@ -41,7 +41,8 @@ export default function AuditoriaEquip({ refresc }: { refresc: number }) {
     [apunts, qui],
   )
 
-  const nomRol = (r: RolEquip | null) => (r ? t(`eq.rol_${r}`) : t('eq.cap'))
+  // La historia conserva el `tecnic` retirado (25-11-2026): se dice como «Tècnic (rol retirat)».
+  const nomRol = (r: RolHistoric | null) => (r ? t(clauRol(r)) : t('eq.cap'))
 
   /** El apunte, como una frase con nombres y correos. */
   function frase(a: ApuntAuditoria): string {

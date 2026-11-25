@@ -3,9 +3,10 @@
 //   · «Signa aquí»     — con el dedo o el ratón (`FormulariSignaDocument`, el mismo que la
 //                        página pública). Se cierra sola: queda `tancat`.
 //   · «Puja'l signat»  — se descarga, se firma fuera y se sube (PDF o foto del papel). Queda
-//                        `signat` hasta que el super_admin lo revisa.
+//                        `signat` hasta que el equipo lo revisa.
 //
-// `mode='equip'` es el del super_admin («vía correo»): solo «Puja el signat», con una
+// `mode='equip'` es el del equipo («vía correo»; el Superadmin, cualquier documento, y el
+// Dinamitzador, solo un albarán: lo decide `accionsSignatura()`): solo «Puja el signat», con una
 // confirmación que dice que ese fichero pasará a ser el definitivo y el documento quedará
 // cerrado al momento.
 //
@@ -53,7 +54,7 @@ export default function DialegSignaDocument({
 }: {
   obert: boolean
   doc: DocASignar
-  /** `titular`: las dos vías. `equip`: el super_admin sube el que le devolvieron. */
+  /** `titular`: las dos vías. `equip`: el equipo sube el que le devolvieron (ver `accionsSignatura`). */
   mode: 'titular' | 'equip'
   pestanya?: PestanyaSignatura
   onTancar: () => void

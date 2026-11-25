@@ -20,25 +20,22 @@
 import { Link } from 'react-router'
 import { CheckCircle2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
-import { useAppContext, useCanals } from '../../hooks/useAppContext'
+import { useCanals } from '../../hooks/useAppContext'
 import { useComptadorsEquip } from '../../hooks/useComptadorsEquip'
 import type { CuaEquip, PendentEquip } from '../../lib/pendentsEquip'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface FilaCua {
   cua: CuaEquip
-  /** A dónde se resuelve. Las tres primeras colas viven en la misma pantalla. */
-  desti: string
   /**
-   * Aprobar exige `pot_aprovar()` (§4bis): un técnico ve la cola pero no puede vaciarla.
-   * Se dice con un badge en vez de esconder la fila — saber que hay trabajo esperando es
-   * útil aunque no lo puedas hacer tú.
+   * A dónde se resuelve. Las tres primeras colas viven en la misma pantalla.
+   *
+   * Sin insignias de «solo admin» desde el 25-11-2026 (proceso 0.1): el `tecnic` se retiró y
+   * todo el equipo aprueba; las firmas de certificados y convenios, que siguen siendo del
+   * Superadmin, lo dicen fila a fila en la propia cola (`CuaSignatures`).
    */
-  nomesAdmin?: boolean
-  /** Cerrar una firma es solo del super_admin (`tancar_signatura`). */
-  nomesSuperAdmin?: boolean
+  desti: string
 }
 
 /**
@@ -49,16 +46,16 @@ interface FilaCua {
  * llenaría esta tarjeta de cosas que nadie puede resolver desde aquí.
  */
 const FILES: readonly FilaCua[] = [
-  { cua: 'registres', desti: '/equip/aprovacions', nomesAdmin: true },
-  { cua: 'convenis_contrasignar', desti: '/equip/aprovacions', nomesAdmin: true },
-  { cua: 'ofertes_per_validar', desti: '/equip/ofertes?tab=validar', nomesAdmin: true },
-  { cua: 'respostes', desti: '/equip/aprovacions', nomesAdmin: true },
+  { cua: 'registres', desti: '/equip/aprovacions' },
+  { cua: 'convenis_contrasignar', desti: '/equip/aprovacions' },
+  { cua: 'ofertes_per_validar', desti: '/equip/ofertes?tab=validar' },
+  { cua: 'respostes', desti: '/equip/aprovacions' },
   // 17-10-2026: la cuarta cola de Aprovacions; el ancla baja directamente a ella.
-  { cua: 'recollides_per_validar', desti: '/equip/aprovacions#recollides', nomesAdmin: true },
+  { cua: 'recollides_per_validar', desti: '/equip/aprovacions#recollides' },
   // Fase 3 de los puntos 4-6: ventas y maquilas sin albarán que el equipo tiene que registrar.
-  { cua: 'recollides_equip', desti: '/equip/aprovacions#recollides-equip', nomesAdmin: true },
-  // 05-11-2026: firmas subidas por una organización que el super_admin revisa y cierra.
-  { cua: 'signatures_per_tancar', desti: '/equip/aprovacions#signatures', nomesSuperAdmin: true },
+  { cua: 'recollides_equip', desti: '/equip/aprovacions#recollides-equip' },
+  // 05-11-2026: firmas subidas por una organización que el equipo revisa y cierra.
+  { cua: 'signatures_per_tancar', desti: '/equip/aprovacions#signatures' },
   { cua: 'missatges', desti: '/equip/missatgeria' },
   { cua: 'ofertes_sense_enviar', desti: '/equip/ofertes' },
   { cua: 'ofertes_modificades', desti: '/equip/ofertes' },
@@ -87,7 +84,6 @@ const AMB_SUBTITOL: readonly CuaEquip[] = [
 
 export default function PendentsEquip() {
   const { t } = useT()
-  const { ctx } = useAppContext()
   const { pendents, carregat } = useComptadorsEquip()
 
   const quants = (cua: CuaEquip) => pendents.find((p) => p.cua === cua)?.n ?? 0
@@ -172,12 +168,6 @@ export default function PendentsEquip() {
                 <div className="min-w-0 space-y-0.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{text}</span>
-                    {f.nomesAdmin && ctx && !ctx.potAprovar && (
-                      <Badge variant="outline">{t('pe.only_admin')}</Badge>
-                    )}
-                    {f.nomesSuperAdmin && ctx && !ctx.esSuperAdmin && (
-                      <Badge variant="outline">{t('pe.only_super_admin')}</Badge>
-                    )}
                   </div>
                   {sub && <p className="text-sm text-muted-foreground">{sub}</p>}
                 </div>

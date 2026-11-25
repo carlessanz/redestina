@@ -22,9 +22,9 @@
 //    así que lo que se guarda aquí es lo que sale en el SIGUIENTE documento. Lo ya emitido es
 //    inmutable; en modo test se puede repintar con `RegeneraDocuments` (debajo, super_admin).
 //
-// ⚠️ UN `tecnic` VE LA SECCIÓN EN GRIS, no se le esconde. Es el criterio del proyecto
-//    (§6ter, mismo patrón que «Només admin» en Aprovacions): un control apagado con su
-//    motivo informa; un control ausente hace pensar que la función no existe.
+// ⚠️ EL DINAMITZADOR (`admin`) VE LA SECCIÓN EN GRIS, no se le esconde. Es el criterio del
+//    proyecto (§6ter): un control apagado con su motivo informa; un control ausente hace
+//    pensar que la función no existe. Escribir los datos de la Fundació es del Superadmin.
 
 import { useCallback, useEffect, useState } from 'react'
 import { Loader2, ShieldAlert, ShieldCheck } from 'lucide-react'

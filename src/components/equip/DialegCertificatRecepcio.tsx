@@ -17,7 +17,8 @@ import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
 import AvisCorreuDesactivat from '../AvisCorreuDesactivat'
 import { avuiMadrid } from '../../lib/format'
-import { textError } from '../../lib/textError'
+import { textError, textErrorInstitucional } from '../../lib/textError'
+import { useAppContext } from '../../hooks/useAppContext'
 import { bloqueja } from '../../lib/tancament'
 import { calcularCertificatRecepcio, emetreCertificatRecepcio } from '../../lib/certificatRecepcio'
 import { dataCurta, kg } from '../../lib/albarans'
@@ -58,6 +59,9 @@ export default function DialegCertificatRecepcio(
   { obert, onTancar, entitatId, modo, provisionals, onEmes }: Props,
 ) {
   const { t } = useT()
+  const { ctx } = useAppContext()
+  // El CR real lleva la firma institucional: solo el Superadmin (25-11-2026). En prueba, el equipo.
+  const esSuperAdmin = ctx?.esSuperAdmin ?? false
   const { confirma, dialeg } = useConfirma()
   const hoy = avuiMadrid()
   const [desde, setDesde] = useState(`${hoy.slice(0, 4)}-01-01`)
@@ -95,7 +99,7 @@ export default function DialegCertificatRecepcio(
     setOcupat(true)
     const res = await emetreCertificatRecepcio(calcul.id)
     setOcupat(false)
-    if (!res.ok) { toast.error(textError(t, res)); return }
+    if (!res.ok) { toast.error(textErrorInstitucional(t, res)); return }
     toast.success(t('cdp.done', { num: res.data.numero ?? '' }))
     onEmes()
     onTancar()
@@ -108,7 +112,8 @@ export default function DialegCertificatRecepcio(
       ? t('tan.why_blocked')
       : senseKg
         ? t('cdp.why_no_kg')
-        : bloquejaProvisionals(provisionals, modo) ? t('tan.why_provisional') : undefined
+        : modo === 'real' && !esSuperAdmin ? t('tan.why_super_admin')
+          : bloquejaProvisionals(provisionals, modo) ? t('tan.why_provisional') : undefined
 
   return (
     <Dialog open={obert} onOpenChange={(v) => { if (!v) onTancar() }}>

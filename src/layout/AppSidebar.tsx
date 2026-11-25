@@ -101,7 +101,7 @@ export default function AppSidebar({
           <img src="/logo-redestina-negativo.svg" alt="Redestina" className="h-7 w-auto shrink-0" />
           {titol && rolEquip && !organitzacio?.nombre ? (
             // Un chip y no solo texto: el super_admin lleva el coral de marca, para distinguirlo a
-            // primera vista del admin y del técnico.
+            // primera vista del Dinamitzador.
             <span
               className={cn(
                 'min-w-0 truncate rounded-full px-2.5 py-0.5 text-xs font-semibold group-data-[collapsible=icon]:hidden',

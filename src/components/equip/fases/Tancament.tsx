@@ -62,7 +62,7 @@ export default function FaseTancament({ c }: { c: ContextFase }) {
         <div className="space-y-3 rounded-md border p-3">
           <p className="text-sm font-medium">{t('cfase.cost_t', { p: producte })}</p>
           <p className="text-xs text-muted-foreground">{t('cfase.cost_hint')}</p>
-          {/* Sin el formulario, un técnico no sabría por qué no puede cambiarlo. */}
+          {/* Sin el formulario, quien no puede fijarlo no sabría por qué no puede cambiarlo. */}
           {!c.potAprovar
             ? <p className="text-sm text-muted-foreground">{t('cost.readonly')}</p>
             : (

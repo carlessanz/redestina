@@ -7,7 +7,11 @@
 /** Panel: el equipo interno, un productor o una entidad receptora. */
 export type Rol = 'intern' | 'productor' | 'receptor'
 
-export type RolPlataforma = 'super_admin' | 'admin' | 'tecnic'
+/**
+ * El rol de plataforma (proceso 0.1, 25-11-2026): dos perfiles internos. `super_admin` se muestra
+ * «Superadmin» y `admin`, «Dinamitzador»; el `tecnic` se retiró (la base lo pasó a `admin`).
+ */
+export type RolPlataforma = 'super_admin' | 'admin'
 export type TipusReceptor = 'social' | 'animal' | 'transformador' | 'comercial'
 
 export interface Organitzacio {

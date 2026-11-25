@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  ACCIONS_HIST, GRUPS_ACCIO, GRUP_TAULA, ROLS_EQUIP, accionsMembre, agrupaAccions, clauErrorEquip, destiPerDefecte,
+  ACCIONS_HIST, GRUPS_ACCIO, GRUP_TAULA, ROLS_EQUIP, accionsMembre, agrupaAccions, clauErrorEquip, clauRol, destiPerDefecte,
   destinsPossibles, esBaixada, filtraEquip, persona, personesAuditoria, normalitzaTelefon, ordenaEquip, recompteRols, rolEquipDe, telefonValid, type MembreEquip,
 } from '../src/lib/equip'
 import { DICTS } from '../src/lib/i18n'
@@ -18,16 +18,16 @@ function membre(over: Partial<MembreEquip>): MembreEquip {
 describe('ordenaEquip', () => {
   it('primero el rol con más permisos y, dentro, por correo', () => {
     const r = ordenaEquip([
-      membre({ user_id: '1', email: 'z@x.org', rol: 'tecnic' }),
+      membre({ user_id: '1', email: 'z@x.org', rol: 'admin' }),
       membre({ user_id: '2', email: 'b@x.org', rol: 'admin' }),
       membre({ user_id: '3', email: 'a@x.org', rol: 'admin' }),
-      membre({ user_id: '4', email: 'm@x.org', rol: 'super_admin' }),
+      membre({ user_id: '4', email: 'z@x.org', rol: 'super_admin' }),
     ])
     expect(r.map((m) => m.user_id)).toEqual(['4', '3', '2', '1'])
   })
 
   it('no modifica el array de entrada', () => {
-    const entrada = [membre({ user_id: '1', rol: 'tecnic' }), membre({ user_id: '2', rol: 'super_admin' })]
+    const entrada = [membre({ user_id: '1', rol: 'admin' }), membre({ user_id: '2', rol: 'super_admin' })]
     ordenaEquip(entrada)
     expect(entrada.map((m) => m.user_id)).toEqual(['1', '2'])
   })
@@ -40,7 +40,32 @@ describe('ordenaEquip', () => {
 describe('recompteRols', () => {
   it('cuenta cada rol y deja a cero los que no hay', () => {
     expect(recompteRols([membre({ rol: 'admin' }), membre({ rol: 'admin' }), membre({ rol: 'super_admin' })]))
-      .toEqual({ super_admin: 1, admin: 2, tecnic: 0 })
+      .toEqual({ super_admin: 1, admin: 2 })
+  })
+  it('un rol que la pantalla no conoce (el `tecnic` retirado) no suma ni rompe', () => {
+    const viejo = membre({ rol: 'tecnic' as unknown as MembreEquip['rol'] })
+    expect(recompteRols([viejo, membre({ rol: 'admin' })])).toEqual({ super_admin: 0, admin: 1 })
+  })
+})
+
+describe('dos roles (proceso 0.1, 25-11-2026)', () => {
+  it('ROLS_EQUIP ya no tiene `tecnic`', () => {
+    expect([...ROLS_EQUIP]).toEqual(['super_admin', 'admin'])
+  })
+  it('se muestran «Superadmin» y «Dinamitzador»/«Dinamizador»', () => {
+    expect(DICTS.ca['eq.rol_super_admin']).toBe('Superadmin')
+    expect(DICTS.es['eq.rol_super_admin']).toBe('Superadmin')
+    expect(DICTS.ca['eq.rol_admin']).toBe('Dinamitzador')
+    expect(DICTS.es['eq.rol_admin']).toBe('Dinamizador')
+    expect(DICTS.ca['eq.rol_tecnic']).toBeUndefined()
+    expect(DICTS.es['eq.rol_tecnic']).toBeUndefined()
+    expect(DICTS.ca['eq.d_tecnic']).toBeUndefined()
+  })
+  it('clauRol: los vigentes por su clave; el retirado de la historia, con la suya', () => {
+    expect(clauRol('super_admin')).toBe('eq.rol_super_admin')
+    expect(clauRol('admin')).toBe('eq.rol_admin')
+    expect(clauRol('tecnic')).toBe('eq.rol_retirat_tecnic')
+    for (const l of ['ca', 'es'] as const) expect(DICTS[l]['eq.rol_retirat_tecnic'], l).toBeTruthy()
   })
 })
 
@@ -68,9 +93,9 @@ describe('accionsMembre', () => {
     expect(accionsMembre(a, [a, b]).motiu).toBe('eq.m_ultim')
   })
 
-  it('un admin ofrece los tres roles y «treure de l’equip», en ese orden', () => {
+  it('un admin ofrece los dos roles y «treure de l’equip», en ese orden', () => {
     const a = membre({ rol: 'admin' })
-    expect(accionsMembre(a, [a]).opcions.map((o) => o.valor)).toEqual(['super_admin', 'admin', 'tecnic', 'cap'])
+    expect(accionsMembre(a, [a]).opcions.map((o) => o.valor)).toEqual(['super_admin', 'admin', 'cap'])
   })
 
   it('todas las claves de las opciones existen en ca y es', () => {
@@ -85,13 +110,13 @@ describe('accionsMembre', () => {
 describe('esBaixada', () => {
   it('bajar de rol o sacar del equipo es baja', () => {
     expect(esBaixada('super_admin', 'admin')).toBe(true)
-    expect(esBaixada('admin', 'tecnic')).toBe(true)
-    expect(esBaixada('tecnic', 'cap')).toBe(true)
+    expect(esBaixada('admin', 'cap')).toBe(true)
+    expect(esBaixada('super_admin', 'cap')).toBe(true)
   })
   it('subir o repetir no lo es', () => {
     expect(esBaixada('admin', 'super_admin')).toBe(false)
-    expect(esBaixada('tecnic', 'admin')).toBe(false)
     expect(esBaixada('admin', 'admin')).toBe(false)
+    expect(esBaixada('super_admin', 'super_admin')).toBe(false)
   })
 })
 
@@ -118,7 +143,8 @@ describe('rolEquipDe', () => {
   it('devuelve el rol de plataforma conocido y null para el resto', () => {
     expect(rolEquipDe('super_admin')).toBe('super_admin')
     expect(rolEquipDe('admin')).toBe('admin')
-    expect(rolEquipDe('tecnic')).toBe('tecnic')
+    // Retirado el 25-11-2026: un `tecnic` que llegara de una base vieja no se pinta.
+    expect(rolEquipDe('tecnic')).toBeNull()
     expect(rolEquipDe(null)).toBeNull()
     expect(rolEquipDe(undefined)).toBeNull()
     expect(rolEquipDe('productor')).toBeNull()
@@ -163,14 +189,14 @@ describe('accionsMembre: las demás acciones', () => {
 describe('destinsPossibles y destiPerDefecte', () => {
   const yo = membre({ user_id: 'yo', email: 'yo@x.org', rol: 'super_admin', es_tu: true })
   const a = membre({ user_id: 'a', email: 'a@x.org', rol: 'admin' })
-  const t = membre({ user_id: 't', email: 't@x.org', rol: 'tecnic' })
+  const t = membre({ user_id: 't', email: 't@x.org', rol: 'admin' })
   const baja = membre({ user_id: 'b', email: 'b@x.org', rol: 'admin', actiu: false })
 
   it('solo activas y nunca el origen', () => {
     expect(destinsPossibles([yo, a, t, baja], 'a').map((m) => m.user_id)).toEqual(['yo', 't'])
   })
   it('propone a quien pulsa, y si no puede ser él, la primera', () => {
-    expect(destiPerDefecte([yo, a, t], 'a')).toBe('yo')
+    expect(destiPerDefecte([yo, a], 'a')).toBe('yo')
     expect(destiPerDefecte([yo, a, t], 'yo')).toBe('a')
   })
   it('sin nadie, cadena vacía', () => {
@@ -179,18 +205,18 @@ describe('destinsPossibles y destiPerDefecte', () => {
   it('prefiere a alguien del mismo rol (y entre ellos, a quien pulsa)', () => {
     const a2 = membre({ user_id: 'a2', email: 'a2@x.org', rol: 'admin' })
     const s2 = membre({ user_id: 's2', email: 's2@x.org', rol: 'super_admin' })
-    expect(destiPerDefecte([yo, a, a2, t], 'a')).toBe('a2')
+    expect(destiPerDefecte([yo, a, a2], 'a')).toBe('a2')
     expect(destiPerDefecte([yo, s2, a, t], 's2')).toBe('yo')
     expect(destiPerDefecte([s2, yo, a], 'yo')).toBe('s2')
     // El del mismo rol desactivado no vale: entonces, quien pulsa.
-    expect(destiPerDefecte([yo, a, baja, t], 'a')).toBe('yo')
+    expect(destiPerDefecte([yo, a, baja], 'a')).toBe('yo')
   })
 })
 
 describe('filtraEquip', () => {
   it('separa activas e inactivas, ordenadas por rol', () => {
     const yo = membre({ user_id: 'yo', email: 'yo@x.org', rol: 'super_admin', es_tu: true })
-    const t = membre({ user_id: 't', email: 't@x.org', rol: 'tecnic' })
+    const t = membre({ user_id: 't', email: 't@x.org', rol: 'admin' })
     const a = membre({ user_id: 'a', email: 'a@x.org', rol: 'admin' })
     const baja = membre({ user_id: 'b', email: 'b@x.org', rol: 'admin', actiu: false })
     expect(filtraEquip([t, baja, yo, a], 'actius').map((m) => m.user_id)).toEqual(['yo', 'a', 't'])

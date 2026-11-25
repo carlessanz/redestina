@@ -22,7 +22,7 @@ import { ArrowLeft, Download, Eye, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
-import { textError } from '../../lib/textError'
+import { textError, textErrorInstitucional } from '../../lib/textError'
 import { useAppContext, useCanals } from '../../hooks/useAppContext'
 import { motiuCanal } from '../../lib/canals'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
@@ -40,6 +40,7 @@ import DialegMotiu from '../../components/DialegMotiu'
 import { useConfirma } from '../../components/DialegConfirma'
 import { acceptaEnviament } from '../../lib/enviamentManual'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
+import AvisSignaturaInstitucional from '../../components/AvisSignaturaInstitucional'
 import PasosProces from '../../components/proces/PasosProces'
 import QueTocaAra from '../../components/proces/QueTocaAra'
 import DialegConveniDeclarat from '../../components/equip/DialegConveniDeclarat'
@@ -125,6 +126,8 @@ export default function ConveniDetall() {
   // Sin contexto, no: los permisos se conceden explícitamente o no se conceden (fail-cerrado,
   // 07-10-2026). La RPC revalida de todas formas y devuelve 42501.
   const potAprovar = ctx?.potAprovar ?? false
+  // Contrafirmar estampa la firma institucional de la Fundació: solo el Superadmin (25-11-2026).
+  const esSuperAdmin = ctx?.esSuperAdmin ?? false
   const navigate = useNavigate()
 
   const carrega = useCallback(async () => {
@@ -252,7 +255,8 @@ export default function ConveniDetall() {
     setOcupat(true)
     const res = await contrafirmarConveni(conv.id)
     setOcupat(false)
-    if (!res.ok) { toast.error(textError(t, res)); return }
+    // Un `42501` aquí es la firma institucional (solo el Superadmin): se dice así.
+    if (!res.ok) { toast.error(textErrorInstitucional(t, res)); return }
     toast.success(t('conv.countersigned'))
     void refrescaComptadors()
     await carrega()
@@ -427,7 +431,7 @@ export default function ConveniDetall() {
                 && (conv.tipo === 'col_productor' || conv.tipo === 'col_receptor')
                 && (conv.productor_id || conv.entidad_id) && (
                 <BotoAmbMotiu variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
-                  disabled={ocupat || !(ctx?.esSuperAdmin ?? false)} motiu={t('cdecl.need_super')}
+                  disabled={ocupat || !esSuperAdmin} motiu={t('cdecl.need_super')}
                   onClick={() => setDialegDeclarat(true)}>
                   {t('cdecl.open')}
                 </BotoAmbMotiu>
@@ -446,11 +450,13 @@ export default function ConveniDetall() {
             <div className="flex flex-wrap gap-2">
               {potContrafirmar && (
                 <>
-                  <BotoAmbMotiu className="h-11 whitespace-normal md:h-8"
-                    disabled={ocupat || !potAprovar} motiu={motiuRol}
-                    onClick={() => void contrafirma()}>
-                    {ocupat && <Loader2 className="size-4 animate-spin" />}{t('conv.countersign')}
-                  </BotoAmbMotiu>
+                  {/* La firma institucional: el Dinamitzador ve el estado, no el botón. */}
+                  {esSuperAdmin ? (
+                    <Button className="h-11 whitespace-normal md:h-8" disabled={ocupat}
+                      data-testid="conv-contrasigna" onClick={() => void contrafirma()}>
+                      {ocupat && <Loader2 className="size-4 animate-spin" />}{t('conv.countersign')}
+                    </Button>
+                  ) : <AvisSignaturaInstitucional className="w-full sm:w-auto" />}
                   <BotoAmbMotiu variant="outline" className="h-11 whitespace-normal md:h-8"
                     disabled={ocupat || !potAprovar} motiu={motiuRol}
                     onClick={() => setDialegRetorn(true)}>

@@ -128,7 +128,7 @@ function declaraIComprova(ent: string) {
   expect(sql(`select count(*) from convenios where entidad_id = '${ent}' and tipo = 'col_receptor' and estado = 'vigent'`)).toBe('0')
   expect(sql(`select public.convenio_vigente('entidad', '${ent}', 'donacio', 'recibe')`)).toBe('f')
 
-  // Un técnico no puede: es del super_admin.
+  // La Dinamitzadora (cuenta `equip`) no puede: es del super_admin.
   expect(() => sqlCom('equip', `select declarar_conveni('entidad', '${ent}', 'col_receptor', 'Persona Prova', 'Presidenta')`))
     .toThrow(/no_autoritzat/)
 

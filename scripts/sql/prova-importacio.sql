@@ -11,7 +11,7 @@
 -- Cada caso imprime «ok · …»; el primero que no se cumple aborta con «FALLA · …».
 --
 -- Casos:
---   0. Permisos: el técnico y una cuenta externa reciben 42501 en las dos RPC; las internas no
+--   0. Permisos: el admin (cuenta equip) y una cuenta externa reciben 42501 en las dos RPC; las internas no
 --      se ejecutan con sesión; el super_admin recibe 22023 con un payload inválido.
 --   a. 3 filas nuevas (NIF válido, sin NIF, receptora social) → 3 `creada`, inactivas, con su
 --      `ref_externa`, su nota y su rastro en `fitxa_estat_hist`.
@@ -117,18 +117,12 @@ select pg_temp.ok(not exists (select 1 from entidades where organizacion_id = :'
 
 \echo
 \echo '== 0. Permisos =='
+-- Desde 20270615100000 no hay `tecnic`: la cuenta `equip` es el Dinamitzador (`admin`).
+select pg_temp.ok(pg_temp.com(:'u_equip', $q$select pot_aprovar()::text$q$) = 'true', 'la cuenta equip es admin (pot_aprovar)');
 select pg_temp.ok(pg_temp.com(:'u_equip', $q$select previsualitzar_importacio_entitats('[]')::text$q$) like 'ERR 42501%',
-                  'el tècnic no previsualitza (42501)');
+                  'un admin no previsualiza (42501: solo super_admin)');
 select pg_temp.ok(pg_temp.com(:'u_equip', $q$select importar_entitats('{}', '[]')::text$q$) like 'ERR 42501%',
-                  'el tècnic no importa (42501)');
--- El clon no tiene ninguna cuenta `admin`: el técnico sube a admin dentro de la transacción.
-update usuario_roles set rol = 'admin' where user_id = :'u_equip' and rol = 'tecnic';
-select pg_temp.ok(pg_temp.com(:'u_equip', $q$select pot_aprovar()::text$q$) = 'true', 'el técnico, ascendido, es admin (pot_aprovar)');
-select pg_temp.ok(pg_temp.com(:'u_equip', $q$select previsualitzar_importacio_entitats('[]')::text$q$) like 'ERR 42501%',
-                  'un admin tampoco previsualitza (42501: solo super_admin)');
-select pg_temp.ok(pg_temp.com(:'u_equip', $q$select importar_entitats('{}', '[]')::text$q$) like 'ERR 42501%',
-                  'un admin tampoco importa (42501)');
-update usuario_roles set rol = 'tecnic' where user_id = :'u_equip' and rol = 'admin';
+                  'un admin no importa (42501)');
 select pg_temp.ok(pg_temp.com(:'u_prod1', $q$select previsualitzar_importacio_entitats('[]')::text$q$) like 'ERR 42501%',
                   'una cuenta externa no previsualiza (42501)');
 select pg_temp.ok(pg_temp.com(:'u_prod1', $q$select importar_entitats('{}', '[]')::text$q$) like 'ERR 42501%',

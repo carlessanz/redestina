@@ -336,6 +336,14 @@ verify_jwt = true
 import_map = "./functions/pujar-document-signat/deno.json"
 entrypoint = "./functions/pujar-document-signat/index.ts"
 
+# La firma propia de una cuenta del equipo (fase 0 del plan DIC 26): se guarda una vez en el
+# perfil y se estampa en los albaranes que esa cuenta valida o emite. Con JWT y `exigirEquipo`.
+[functions.firma-equip]
+enabled = true
+verify_jwt = true
+import_map = "./functions/firma-equip/deno.json"
+entrypoint = "./functions/firma-equip/index.ts"
+
 # Verificación pública de un certificado de recepción (F4). Sin JWT: quien comprueba un
 # certificado es un tercero —un ayuntamiento, una financiadora, un auditor— que no tiene
 # cuenta. Lo que autoriza es conocer el código impreso (16 hex del sha256 del snapshot, o

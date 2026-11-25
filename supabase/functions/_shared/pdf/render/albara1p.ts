@@ -17,6 +17,12 @@
 //    se respeta lo que traiga: sin `valor_kg` en ninguna línea, la tabla no tiene columnas de
 //    euros. El IMPORTE se calcula al pintar, no se guarda.
 //
+// EL PIE (fase 0, dic. 2026): si el snapshot trae `signant_equip` —la persona del equipo que
+// validó o emitió—, a la izquierda va la caja «Per Espigoladors» con su nombre, su firma (la
+// imagen que tenía guardada al emitir, `op.firmaEquipBytes`) y la identidad de la Fundació; a
+// la derecha, la de la contraparte, del mismo alto. Sin `signant_equip` (lo emitió el sistema,
+// o es un albarán de antes) el pie es el de siempre: «Atentament, Equip de Redestina».
+//
 // Dibuja a mano con pdf-lib sobre las piezas del motor (fuentes, logo, colores del sistema
 // de diseño); el `Maquetador` es de flujo de párrafos y aquí hacen falta cajas fijas.
 
@@ -27,7 +33,7 @@ import {
   codigoVerificacion, type ConfirmacionAlbaran, type DatosAlbaran, fecha, type LineaAlbaran,
   lineasDe, num, type OpcionesAlbaran, type ParteAlbaran, type Renderizado, textoIncidencias,
 } from "./comu.ts";
-import { dataSignatura, embeberTrazo, textosSignatura, viaSignatura } from "./signatura.ts";
+import { dataSignatura, embeberImatgeFirma, embeberTrazo, textosSignatura, viaSignatura } from "./signatura.ts";
 import { textFontValor, type ValorFont } from "../../fontValor.ts";
 
 type Idioma = "ca" | "es";
@@ -39,6 +45,30 @@ export interface DatosAlbara1p extends DatosAlbaran {
   modalitat?: string | null;
   fundacio?: { razon_social?: string | null; nif?: string | null; domicilio?: string | null } | null;
   linies?: (LineaAlbaran & { valor_kg?: number | null; valor_font?: ValorFont | null })[] | null;
+  /**
+   * Quién del EQUIPO validó (`validar_recollida`) o emitió (`emitir_albaran`) el albarán
+   * (fase 0, dic. 2026), congelado al emitir. Ausente o null = lo emitió el sistema, y el pie
+   * sale como antes («Atentament, Equip de Redestina»). `firma_ruta` es la ruta en el bucket
+   * `activos` de la firma que tenía ESA persona en ese momento; la imagen la baja
+   * `generar-documento` y llega en `op.firmaEquipBytes`.
+   */
+  signant_equip?: SignantEquip | null;
+}
+
+export interface SignantEquip {
+  nom?: string | null;
+  rol?: string | null;
+  firma_ruta?: string | null;
+}
+
+/** El firmante del equipo del snapshot, si lo hay y tiene algo que pintar. */
+export function signantEquipDe(datos: DatosAlbara1p): SignantEquip | null {
+  const s = datos.signant_equip;
+  if (!s || typeof s !== "object") return null;
+  const nom = typeof s.nom === "string" ? s.nom.trim() : "";
+  const ruta = typeof s.firma_ruta === "string" ? s.firma_ruta.trim() : "";
+  if (!nom && !ruta) return null;
+  return { nom: nom || null, rol: s.rol ?? null, firma_ruta: ruta || null };
 }
 
 /**
@@ -70,6 +100,7 @@ const TXT = {
     nota_valor: "El valor assignat als productes és orientatiu i s'ha establert a partir dels albarans de recepció i de preus de referència oficials (Observatori Agrari {any}), sense superar en cap cas el valor normal de mercat en el moment de la seva transmissió, d'acord amb l'article 18 de la Llei 49/2002.",
     provisional: "Text provisional, pendent de validar per l'assessoria.",
     gracies: "Gràcies per confiar en nosaltres,", atentament: "Atentament,", equip: "Equip de Redestina",
+    per_espigoladors: "Per Espigoladors",
     firma_rec: "Firma del donant:", firma_ent: "Conformitat de qui rep:", firma_entrega: "Conformitat de qui lliura:",
     firma_recibe: "Conformitat de qui rep:",
     confirmat: "Confirmat per", via_enllac: "des de l'enllaç", via_assistit: "amb acompanyament de l'equip",
@@ -92,6 +123,7 @@ const TXT = {
     nota_valor: "El valor asignado a los productos es orientativo y se ha establecido a partir de los albaranes de recepción y de precios de referencia oficiales (Observatori Agrari {any}), sin superar en ningún caso el valor normal de mercado en el momento de su transmisión, de acuerdo con el artículo 18 de la Ley 49/2002.",
     provisional: "Texto provisional, pendiente de validar por la asesoría.",
     gracies: "Gracias por confiar en nosotros,", atentament: "Atentamente,", equip: "Equipo de Redestina",
+    per_espigoladors: "Por Espigoladors",
     firma_rec: "Firma del donante:", firma_ent: "Conformidad de quien recibe:", firma_entrega: "Conformidad de quien entrega:",
     firma_recibe: "Conformidad de quien recibe:",
     confirmat: "Confirmado por", via_enllac: "desde el enlace", via_assistit: "con acompañamiento del equipo",
@@ -384,19 +416,48 @@ export async function renderAlbara1p(activos: BytesActivos, op: OpcionesAlbaran)
   // La firma con trazo de la versión `signat` (05-11-2026): solo REC y ENT, una caja.
   const signatura = op.signatura && (tipo === "REC" || tipo === "ENT") ? op.signatura : null;
   const trazo = signatura ? await embeberTrazo(doc, signatura) : null;
-  const hPeu = signatura ? 104 : 98;
+  // Fase 0 (dic. 2026): si lo validó o emitió una persona del equipo, el pie de la izquierda
+  // deja de ser «Atentament, Equip de Redestina» y pasa a ser la caja «Per Espigoladors» con
+  // su nombre, su firma (la congelada en el snapshot) y la identidad de la Fundació.
+  const signant = signantEquipDe(datos);
+  const firmaEquip = signant ? await embeberImatgeFirma(doc, op.firmaEquipBytes) : null;
+  const hEquip = 108;
+  const hPeu = Math.max(signatura ? 104 : 98, signant ? hEquip + 4 : 0);
   if (y - hPeu < 40) {
     p = doc.addPage([A4.ancho, A4.alto]);
     pagines.push(p);
     y = A4.alto - MARGEN;
   }
-  let yy = y - 4;
-  for (const [l, negreta] of [
-    [t.gracies, false], [t.atentament, false], ["", false], [t.equip, true],
-    [fundObj.razon_social, true], [fundObj.domicilio, true], [fundObj.nif, true],
-  ] as [unknown, boolean][]) {
-    if (l) text(l, MARGEN, yy, { size: 7.5, font: negreta ? f.cuerpoFuerte : f.cuerpo, max: ANCHO * 0.48 });
+  const wEsq = ANCHO * 0.48;
+  if (signant) {
+    caixa(MARGEN, y, wEsq, hEquip, COLORES.crema100);
+    text(t.per_espigoladors, MARGEN + wEsq / 2, y - 12, { font: f.cuerpoFuerte, size: 8.5, centre: true });
+    if (firmaEquip) {
+      // Mismo hueco que el trazo de la contraparte: alto 40 como máximo, centrado.
+      const altMax = 40;
+      const ampleMax = wEsq - 24;
+      let w = (firmaEquip.width / firmaEquip.height) * altMax;
+      let h = altMax;
+      if (w > ampleMax) { w = ampleMax; h = (firmaEquip.height / firmaEquip.width) * w }
+      p.drawImage(firmaEquip, { x: MARGEN + (wEsq - w) / 2, y: y - 18 - h, width: w, height: h });
+    }
+    let yy = y - 70;
+    if (signant.nom) text(signant.nom, MARGEN + 6, yy, { font: f.cuerpoFuerte, size: 8.5, max: wEsq - 12 });
     yy -= 11;
+    for (const l of [fundObj.razon_social, fundObj.domicilio, fundObj.nif ? `NIF ${fundObj.nif}` : null]) {
+      if (!l) continue;
+      text(l, MARGEN + 6, yy, { size: 7, color: COLORES.verdeGris, max: wEsq - 12 });
+      yy -= 10;
+    }
+  } else {
+    let yy = y - 4;
+    for (const [l, negreta] of [
+      [t.gracies, false], [t.atentament, false], ["", false], [t.equip, true],
+      [fundObj.razon_social, true], [fundObj.domicilio, true], [fundObj.nif, true],
+    ] as [unknown, boolean][]) {
+      if (l) text(l, MARGEN, yy, { size: 7.5, font: negreta ? f.cuerpoFuerte : f.cuerpo, max: wEsq });
+      yy -= 11;
+    }
   }
   // La caja de la firma: una (REC, ENT) o dos (OPE, confirman las dos partes). Dentro, la
   // confirmación registrada, si la hay: por quién, cuándo y por qué vía.
@@ -406,7 +467,8 @@ export async function renderAlbara1p(activos: BytesActivos, op: OpcionesAlbaran)
     : [{ titol: tipo === "REC" ? t.firma_rec : t.firma_ent, rol: null }];
   const xF = MARGEN + ANCHO * 0.52;
   const wF = ANCHO * 0.48;
-  const hF = tipo === "OPE" ? 44 : signatura ? 100 : 64;
+  // Con la caja «Per Espigoladors» al lado, la de la contraparte (REC, ENT) iguala su alto.
+  const hF = tipo === "OPE" ? 44 : Math.max(signatura ? 100 : 64, signant ? hEquip : 0);
   let yF = y;
   for (const c of caixesFirma) {
     caixa(xF, yF, wF, hF, COLORES.crema100);

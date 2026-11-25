@@ -4,7 +4,8 @@
 // —producto, kg, modalidades, franja— y la valida o la rechaza con motivo. Va en tono
 // `aviso` porque es trabajo del equipo (§2bis: el ámbar dice «et toca a tu»).
 //
-// Quien no puede aprobar (`tecnic`) ve los botones en gris con el motivo, no escondidos.
+// Quien no puede aprobar (`pot_aprovar()` falso: hoy nadie del equipo desde que se retiró el
+// `tecnic`, 25-11-2026) vería los botones en gris con el motivo, no escondidos.
 
 import { useState } from 'react'
 import { toast } from 'sonner'

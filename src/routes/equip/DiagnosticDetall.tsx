@@ -136,7 +136,7 @@ function ExpedientDelDiagnostic({ productorId }: { productorId: string }) {
         <BotoAmbMotiu
           onClick={() => void obre()}
           disabled={!potAprovar || obrint}
-          motiu={potAprovar ? undefined : t('pe.only_admin')}
+          motiu={potAprovar ? undefined : t('appr.need_approver')}
           className="min-h-11 whitespace-normal md:min-h-8"
         >
           <FolderOpen className="size-4" aria-hidden />

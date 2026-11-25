@@ -26,7 +26,7 @@ import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
 import AvisCorreuDesactivat from '../AvisCorreuDesactivat'
 import { avuiMadrid, dataCurta, kg } from '../../lib/format'
-import { textError } from '../../lib/textError'
+import { textError, textErrorInstitucional } from '../../lib/textError'
 import {
   bloqueja, calcularCertificatPeriode, emetreCertificat, emetreCertificatPeriode, euros, excloses,
 } from '../../lib/tancament'
@@ -287,7 +287,7 @@ export default function DialegCertificatDonacio({
       ? await emetreCertificat(anual!.id, opcions)
       : await emetreCertificatPeriode(calcul!.id, { ...opcions, excedente: abast === 'oferta' ? excedente : null })
     setOcupat(false)
-    if (!res.ok) { toast.error(textError(t, res)); return }
+    if (!res.ok) { toast.error(textErrorInstitucional(t, res)); return }
     toast.success(t('cdp.done', { num: res.data.numero ?? '' }))
     const subst = 'substitueix' in res.data ? Number(res.data.substitueix ?? 0) : 0
     if (subst > 0) toast.info(t('cdp.done_subst', { n: subst }))

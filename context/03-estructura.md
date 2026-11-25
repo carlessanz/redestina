@@ -478,6 +478,9 @@ supabase/
     reenviar-documento/        POST (JWT, equipo): vuelve a mandar un documento emitido por
                                correo, al destinatario de su `envio` y con las mismas barreras (§4);
                                `manual` lo deja salir con las notificaciones apagadas (§8)
+    firma-equip/               GET·POST·DELETE (JWT + equipo; 25-11-2026): la firma propia de la cuenta del
+                               equipo en `activos/equip/<uid>/firma-<ts>.<png|jpg>` (≤1 MB, por bytes);
+                               `fixar_firma_equip()`; devuelve {ruta, url (10 min), actualitzada_at}.
     pujar-document-signat/     POST multipart (JWT; 05-11-2026): el PDF/JPG/PNG firmado que vuelve
                                (CD, CR, REC, ENT, CONV); formato por bytes (`_shared/pujada.ts`),
                                `puc_signar_document` antes de leerlo, `registrar_document_signat` (§9)

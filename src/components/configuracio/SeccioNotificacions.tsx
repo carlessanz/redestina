@@ -34,11 +34,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function SeccioNotificacions({ potCanviar }: { potCanviar: boolean }) {
   const { t } = useT()
-  const { ctx, recarrega } = useAppContext()
+  const { recarrega } = useAppContext()
   const { confirma, dialeg } = useConfirma()
   const motiu = potCanviar ? undefined : t('set.only_super')
-  // Las listas de prueba las escribe `pot_aprovar()` (admin o super_admin).
-  const motiuLlistes = (ctx?.potAprovar ?? false) ? undefined : t('wl.no_perm')
+  // Las listas de prueba son configuración general: solo el Superadmin las ve y las escribe
+  // (25-11-2026, proceso 0.1; la base exige `es_super_admin()`). Al Dinamitzador no se le pintan.
+  const potLlistes = potCanviar
   const [canals, setCanals] = useState<Canals | null>(null)
   // El tercer paso: A QUIÉN (27-10-2026; antes vivía en General). `true` = solo usuarios de prueba.
   const [testMode, setTest] = useState<boolean | null>(null)
@@ -219,8 +220,9 @@ export default function SeccioNotificacions({ potCanviar }: { potCanviar: boolea
         ajuda={<p>{t('set.test_help')}</p>}
       />
 
-      {/* Las listas de prueba: la segunda barrera técnica del entorno de test. */}
-      <Card>
+      {/* Las listas de prueba: la segunda barrera técnica del entorno de test. Solo el Superadmin. */}
+      {potLlistes && (
+      <Card data-testid="seccio-llistes-prova">
         <CardHeader>
           <CardTitle className="text-base">{t('set.lists_title')}</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">{t('set.lists_help')}</p>
@@ -236,7 +238,7 @@ export default function SeccioNotificacions({ potCanviar }: { potCanviar: boolea
               items={lista.map((r) => ({ clave: r.phone, etiqueta: r.etiqueta }))}
               placeholderClave={t('dash.ph_phone')} placeholderEtiqueta={t('dash.ph_label')} max={5}
               addLabel={t('c.add')} noneLabel={t('dash.none_yet')}
-              deleteLabel={t('c.delete')} motiuBloqueig={motiuLlistes}
+              deleteLabel={t('c.delete')}
               onAdd={async (c, e) => {
                 const err = await anadirNumeroTest(c, e)
                 if (!err) setLista(await listarNumerosTest())
@@ -256,7 +258,7 @@ export default function SeccioNotificacions({ potCanviar }: { potCanviar: boolea
               items={listaEmail.map((r) => ({ clave: r.email, etiqueta: r.etiqueta }))}
               placeholderClave={t('dash.ph_email')} placeholderEtiqueta={t('dash.ph_label')} max={20}
               addLabel={t('c.add')} noneLabel={t('dash.none_yet')}
-              deleteLabel={t('c.delete')} motiuBloqueig={motiuLlistes}
+              deleteLabel={t('c.delete')}
               onAdd={async (c, e) => {
                 const err = await anadirEmailTest(c, e)
                 if (!err) setListaEmail(await listarEmailsTest())
@@ -271,6 +273,7 @@ export default function SeccioNotificacions({ potCanviar }: { potCanviar: boolea
           </div>
         </CardContent>
       </Card>
+      )}
 
       </div>
 

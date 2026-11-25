@@ -156,6 +156,8 @@ apuntarían a la nada. Un número retirado no se reutiliza jamás.
 ⚠️ **20-11-2026 (vaciado de producción, fase 6): se cierra la 194** (las dos recogidas sin registrador desaparecieron con el vaciado): **96 vivas**; la siguiente sigue siendo la 203.
 
 ⚠️ **20-11-2026 (`20270613100000`, fecha real de la recogida validada): se abre la 203**: **97 vivas** y la siguiente es la 204.
+
+⚠️ **25-11-2026 (`20270615100000`…`100200`, plan DIC 26 fase 0, roles y firmas): se abren la 204 y la 205 y se cierra la 132** (sin rol `tecnic` no hay nadie del equipo sin `pot_aprovar()`): **98 vivas** y la siguiente es la 206.
 ⚠️ **17-11-2026 (`20270528100000`, fase A del punto 3): se abre la 180** (el interés en maquila y `preu_minim`): **77 vivas** y la siguiente entrada nueva es la 181.
 ⚠️ **16-11-2026 (`20270527100000`): se abre la 179** (la facturación, solo por rango): **76 vivas** y la siguiente entrada nueva es la 180.
 ⚠️ **11-11-2026 (sin código): se cierran la 115 y la 116**, que hablaban del cuestionario y del plan básico retirados en `20270524100000`: **75 vivas** y la siguiente entrada nueva sigue siendo la 179.
@@ -693,7 +695,8 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      receptor de la política a lo que necesitan Interessos e Històric; después un check «denegar» de
      `leer` con `columnas: "texto_oferta"` desde una cuenta receptora. **Decisión de producto previa**: si el
      receptor debe ver quién ofrece (la revisión del 23-09 lo pide), y el WhatsApp/correo ya lo mandan.
-132. **Un `tecnic` se salta las puertas `pot_aprovar()` escribiendo directo en las tablas** (misma raíz que la
+132. ~~**Cerrada el 25-11-2026** (`20270615100000`): se retiró el rol `tecnic`, así que todo el equipo tiene `pot_aprovar()` y escribir directo ya no salta ninguna puerta. Texto original:~~
+     **Un `tecnic` se salta las puertas `pot_aprovar()` escribiendo directo en las tablas** (misma raíz que la
      109). `canalizaciones` tiene INSERT/UPDATE por columnas —incluidas `estado`, `kg_conciliados`, `coste_kg`,
      `conciliada_at`— y DELETE de tabla con la política `es_intern()`, sin trigger de control: puede crear una
      canalización sin `aprovar_resposta()` ni `exigir_convenio()` y conciliar kilos y coste sin
@@ -996,3 +999,9 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      emitido. Arreglo: revisarlas una a una (`recollida_real_at <> data_hora_recollida and recollida_validada_at is not
      null`) y corregir solo las que no tengan cierre. **En producción, 0** al publicar la migración (20-11-2026): solo
      afecta al clon.
+204. **`scripts/sql/prova-importacio.sql` falla en el caso e** («no pisa el nombre…», relleno de `comentarios`) (25-11-2026).
+     No tiene que ver con los roles: el fichero no se toca desde `35ca22b` y probablemente quedó desfasado con D11
+     (`20270519100000`). Arreglo: revisar el caso contra la `importar_entitats` vigente y actualizar la expectativa.
+205. **La firma PNG de una cuenta del equipo queda huérfana en `activos/equip/<uid>/` al borrar la cuenta** (25-11-2026).
+     Ninguna migración la lleva a `fitxers_orfes`, y no puede borrarse si un albarán la ha congelado en `signant_equip`.
+     Arreglo: al borrar el miembro, registrar la ruta en `fitxers_orfes` si ningún `documentos.datos` la cita.

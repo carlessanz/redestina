@@ -275,6 +275,46 @@ Deno.serve(async (req) => {
 // ellos el certificado se imprime con el espacio en blanco para firmar a mano, que es
 // mejor que no poder emitirlo (§cd.ts).
 
+/** Un fichero del bucket privado `activos`, o null (sin ruta, o no se pudo bajar). */
+async function bajarActivo(supabase: Cliente, ruta: string | null): Promise<Uint8Array | null> {
+  if (!ruta) return null;
+  const { data: fichero, error: err } = await supabase.storage
+    .from(BUCKET_ACTIVOS)
+    .download(ruta);
+  if (err || !fichero) {
+    console.warn("generar-documento: activo no descargado:", ruta, err?.message);
+    return null;
+  }
+  return new Uint8Array(await fichero.arrayBuffer());
+}
+
+/**
+ * La firma de la persona del EQUIPO que validó o emitió el albarán (fase 0, dic. 2026).
+ *
+ * Se baja la ruta CONGELADA en el snapshot (`datos.signant_equip.firma_ruta`), no la que esa
+ * persona tenga hoy en `perfiles`: regenerar el PDF de un albarán (la versión `signat`, un
+ * reintento) tiene que volver a pintar la misma firma. Por eso `firma-equip` no borra un
+ * fichero que algún documento haya congelado.
+ *
+ * Solo rutas de `equip/`: es la única carpeta que escribe `firma-equip`, y así un snapshot
+ * no puede hacer que se estampe otro activo del bucket (la firma de la apoderada, el sello).
+ */
+async function firmaEquipDe(
+  supabase: Cliente,
+  datos: Record<string, unknown>,
+): Promise<{ bytes: Uint8Array | null; ms: number; ruta: boolean }> {
+  const t0 = performance.now();
+  const signant = datos.signant_equip as { firma_ruta?: unknown } | null | undefined;
+  const ruta = typeof signant?.firma_ruta === "string" ? signant.firma_ruta.trim() : "";
+  if (!ruta) return { bytes: null, ms: 0, ruta: false };
+  if (!ruta.startsWith("equip/") || ruta.includes("..")) {
+    console.warn("generar-documento: firma de l'equip amb una ruta inesperada; no s'estampa");
+    return { bytes: null, ms: performance.now() - t0, ruta: true };
+  }
+  const bytes = await bajarActivo(supabase, ruta);
+  return { bytes, ms: performance.now() - t0, ruta: true };
+}
+
 interface ActivosFirma {
   apoderadaDni: string | null;
   firmaPng: Uint8Array | null;
@@ -296,17 +336,7 @@ async function activosFirma(supabase: Cliente): Promise<ActivosFirma> {
     return vacio;
   }
 
-  const bajar = async (ruta: string | null): Promise<Uint8Array | null> => {
-    if (!ruta) return null;
-    const { data: fichero, error: err } = await supabase.storage
-      .from(BUCKET_ACTIVOS)
-      .download(ruta);
-    if (err || !fichero) {
-      console.warn("generar-documento: activo no descargado:", ruta, err?.message);
-      return null;
-    }
-    return new Uint8Array(await fichero.arrayBuffer());
-  };
+  const bajar = (ruta: string | null) => bajarActivo(supabase, ruta);
 
   const [firmaPng, selloPng] = await Promise.all([
     bajar(data.firma_ruta as string | null),
@@ -389,9 +419,24 @@ async function renderizar(
 
   const tipoBase = doc.tipo.replace(/^R-/, "");
   if (tipoBase === "REC" || tipoBase === "ENT" || tipoBase === "OPE") {
-    const confirmaciones = await confirmacionesAlbaran(supabase, doc.objeto_id);
+    const [confirmaciones, firmaEquip] = await Promise.all([
+      confirmacionesAlbaran(supabase, doc.objeto_id),
+      // Solo el albarán de una página la pinta; los renderizadores antiguos no la conocen.
+      (datos as { format?: string }).format === "albara-1p"
+        ? firmaEquipDe(supabase, datos)
+        : Promise.resolve({ bytes: null, ms: 0, ruta: false }),
+    ]);
+    if (firmaEquip.ruta) {
+      console.log(JSON.stringify({
+        fn: "generar-documento",
+        tipo: doc.tipo,
+        firma_equip: firmaEquip.bytes !== null,
+        firma_equip_ms: Number(firmaEquip.ms.toFixed(1)),
+      }));
+    }
     const op = {
       signatura,
+      firmaEquipBytes: firmaEquip.bytes,
       datos: datos as DatosAlbaran,
       sha256Datos: doc.sha256_datos,
       plantilla: await plantillaDe(supabase, doc.plantilla_id),

@@ -42,7 +42,8 @@ test.beforeAll(() => {
   neteja()
   sql(`insert into auth.users (id, instance_id, aud, role, email, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
        values (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', '${EMAIL}', '{}', '{}', now(), now())`)
-  sql(`insert into usuario_roles (user_id, rol) values ('${userId()}', 'tecnic')`)
+  // Un Dinamitzador (`admin`): el `tecnic` se retiró el 25-11-2026 y la base ya no lo admite.
+  sql(`insert into usuario_roles (user_id, rol) values ('${userId()}', 'admin')`)
   // Algo que ha «hecho» la cuenta: un documento emitido (INMUTABLE) y un enlace.
   doc = sql(`select id from documentos where emitido_por is not null order by id limit 1`)
   docOrigen = sql(`select emitido_por from documentos where id = '${doc}'`)
@@ -104,8 +105,8 @@ test('desactivar con traspaso: la cuenta queda inactiva y lo emitido pasa al des
   await fila(page).getByTestId('eq-desactiva').click()
   const d = page.getByTestId('eq-t-dialeg')
   await expect(d.getByTestId('eq-t-accions')).toBeVisible()
-  // El destino propuesto es alguien del MISMO rol (la cuenta es técnica: otro técnico), no quien pulsa…
-  await expect(d.getByTestId('eq-t-desti')).toContainText(/Tècnic|Técnico/)
+  // El destino propuesto es alguien del MISMO rol (la cuenta es Dinamitzador: otro), no quien pulsa…
+  await expect(d.getByTestId('eq-t-desti')).toContainText(/Dinamitzador|Dinamizador/)
   await expect(d.getByTestId('eq-t-desti')).not.toContainText(/Tu|Tú/)
   // …pero se puede elegir cualquier cuenta activa del equipo: aquí, quien pulsa.
   await tria(d.getByTestId('eq-t-desti'), dest)
@@ -164,7 +165,7 @@ test('borrar a quien ha hecho algo exige destino y la palabra, y traspasa', asyn
   expect(sql(`select count(*) from equip_rols_hist where email = '${EMAIL}' and accio = 'esborra'`)).toBe('1')
 
   // La auditoría conserva a la persona borrada, con su nombre y su correo (20270516100000).
-  expect(sql(`select nom || '|' || rol from equip_persones_arxiu where email = '${EMAIL}'`)).toBe('Prova E2E|tecnic')
+  expect(sql(`select nom || '|' || rol from equip_persones_arxiu where email = '${EMAIL}'`)).toBe('Prova E2E|admin')
   const hist = page.getByTestId('eq-hist')
   await expect(hist.locator('[data-accio="esborra"]').filter({ hasText: EMAIL }).first()).toContainText('Prova E2E')
   await expect(hist.locator('[data-accio="mou_accions"]').filter({ hasText: EMAIL }).first()).toBeVisible()

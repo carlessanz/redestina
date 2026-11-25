@@ -175,7 +175,7 @@ export function interesAssistit(args: {
 
 /**
  * Asignación en un acto (nivel 1, `assignar_directe()`, 20270607100000): interés, aprobación y
- * canalización confirmada en una sola transacción. Solo `pot_aprovar()`; el técnico sigue con
+ * canalización confirmada en una sola transacción. Solo `pot_aprovar()`; sin él quedaría
  * `interesAssistit()` y la aprobación de Aprovacions (nivel 2).
  *
  * En venta, `preu` (precio ACORDADO, EUR/kg) y `preuAcceptat` son obligatorios

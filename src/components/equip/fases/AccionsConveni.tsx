@@ -1,5 +1,6 @@
 // Los botones que resuelven el convenio de UNA organización desde el ciclo guiado: prepararlo,
-// firmarlo con la persona delante, darlo por vigente (super_admin) y contrafirmarlo. Los usan
+// firmarlo con la persona delante, darlo por vigente (super_admin) y contrafirmarlo (la firma
+// institucional, solo el Superadmin desde el 25-11-2026: el Dinamitzador ve el estado). Los usan
 // la fase 1 (el de quien entrega) y la fase 4 (el de cada receptora), que antes los tenían
 // copiados uno a uno.
 //
@@ -11,12 +12,13 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
 import { useT } from '../../../lib/i18n'
-import { textError } from '../../../lib/textError'
+import { textError, textErrorInstitucional } from '../../../lib/textError'
 import { contrafirmarConveni, prepararConveni } from '../../../lib/convenis'
 import { refrescaComptadors } from '../../../lib/pendentsEquip'
 import type { ConvenioTipo } from '../../../types'
 import { useConfirma } from '../../DialegConfirma'
 import BotoAmbMotiu from '../../proces/BotoAmbMotiu'
+import AvisSignaturaInstitucional from '../../AvisSignaturaInstitucional'
 import DialegFirmaAssistida from '../DialegFirmaAssistida'
 import DialegConveniDeclarat from '../DialegConveniDeclarat'
 import { Button } from '@/components/ui/button'
@@ -28,7 +30,7 @@ export function declarable(estat: string | null | undefined): boolean {
 }
 
 export default function AccionsConveni({
-  tipusOrg, orgId, nom, conveni, tipusCal, potAprovar, esSuperAdmin, onCanvi, petit = false,
+  tipusOrg, orgId, nom, conveni, tipusCal, esSuperAdmin, onCanvi, petit = false,
 }: {
   tipusOrg: 'productor' | 'entidad'
   orgId: string
@@ -36,7 +38,7 @@ export default function AccionsConveni({
   conveni: ConveniFase | null
   /** El tipo que hay que preparar si no hay ninguno (`col_productor`/`col_receptor`). */
   tipusCal: ConvenioTipo | null
-  potAprovar: boolean
+  /** Declarar vigente y contrafirmar (la firma institucional) son del Superadmin. */
   esSuperAdmin: boolean
   onCanvi: () => void
   /** Botones pequeños, para dentro de una fila. */
@@ -71,7 +73,8 @@ export default function AccionsConveni({
     setOcupat(true)
     const r = await contrafirmarConveni(id)
     setOcupat(false)
-    if (!r.ok) { toast.error(textError(t, r)); return }
+    // Un `42501` aquí es la firma institucional: lo dice así, no «sin permiso».
+    if (!r.ok) { toast.error(textErrorInstitucional(t, r)); return }
     toast.success(t('canalz.ok_contrasignat'))
     void refrescaComptadors()
     onCanvi()
@@ -103,17 +106,19 @@ export default function AccionsConveni({
           {t('cdecl.open')}
         </BotoAmbMotiu>
       )}
-      {conveni?.estado === 'firmat' && (
-        <BotoAmbMotiu
+      {/* Contrafirmar estampa la firma institucional: solo el Superadmin. El Dinamitzador ve el
+          estado, sin botón (un botón que siempre responde 42501 solo invita a pulsarlo). */}
+      {conveni?.estado === 'firmat' && (esSuperAdmin ? (
+        <Button
           size={mida}
           className={classe}
-          disabled={ocupat || !potAprovar}
-          motiu={potAprovar ? undefined : t('conv.need_approver')}
+          disabled={ocupat}
+          data-testid="conv-contrasigna"
           onClick={() => void contrasigna(conveni.id)}
         >
           {t('canalz.b_contrasignar')}
-        </BotoAmbMotiu>
-      )}
+        </Button>
+      ) : <AvisSignaturaInstitucional className="w-full" />)}
       {conveni && (
         <Button asChild size={mida} variant="outline" className={classe}>
           <Link to={`/equip/convenis/${conveni.id}`}>{t('canalz.b_veure_conveni')}</Link>

@@ -2,13 +2,13 @@
 //
 // Lo importante es la MATRIZ de `accionsSignatura()`: es el único sitio que decide qué botón
 // sale a quién, y un error aquí es un «Signa» ofrecido a quien la base rechaza (el operador,
-// el CONV) o un «Tanca» a un técnico. Se recorre entera: estados × roles × tipos.
+// el CONV) o un «Tanca» del certificado a un Dinamitzador. Se recorre entera: estados × roles × tipos.
 
 import { describe, expect, it } from 'vitest'
 import { DICTS } from '../src/lib/i18n'
 import {
   MAX_BYTES_SIGNAT, MIN_DNI, MIN_NOM, TIPUS_CANVAS, TIPUS_PUJABLES,
-  accionsSignatura, clauEstatSignatura, clauQuiSigna, clauVia, esPujable, esSignableCanvas,
+  accionsSignatura, clauEstatSignatura, clauQuiSigna, clauVia, esPujable, esSignableCanvas, esTipusAlbara, potGestionarSignatura,
   estilEstatSignatura, megues, mostraEstatSignatura, panellQueSigna, rolSignatura,
   signantValid, validaFitxerSignat,
   type AccioSignatura, type RolSignatura,
@@ -16,7 +16,7 @@ import {
 import type { EstatSignatura } from '../src/types'
 
 const ESTATS: EstatSignatura[] = ['pendent', 'signat', 'tancat']
-const ROLS: RolSignatura[] = ['titular', 'operador', 'super_admin', 'equip']
+const ROLS: RolSignatura[] = ['titular', 'operador', 'super_admin', 'dinamitzador', 'equip']
 
 describe('tipos firmables', () => {
   it('canvas: CD, CR, REC, ENT; el CONV solo se sube', () => {
@@ -43,6 +43,8 @@ describe('rolSignatura', () => {
   it('super_admin > equipo > titular > operador', () => {
     expect(rolSignatura({ esIntern: true, esSuperAdmin: true, titular: false })).toBe('super_admin')
     expect(rolSignatura({ esIntern: true, esSuperAdmin: false, titular: true })).toBe('equip')
+    expect(rolSignatura({ esIntern: true, esSuperAdmin: false, potAprovar: true, titular: false })).toBe('dinamitzador')
+    expect(rolSignatura({ esIntern: true, esSuperAdmin: true, potAprovar: true, titular: false })).toBe('super_admin')
     expect(rolSignatura({ esIntern: false, esSuperAdmin: false, titular: true })).toBe('titular')
     expect(rolSignatura({ esIntern: false, esSuperAdmin: false, titular: false })).toBe('operador')
   })
@@ -75,6 +77,26 @@ describe('accionsSignatura · la matriz completa', () => {
       expect(crida('signat', 'super_admin', tipo, true)).toEqual(['veure_fitxer', 'tanca', 'rebutja'])
       expect(crida('signat', 'super_admin', tipo, false)).toEqual(['tanca', 'rebutja'])
     }
+  })
+  it('Dinamitzador + albarán (REC/ENT) → lo mismo que el Superadmin (25-11-2026)', () => {
+    for (const tipo of ['REC', 'ENT']) {
+      expect(crida('pendent', 'dinamitzador', tipo)).toEqual(['puja_equip'])
+      expect(crida('signat', 'dinamitzador', tipo, true)).toEqual(['veure_fitxer', 'tanca', 'rebutja'])
+      expect(crida('signat', 'dinamitzador', tipo, false)).toEqual(['tanca', 'rebutja'])
+    }
+  })
+  it('Dinamitzador + CONV, CD o CR → nada (es del Superadmin)', () => {
+    for (const e of ESTATS) for (const tipo of ['CONV', 'CD', 'CR']) expect(crida(e, 'dinamitzador', tipo, true)).toEqual([])
+  })
+  it('potGestionarSignatura: la misma regla, para las colas', () => {
+    expect(esTipusAlbara('REC') && esTipusAlbara('ENT') && esTipusAlbara('OPE')).toBe(true)
+    expect(esTipusAlbara('CD') || esTipusAlbara('CONV') || esTipusAlbara(null)).toBe(false)
+    for (const tipo of ['REC', 'ENT']) expect(potGestionarSignatura({ tipo, esSuperAdmin: false, potAprovar: true })).toBe(true)
+    for (const tipo of ['CD', 'CR', 'CDP', 'CONV']) {
+      expect(potGestionarSignatura({ tipo, esSuperAdmin: false, potAprovar: true })).toBe(false)
+      expect(potGestionarSignatura({ tipo, esSuperAdmin: true, potAprovar: true })).toBe(true)
+    }
+    expect(potGestionarSignatura({ tipo: 'REC', esSuperAdmin: false, potAprovar: false })).toBe(false)
   })
   it('el resto del equipo no actúa', () => {
     for (const e of ESTATS) for (const tipo of TIPUS_PUJABLES) expect(crida(e, 'equip', tipo, true)).toEqual([])

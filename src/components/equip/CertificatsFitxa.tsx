@@ -210,9 +210,12 @@ export default function CertificatsFitxa(
 
   const descarregador = useDescarregaDocument(carrega)
 
+  // Un certificado REAL lleva la firma institucional de la Fundació: solo el Superadmin lo emite
+  // (25-11-2026, proceso 0.1). En prueba, como antes: el equipo.
   const motiu = !potAprovar
     ? t('fit.cert_readonly')
-    : bloquejaProvisionals(provisionals, esTest ? 'prueba' : 'real') ? t('tan.why_provisional') : undefined
+    : !esTest && !esSuperAdmin ? t('tan.why_super_admin')
+      : bloquejaProvisionals(provisionals, esTest ? 'prueba' : 'real') ? t('tan.why_provisional') : undefined
   // La donación: el botón solo existe para el super_admin (a los demás no se les ofrece).
   const potEmetre = tipus === 'entidad' || esSuperAdmin
 

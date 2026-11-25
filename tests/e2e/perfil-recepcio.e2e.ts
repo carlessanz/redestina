@@ -117,7 +117,7 @@ test('el equipo sí la cambia desde la ficha, y la entidad vuelve a ver la donac
   await expect.poll(() => sql(`select naturalesa || '|' || naturalesa_origen from organizaciones where id = '${org}'`))
     .toBe('entitat_social|confirmada')
   expect(veu(donacio)).toBe('1')
-  // El técnico también (es_intern), y un valor inventado es 22023.
+  // La Dinamitzadora también (es_intern), y un valor inventado es 22023.
   sqlCom('equip', `select fixar_naturalesa('${org}', 'empresa')`)
   expect(sql(`select naturalesa from organizaciones where id = '${org}'`)).toBe('empresa')
   expect(() => sqlCom('equip', `select fixar_naturalesa('${org}', 'cooperativa')`)).toThrow(/naturalesa_desconeguda/)

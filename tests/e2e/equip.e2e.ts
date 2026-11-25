@@ -4,10 +4,11 @@
 // Lo que se afirma:
 //   1. El super_admin ve la pestaña «Equip» con las cuentas del equipo; a sí mismo no se le
 //      ofrece cambiar nada.
-//   2. Bajar a un admin a técnico pide confirmación (roja), cambia el rol y queda en el historial;
-//      subirlo otra vez, igual.
+//   2. Subir a un Dinamitzador (`admin`) a Superadmin pide confirmación, cambia el rol y queda en
+//      el historial; bajarlo otra vez pide confirmación roja, igual. (Hasta el 25-11-2026 se bajaba
+//      a `tecnic`, que ya no existe: proceso 0.1.)
 //   3. Quien no es super_admin no ve la pestaña, y con `?tab=equip` cae en «General».
-//   4. El menú lateral dice el rol de verdad (Super admin / Tècnic): antes ponía «Admin» a todos.
+//   4. El menú lateral dice el rol de verdad (Superadmin / Dinamitzador): antes ponía «Admin» a todos.
 
 import { expect, test, type Page } from '@playwright/test'
 import { compte, entra, motiuSaltClon, sql, tria } from './ajuda'
@@ -49,7 +50,7 @@ test('el super_admin ve el equipo y a sí mismo no se le deja cambiar', async ({
 
   const jo = page.locator(`[data-testid="eq-fila"][data-email="${compte('super_admin')!.email}"]`)
   await expect(jo).toBeVisible()
-  await expect(jo.getByTestId('eq-rol')).toHaveText(/Super admin/)
+  await expect(jo.getByTestId('eq-rol')).toHaveText(/^Superadmin$/)
   await expect(jo).toContainText(/Tu|Tú/)
   await expect(jo.getByTestId('eq-rol-tria')).toHaveCount(0)
 
@@ -58,23 +59,27 @@ test('el super_admin ve el equipo y a sí mismo no se le deja cambiar', async ({
   expect(String(filas)).toBe(sql(`select count(distinct user_id) from usuario_roles`))
 })
 
-test('baja a un admin a técnico y lo sube otra vez, con confirmación y con historial', async ({ page }) => {
+test('sube a un Dinamitzador a Superadmin y lo baja otra vez, con confirmación y con historial', async ({ page }) => {
   await entra(page, 'super_admin')
   await page.goto(URL_EQUIP)
   const fila = page.locator(`[data-testid="eq-fila"][data-email="${OBJECTIU}"]`)
   await expect(fila).toHaveAttribute('data-rol', 'admin')
+  await expect(fila.getByTestId('eq-rol')).toHaveText(/^(Dinamitzador|Dinamizador)$/)
 
-  // Bajar.
-  await tria(fila.getByTestId('eq-rol-tria'), 'tecnic')
-  const dialeg = page.getByRole('dialog')
-  await expect(dialeg).toContainText(/Baixar|Bajar/)
-  await dialeg.getByRole('button', { name: /^Canvia el rol$|^Cambiar el rol$/ }).click()
-  await expect(fila).toHaveAttribute('data-rol', 'tecnic')
-  expect(sql(`select string_agg(rol, ',') from usuario_roles where user_id = (select id from auth.users where email = '${OBJECTIU}')`)).toBe('tecnic')
+  // El desplegable solo ofrece los dos roles y «treure de l’equip»: el `tecnic` ya no existe.
+  await expect(fila.getByTestId('eq-rol-tria')).not.toContainText(/Tècnic|Técnico/)
 
   // Subir.
+  await tria(fila.getByTestId('eq-rol-tria'), 'super_admin')
+  const dialeg = page.getByRole('dialog')
+  await expect(dialeg).toContainText(/Pujar|Subir/)
+  await dialeg.getByRole('button', { name: /^Canvia el rol$|^Cambiar el rol$/ }).click()
+  await expect(fila).toHaveAttribute('data-rol', 'super_admin')
+  expect(sql(`select string_agg(rol, ',') from usuario_roles where user_id = (select id from auth.users where email = '${OBJECTIU}')`)).toBe('super_admin')
+
+  // Bajar.
   await tria(fila.getByTestId('eq-rol-tria'), 'admin')
-  await expect(page.getByRole('dialog')).toContainText(/Pujar|Subir/)
+  await expect(page.getByRole('dialog')).toContainText(/Baixar|Bajar/)
   await page.getByRole('dialog').getByRole('button', { name: /^Canvia el rol$|^Cambiar el rol$/ }).click()
   await expect(fila).toHaveAttribute('data-rol', 'admin')
   expect(sql(`select string_agg(rol, ',') from usuario_roles where user_id = (select id from auth.users where email = '${OBJECTIU}')`)).toBe('admin')
@@ -90,7 +95,7 @@ test('cancelar la confirmación no cambia nada', async ({ page }) => {
   await entra(page, 'super_admin')
   await page.goto(URL_EQUIP)
   const fila = page.locator(`[data-testid="eq-fila"][data-email="${OBJECTIU}"]`)
-  await tria(fila.getByTestId('eq-rol-tria'), 'tecnic')
+  await tria(fila.getByTestId('eq-rol-tria'), 'super_admin')
   await page.getByRole('dialog').getByRole('button', { name: /^Cancel·lar$|^Cancelar$/ }).click()
   await expect(fila).toHaveAttribute('data-rol', 'admin')
   expect(sql(`select count(*) from equip_rols_hist where email = '${OBJECTIU}' and at >= '${inici}'`)).toBe('2')
@@ -108,13 +113,13 @@ async function obreMenu(page: Page, projecte: string) {
   if (projecte === 'mobil') await page.getByRole('button', { name: /sidebar|menú|menu/i }).first().click()
 }
 
-test('el menú lateral dice «Super admin» al super_admin', async ({ page }, info) => {
+test('el menú lateral dice «Superadmin» al super_admin', async ({ page }, info) => {
   await entra(page, 'super_admin')
   await page.goto('/equip/tauler')
   await obreMenu(page, info.project.name)
   const rotul = page.getByTestId('rol-equip')
   await expect(rotul).toHaveAttribute('data-rol', 'super_admin')
-  await expect(rotul).toHaveText(/Super admin/)
+  await expect(rotul).toHaveText(/^Superadmin$/)
 })
 
 test('el menú lateral dice el rol real de la cuenta del equipo, no un «Admin» para todos', async ({ page }, info) => {
@@ -123,4 +128,7 @@ test('el menú lateral dice el rol real de la cuenta del equipo, no un «Admin»
   await page.goto('/equip/tauler')
   await obreMenu(page, info.project.name)
   await expect(page.getByTestId('rol-equip')).toHaveAttribute('data-rol', rol)
+  // La cuenta `equip` del arnés es un Dinamitzador desde el 25-11-2026 (proceso 0.1).
+  expect(rol).toBe('admin')
+  await expect(page.getByTestId('rol-equip')).toHaveText(/^(Dinamitzador|Dinamizador)$/)
 })

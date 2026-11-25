@@ -2831,3 +2831,24 @@ y el E2E lo comprueba.
   Mercabarna → el mes sale el día 1 del siguiente). La captura de Gencat era correcta: el fallo era de lectura.
   En producción quedan costes manuales viejos de prueba (Poma 2 «proba», Carbassa «Fixture de proves»…): solo cuentan
   si un producto no tiene ningún mes validado; borrarlos, decisión de Carles.
+
+## Proceso 0.1: Superadmin y Dinamitzador (25-11-2026, plan DIC 26 fase 0)
+
+- Etiquetas: `eq.rol_super_admin` «Superadmin», `eq.rol_admin` «Dinamitzador»/«Dinamizador», `app.team` «Equip»;
+  fuera `eq.rol_tecnic`, `eq.d_tecnic`, `pe.only_admin`, `pe.only_super_admin`; `proc.*_qui` dicen «Dinamitzador».
+  Los mensajes «només un admin» se reescribieron («un Dinamitzador o el Superadmin») como salvaguarda.
+- Firma institucional: `AccionsConveni`, `ConveniDetall` y Aprovacions sin «Contrasigna» para el Dinamitzador, que ve
+  `AvisSignaturaInstitucional` («Pendent de la signatura institucional (Superadmin)», neutro: no es tarea suya).
+  `CertificatsFitxa`, `DialegCertificatRecepcio`, `DialegCertificatDonacio` y `TancamentDetall` («Emet tots» y
+  «Rectifica»): en real, gris con `tan.why_super_admin`; en prueba, como antes.
+- Firmas de la contraparte: `lib/signatures.ts` tiene el rol `dinamitzador` (equipo con `potAprovar` que no es
+  Superadmin); `accionsSignatura()` le da lo mismo que al Superadmin en REC/ENT y nada en CONV/CD/CR;
+  `CuaSignatures` decide fila a fila (`potGestionarSignatura()`).
+- Configuració › Notificacions: la tarjeta de listas de prueba **se esconde** al Dinamitzador (excepción consciente al
+  criterio de mostrar en gris).
+- **«La meva signatura»**: menú de la cuenta (`UserMenu`, solo equipo) → `DialegMevaSignatura` con la firma guardada y
+  su fecha, pestañas «Dibuixa-la» (`SignaturePad`) y «Puja una imatge» (PNG/JPEG ≤1 MB, validado en el cliente),
+  «Desa» y «Esborra» (con confirmación). `lib/firmaEquip.ts` nunca lanza. Lo emitido no cambia al borrarla.
+- E2E: `rols-dinamitzador.e2e.ts` (chip, contrafirma, Configuració, firma propia); ajustados `gestio-autonoma`
+  (el interés de nivel 2 se registra por SQL porque el equipo ya asigna en un acto), `proposar-canvis` (c),
+  `recollida`, `entitats-estat`, `equip` y `equip-gestio`.

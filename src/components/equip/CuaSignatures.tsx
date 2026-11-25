@@ -6,9 +6,10 @@
 // pasa a ser la definitiva— o lo rechaza con motivo, y el documento vuelve a «pendent».
 // Las firmas con trazo y las que sube el propio super_admin nacen cerradas y no pasan por aquí.
 //
-// Lee `v_signatures_bandeja` (solo equipo, `security_invoker`). Solo el super_admin actúa
-// (`tancar_/rebutjar_signatura` lo exigen); el resto del equipo ve la cola con los botones
-// en gris y el motivo, como las otras cuatro.
+// Lee `v_signatures_bandeja` (solo equipo, `security_invoker`). Desde el 25-11-2026 (proceso
+// 0.1) la firma de un ALBARÁN la cierra o la rechaza también el Dinamitzador; la de un
+// certificado o un convenio, solo el Superadmin (`potGestionarSignatura`, la misma regla que
+// `tancar_/rebutjar_signatura`). Quien no puede ve esa fila con los botones en gris y el motivo.
 
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
@@ -18,7 +19,7 @@ import { useT } from '../../lib/i18n'
 import { useAppContext } from '../../hooks/useAppContext'
 import { carregaBandejaSignatures, rebutjarSignatura, tancarSignatura } from '../../lib/documents'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
-import { clauVia, megues } from '../../lib/signatures'
+import { clauVia, megues, potGestionarSignatura } from '../../lib/signatures'
 import { dataCurta } from '../../lib/format'
 import { filtraCerca } from '../../lib/cerca'
 import type { SignaturaBandeja } from '../../types'
@@ -45,6 +46,7 @@ export default function CuaSignatures({ q = '' }: { q?: string }) {
   const location = useLocation()
   const { ctx } = useAppContext()
   const esSuperAdmin = ctx?.esSuperAdmin ?? false
+  const potAprovar = ctx?.potAprovar ?? false
   const [files, setFiles] = useState<SignaturaBandeja[]>([])
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState(false)
@@ -83,7 +85,7 @@ export default function CuaSignatures({ q = '' }: { q?: string }) {
     await carrega()
   }
 
-  const motiu = esSuperAdmin ? undefined : t('sgn.need_super')
+  const pot = (tipo: string) => potGestionarSignatura({ tipo, esSuperAdmin, potAprovar })
   const classe = 'h-11 w-full whitespace-normal sm:w-auto md:h-8'
   const visibles = filtraCerca(files, q, (f) => [f.numero_completo, f.org_nom, f.signant_nom, t(`doc.tipus_${f.tipo}`)])
 
@@ -92,7 +94,7 @@ export default function CuaSignatures({ q = '' }: { q?: string }) {
       <CardHeader>
         <CardTitle>{t('appr.sgn_title')} ({files.length})</CardTitle>
         <p className="mt-1 text-sm text-muted-foreground">{t('appr.sgn_subtitle')}</p>
-        {!esSuperAdmin && <p className="mt-1 text-sm text-aviso">{t('sgn.need_super')}</p>}
+        {!esSuperAdmin && files.some((f) => !pot(f.tipo)) && <p className="mt-1 text-sm text-aviso">{t('sgn.need_super')}</p>}
       </CardHeader>
       <CardContent className="space-y-2">
         {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
@@ -105,7 +107,9 @@ export default function CuaSignatures({ q = '' }: { q?: string }) {
         )}
         {visibles.map((f) => {
           const ruta = rutaSignatura(f)
-          const bloquejat = !esSuperAdmin || ocupat === f.documento_id
+          const potAquesta = pot(f.tipo)
+          const bloquejat = !potAquesta || ocupat === f.documento_id
+          const motiu = potAquesta ? undefined : t('sgn.need_super')
           return (
             <div key={f.documento_id} className="rounded-lg border p-3" data-testid="signatura-per-tancar">
               <div className="flex flex-wrap items-start justify-between gap-3">

@@ -29,7 +29,7 @@ export async function listarNumerosTest(): Promise<MetaTestRecipient[]> {
 /**
  * Devuelve una CLAVE i18n si falla (la traduce quien pinta), o `null` si fue bien. Antes
  * devolvía texto en castellano escrito a mano y, ante cualquier otro error, el mensaje crudo
- * de Postgres —«new row violates row-level security policy…» a un técnico—.
+ * de Postgres —«new row violates row-level security policy…» a quien no puede—.
  */
 export async function anadirNumeroTest(phone: string, etiqueta: string): Promise<string | null> {
   const limpio = phone.replace(/\D/g, '')

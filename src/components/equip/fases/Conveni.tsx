@@ -42,7 +42,6 @@ export default function FaseConveni({ c }: { c: ContextFase }) {
             nom={extra.productor.nom}
             conveni={extra.conveni_gen}
             tipusCal={conveniQueCalEntregar(extra.oferta.modalitat)}
-            potAprovar={c.potAprovar}
             esSuperAdmin={c.esSuperAdmin}
             onCanvi={c.onCanvi}
           />

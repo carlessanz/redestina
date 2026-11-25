@@ -1,7 +1,7 @@
 // La exportación de entidades a Excel (Plan 2 B3, 10-11-2026; D10): el MISMO formato que la
 // plantilla del importador, para completar datos fuera y volver a subirlo.
 //
-// Lo pidió Sebas (Teams, 09-11). La lanza todo el equipo (también `tecnic`); importar sigue siendo
+// Lo pidió Sebas (Teams, 09-11). La lanza todo el equipo (Superadmin y Dinamitzador); importar sigue siendo
 // del super_admin. Los datos los da la RPC `exportar_entitats()` (una fila por organización, en
 // CÓDIGOS); aquí se ponen en palabras y se compone el fichero:
 //   · «Entitats»: las columnas de la plantilla (`COLUMNES_DE_PLANTILLA`), en su orden, con los

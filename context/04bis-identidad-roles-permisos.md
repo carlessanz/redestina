@@ -893,3 +893,46 @@ Errores `22023`: `periode_invalid`, `modalitat_invalida`, `estat_invalid`, `limi
 `agrupacio_invalida`. La guarda va antes que la validación (un externo recibe `42501`). `albara_rec`: el REC propio, o
 el heredado de la oferta o de la jornada, este último **solo en donación**. Arnés: `SORTIDES_INTERNES`,
 `SORTIDES_EXTERN` y `SORTIDES_EQUIP` (34 checks).
+
+## Perfiles del equipo: Superadmin y Dinamitzador (25-11-2026, plan DIC 26 fase 0, `20270615100000`…`100200`)
+
+Proceso 0.1 del documento de la Fundació. Quedan dos roles internos: `super_admin` («Superadmin») y `admin`
+(«Dinamitzador» / «Dinamizador»; el valor interno no se renombra). **`tecnic` se retira**: las filas se pasaron a
+`admin` (o se borraron si la cuenta ya tenía otro rol) con rastro en `equip_rols_hist.detall.motiu`; el CHECK de
+`usuario_roles` queda en dos valores y `canviar_rol_equip` rechaza `tecnic` con `22023 rol_invalid`. El historial
+conserva `tecnic` (CHECK intacto; la interfaz lo muestra como «Tècnic (rol retirat)» con `clauRol()`). Las listas
+`('super_admin','admin','tecnic')` que quedan en `es_intern`, `diagnostic_datos`, `puede_ver_documento` y
+`puc_veure_document_extern` son inocuas. En la práctica `pot_aprovar()` ≡ `es_intern()`; no se reescribieron las RPC.
+
+| Acción | Superadmin | Dinamitzador |
+| --- | --- | --- |
+| Configuración general, equipo, whitelists (`meta_test_recipients`, `email_test_recipients`), `plantillas_documento` | Sí | No |
+| Invitar (`donar-acces`), importar entidades, `borrar_ficha_completa` | Sí | No |
+| Entidades, CRM, operativa, ofertas, precios | Sí | Sí |
+| Convenios: preparar, enviar, retornar, resolver, descartar, subir, consultar, descargar | Sí | Sí |
+| **Contrafirmar convenio** (siempre real), declarar, en papel | Sí | No |
+| Certificados: calcular, revisar, aprobar, emitir **en prueba** | Sí | Sí |
+| **Emitir CD/CR real, rectificar CD/CDP/CR real** (firma de la apoderada) | Sí | No |
+| Albaranes: emitir, validar recogida, anular, rectificar | Sí | Sí |
+| Cerrar o rechazar la firma de la contraparte en REC/ENT | Sí | Sí |
+| Cerrar o rechazar la firma de la contraparte en CONV/CD/CDP/CR | Sí | No |
+
+Guardas cambiadas (`20270615100100`): `contrafirmar_convenio` → `es_super_admin` («Nomes el super_admin contrasigna
+un conveni (signatura institucional)», `42501`); `emetre_certificat_recepcio`, `rectificar_certificado`,
+`rectificar_certificado_periodo`, `rectificar_certificat_recepcio` → en real super_admin, en prueba `pot_aprovar`
+(«Nomes el super_admin signa un certificat real»; con uuid inventado, `22023` como el CD); `tancar_signatura` /
+`rebutjar_signatura` → `pot_aprovar` y, si no es REC/ENT, además `es_super_admin`; `registrar_document_signat` cierra
+directo también si sube el equipo un REC/ENT; políticas de las whitelists y de `plantillas_documento` →
+`es_super_admin`. La interfaz distingue el `42501` institucional por el mensaje (`textErrorInstitucional()`).
+
+**Firma propia** (`20270615100200`): `perfiles.firma_ruta` y `perfiles.firma_actualitzada_at`. 🔴 `perfiles` pasa a
+**GRANT de SELECT por columnas** (las diez de siempre; toda columna nueva nace sin SELECT). RPC:
+`fixar_firma_equip(p_user, p_ruta) returns text` (solo `service_role`; devuelve la ruta anterior; `22023
+no_es_de_lequip` · `ruta_invalida` si no empieza por `equip/<p_user>/` o lleva `..`), `la_meva_firma()` (`{ruta,
+actualitzada_at}`, equipo) y la interna `signant_equip_actual()`. `emitir_albaran` congela `albaranes.signant_equip`
+`{nom, rol, firma_ruta}` (quien emite o valida; `nom` = `perfiles.nombre` o el correo) en el mismo `update`;
+`albaran_datos()` lo copia a la raíz de `documentos.datos` (sin clave si emite el servidor o un job);
+`trg_albaranes_inmutable` lo congela. Sin backfill. Prueba SQL con rollback: `scripts/sql/prova-signatura-institucional.sql`
+(52 casos). Arnés: el perfil `equip` es ahora `admin` (`crear-usuarios-prueba.ts`, «Dinamitzador Redestina»);
+`PREUS_DINAMITZADOR`, `ASSIGNACIO_SUPER` y `PROPOSTA_SUPER` en el `equip`; `FIRMA_EQUIP_*`; el «denegar» de
+`fijar_tipo_caja` usa tara −1 (con tara 1 escribía `TEST-ARNES` en cuanto la guarda dejaba pasar).

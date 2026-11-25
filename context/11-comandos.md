@@ -491,3 +491,19 @@ deno run -A scripts/crear-respuestas-prueba.ts
 
 Las E2E consumen datos de los fixtures (certificados, convenios): tras una pasada completa, el arnés del clon puede
 subir de «sin datos»; volver a correr los dos fixtures lo devuelve a la referencia.
+
+### Movido de `AGENTS.md` (25-11-2026, para no pasar de 48 KB)
+
+- **Clon local**: se monta o refresca con `scripts/local/` (volcar → preparar-entorno → cargar-local →
+  copiar-storage); el volcado tiene que tener al menos las migraciones del clon. Jobs contra las funciones
+  locales; `roles_activos` y `test_mode` encendidos.
+- **Precios (D1)**: jobs `preus-gencat`/`preus-mercabarna` con `app_config.documentos_secret`; `diagnostic-pdf`
+  comparte activos con `generar-documento` y se redespliega con ella. Logs: Management API de analítica.
+- **Plan DIC 26, fase 0 (25-11-2026)**: al publicar, **primero** `20270615100000`…`100200` en la base y **después**
+  las funciones (si `_shared/autorizacion.ts` sale antes, una cuenta `tecnic` recibe 403 en todas). Redesplegar las
+  que importan `autorizacion.ts` (`cortina-config`, `crear-oferta`, `descargar-documento`, `diagnostic-pdf`,
+  `donar-acces`, `enviar-acceso`, `enviar-albara`, `enviar-email`, `limpiar-documentos-prueba`, `preus-fonts`
+  `--no-verify-jwt`, `priorizar-entidades`, `pujar-document-signat`, `reenviar-documento`,
+  `subir-documento-externo`, `whatsapp-send`), `generar-documento` (render del albarán) y la nueva `firma-equip`
+  (con JWT); después `emitir_documento_prova()`.
+- **E2E fuera del sandbox**: Chromium de la caché, `PW_CHROMIUM_PATH="$(ls ~/Library/Caches/ms-playwright/chromium-1248/chrome-mac*/*.app/Contents/MacOS/* | head -1)"`.

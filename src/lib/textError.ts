@@ -180,3 +180,17 @@ export function textError(
   if (CRUS.test(missatge)) return t(fallback)
   return missatge
 }
+
+/**
+ * El error de una acción con la FIRMA INSTITUCIONAL (contrasignar un convenio, emitir o rectificar
+ * un certificado real; proceso 0.1, 25-11-2026): un `42501` dice que es cosa del Superadmin, no un
+ * «no tens permís» genérico. El resto, como `textError`.
+ */
+export function textErrorInstitucional(
+  t: Traductor,
+  r: { missatge?: string | null; codi?: string | null } | null | undefined,
+  fallback = 'c.error',
+): string {
+  if (r?.codi === '42501') return t('eq.signatura_institucional')
+  return textError(t, r, fallback)
+}
