@@ -555,7 +555,7 @@ Decisiones de negocio pendientes (en `context/12`): **69**, **131**,
    **Referencia: 2.534 de Vitest (116 ficheros, 1 saltada) + 65 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.660/2.660 y 44 sin datos (25-11); producción 2.301/2.301 y 142 (20-11-2026).** `prueba-numeracion.ts` si toca la numeración; `scripts/sql/prova-signatura-institucional.sql` si toca roles o firmas.
+   **Referencia: clon 2.660/2.660 y 44 sin datos (25-11); producción 2.612/2.612 y 92 (25-11-2026).** `prueba-numeracion.ts` si toca la numeración; `scripts/sql/prova-signatura-institucional.sql` si toca roles o firmas.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; el circuito: `circuit-tomaquet`).
 5. Publicar con `/publicar` (base → funciones → frontend).
 6. Estilos solo con tokens; un token nuevo va a `tokens.json`, `index.css` y `preview.html`.

@@ -429,3 +429,9 @@
   `circuit-tomaquet` 12 + 1 saltado (el CR del día, si otra pasada ya lo emitió) y `correus-alta` 4/4; regresión de
   `recollida`, `recollida-un-acte`, `acces` y `enllacos-directes`, 28/28. Producción, tras publicar la migración: **2.301/2.301 y
   142 sin datos** (sin cambios).
+- **25-11-2026 · plan DIC 26 publicado** (`ed46b25`; 23 migraciones `20270615100000`…`20270620100600`, 20 Edge Functions
+  con la nueva `firma-equip`, `emitir_documento_prova()` de 6 páginas): producción **2.612/2.612 y 92 sin datos** (+311
+  sobre 2.301: roles, firma, interacciones, operación a posteriori y multiproducto; las «sin datos» nuevas son las lecturas
+  de `disponibilitats` y `sollicituds_recollida`, vacías en producción). Antes: 1 cuenta `tecnic` (pasa a `admin`) y 3
+  jornadas de espigolada abiertas de fichas `es_test` (queda 1 heredada, con canalización). CORS al dominio en 13
+  funciones, `firma-equip` 401 sin sesión, Vercel `success`, cortina encendida (401).
