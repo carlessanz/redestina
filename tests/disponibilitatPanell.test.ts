@@ -3,9 +3,11 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  canalsGrup, contextText, filesDelText, filesPerEntitat, midaGrupDeFila, midesGrups, missatgeEntitat, ordenaGrup,
-  productesEsborrany, textDelGrup, type OfertaGrup,
+  canalsGrup, componentsPlantillaGrup, contextText, filesDelText, filesPerEntitat, midaGrupDeFila, midesGrups,
+  missatgeEntitat, ordenaGrup, plantillaDirectaGrup, potPlantillaGrup, productesEsborrany, textDelGrup,
+  type OfertaGrup,
 } from '../src/lib/disponibilitat'
+import { PLANTILLA_DISPONIBILITAT_APROVADA } from '../src/lib/plantillas'
 
 function oferta(p: Partial<OfertaGrup>): OfertaGrup {
   return {
@@ -95,5 +97,32 @@ describe('por dónde sale', () => {
   it('sin teléfono ni correo, nada', () => {
     expect(canalsGrup({ canal: 'cap', telefono: null, email: null, email_possible: false }, { email: true, whatsapp: true }))
       .toEqual({ primer: null, alternativa: null })
+  })
+})
+
+describe('la plantilla de Meta `oferta_disponibilitat` (lista, apagada por flag)', () => {
+  const ent = { telefono: '34600000000', opt_in: true, motiu_canal: 'opt_in' }
+  it('con el flag de HOY (apagado) no se manda nunca: el camino de siempre', () => {
+    expect(PLANTILLA_DISPONIBILITAT_APROVADA).toBe(false)
+    expect(potPlantillaGrup(ent, PLANTILLA_DISPONIBILITAT_APROVADA)).toBe(false)
+    expect(plantillaDirectaGrup(ent, PLANTILLA_DISPONIBILITAT_APROVADA)).toBe(false)
+  })
+  it('encendido: exige móvil y opt-in (la iniciamos nosotros, §8)', () => {
+    expect(potPlantillaGrup(ent, true)).toBe(true)
+    expect(potPlantillaGrup({ ...ent, opt_in: false }, true)).toBe(false)
+    expect(potPlantillaGrup({ ...ent, telefono: null }, true)).toBe(false)
+  })
+  it('directa, sin probar el texto, solo si el servidor ya dice que la ventana está cerrada', () => {
+    expect(plantillaDirectaGrup(ent, true)).toBe(true)
+    expect(plantillaDirectaGrup({ ...ent, motiu_canal: 'finestra_oberta' }, true)).toBe(false)
+  })
+  it('los components: lo que encaja con la entidad, el municipio del contexto y el id en el botón', () => {
+    const files = filesPerEntitat([A, B, C], ['a', 'c'])
+    const cs = componentsPlantillaGrup(files.map((f) => ({ ...f, comarca: 'Osona' })), ctx) as
+      { type: string; parameters: { text: string }[] }[]
+    const body = cs.find((c) => c.type === 'body')!.parameters.map((p) => p.text)
+    expect(body[0]).toBe('Ceba 50 kg · Tomàquet 300 kg')
+    expect(body[1]).toBe('Manlleu (Osona)')
+    expect(cs.find((c) => c.type === 'button')!.parameters[0].text).toBe(ctx.disponibilitatId)
   })
 })

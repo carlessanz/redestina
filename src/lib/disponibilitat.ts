@@ -12,12 +12,13 @@ import {
   correuDisponibilitat, textDisponibilitat, type ContextTextDisponibilitat,
 } from '../../supabase/functions/_shared/textOferta.ts'
 import type { EstadoExcedente } from '../types'
+import { construirComponentsDisponibilitat } from './ofertaTemplate'
 
 /**
  * Las columnas de las ofertas del grupo: lo que pide el texto único y lo que enseña el bloque.
  * ⚠️ En UN literal (§7).
  */
-export const COLUMNES_GRUP = 'id, id_excedente, estado, producto, variedad, kg_total, num_caixes, format_entrega, retorn_envasos, retorn_envasos_detall, retorn_envasos_quantitat, modalitat, modalitats, preu_minim, producte_al_camp, espigolada_demanada, gmaps_url, disponible_hasta, dies_recollida, horari_recollida, causa, subcausa_codigo, observacions, ubicacion_id, productor_id, created_at'
+export const COLUMNES_GRUP = 'id, id_excedente, estado, producto, variedad, kg_total, num_caixes, format_entrega, retorn_envasos, retorn_envasos_detall, retorn_envasos_quantitat, modalitat, modalitats, preu_minim, producte_al_camp, espigolada_demanada, gmaps_url, disponible_hasta, dies_recollida, horari_recollida, causa, subcausa_codigo, observacions, ubicacion_id, productor_id, comarca, created_at'
 
 /** Una oferta del grupo, con las columnas de `COLUMNES_GRUP`. */
 export interface OfertaGrup {
@@ -46,6 +47,8 @@ export interface OfertaGrup {
   observacions: string | null
   ubicacion_id: string | null
   productor_id: string | null
+  /** Por trigger (`excedentes_ubica`); solo la usa la plantilla de Meta. Opcional: un servidor anterior no la da. */
+  comarca?: string | null
   created_at: string
 }
 
@@ -132,9 +135,10 @@ export function missatgeEntitat(
 
 /**
  * Por dónde sale el mensaje del grupo a una entidad, según lo que dice el servidor del ranking
- * (`canal`, §8bis) y los interruptores (§8). 🔴 El mensaje del grupo es TEXTO: no hay plantilla
- * de Meta (checkpoint de negocio), así que WhatsApp solo vale con la ventana de 24 h abierta;
- * si `whatsapp-send` contesta `window_closed`, se cae al correo (`alternativa`).
+ * (`canal`, §8bis) y los interruptores (§8). El mensaje del grupo es TEXTO, así que WhatsApp solo
+ * vale con la ventana de 24 h abierta; si `whatsapp-send` contesta `window_closed`, se cae al
+ * correo (`alternativa`) — salvo que la plantilla `oferta_disponibilitat` esté aprobada
+ * (`potPlantillaGrup`), que entonces va primero.
  */
 export function canalsGrup(
   ent: { canal: string; telefono: string | null; email: string | null; email_possible: boolean },
@@ -145,6 +149,39 @@ export function canalsGrup(
     return { primer: 'whatsapp', alternativa: correu ? 'email' : null }
   }
   return { primer: correu ? 'email' : null, alternativa: null }
+}
+
+/**
+ * Con la ventana de 24 h CERRADA, ¿sale la plantilla de Meta `oferta_disponibilitat`? Solo con
+ * el flag encendido (`PLANTILLA_DISPONIBILITAT_APROVADA`, que pasa quien llama), móvil y opt-in
+ * (la plantilla la iniciamos nosotros y exige consentimiento, §8). 🔴 Con el flag apagado, nunca:
+ * se queda el camino de siempre (texto y, si la ventana está cerrada, correo).
+ */
+export function potPlantillaGrup(
+  ent: { telefono: string | null; opt_in: boolean }, aprovada: boolean,
+): boolean {
+  return aprovada && Boolean(ent.telefono) && ent.opt_in === true
+}
+
+/**
+ * ¿Se va DIRECTO a la plantilla, sin probar antes el texto? Cuando el servidor ya dice que
+ * WhatsApp vale solo por el opt-in (`motiu_canal === 'opt_in'`: la ventana está cerrada) y la
+ * plantilla se puede mandar. Si no, se prueba el texto y, con `window_closed`, la plantilla.
+ */
+export function plantillaDirectaGrup(
+  ent: { telefono: string | null; opt_in: boolean; motiu_canal: string }, aprovada: boolean,
+): boolean {
+  return ent.motiu_canal === 'opt_in' && potPlantillaGrup(ent, aprovada)
+}
+
+/** Los `components` de `oferta_disponibilitat` para lo que recibe una entidad (`missatgeEntitat().files`). */
+export function componentsPlantillaGrup(files: readonly OfertaGrup[], ctx: ContextTextDisponibilitat): unknown[] {
+  return construirComponentsDisponibilitat({
+    disponibilitatId: ctx.disponibilitatId,
+    municipi: ctx.municipi || null,
+    comarca: files[0]?.comarca ?? null,
+    ofertes: files,
+  })
 }
 
 /**

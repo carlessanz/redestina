@@ -512,3 +512,9 @@ subir de «sin datos»; volver a correr los dos fixtures lo devuelve a la refere
   `textAvis.ts`, `priorizacion.ts`, `camposOferta.ts` o `intake.ts`).
 - **E2E fuera del sandbox**: Chromium de la caché, `PW_CHROMIUM_PATH="$(ls ~/Library/Caches/ms-playwright/chromium-1248/chrome-mac*/*.app/Contents/MacOS/* | head -1)"`.
 - **Fixture multiproducto** (fase 6): `deno run -A scripts/crear-multiproducte-prova.ts`, después de `crear-usuarios-prueba.ts` (idempotente, solo `TEST-*`).
+- **Alta del equipo (25-11-2026, deuda 169)**: base `20270621100000_alta_equip.sql` y después
+  `supabase functions deploy alta-equip` (con JWT). Sin secretos nuevos; no toca `_shared/`.
+- **Plantillas de Meta (25-11-2026)**: `deno run -A scripts/plantillas-meta.ts listar` (solo lectura) y
+  `crear <oferta_excedent|oferta_disponibilitat>` (dry-run; envía a Meta **solo** con `--enviar`, con el número de
+  producción y el visto bueno de Carles). `WHATSAPP_WABA_ID` opcional (si falta, se descubre). Tocar `_shared/intake.ts`
+  y `_shared/whatsapp.ts` obliga a redesplegar todas las funciones que los importan.

@@ -61,3 +61,16 @@ cierre real (kg reales, albaranes, o marcar `no_colocada` con motivo).
 
 **Valoración**: `valor_eur = kg × productos.eur_kg` (hoy plano a 1 €/kg).
 
+
+## Plantillas de oferta listas y apagadas (25-11-2026)
+
+- Con la ventana cerrada y opt-in, la oferta puede salir por **plantilla de Meta**: `oferta_excedent` (simple,
+  **revisada**: sin productor por D3, con modalidad, precio mínimo, comarca y días, botones «M'interessa»/«Ara no» con
+  payload `accept:si|no`) y `oferta_disponibilitat` (multiproducto, nueva: 5 variables y botón de URL dinámica
+  `/receptor/mercat?disponibilitat={{1}}`). El texto vive solo en `_shared/plantillasMeta.ts` (módulo hoja; `plantillas-meta.md`
+  lo documenta y un test vigila que coincidan); `src/lib/ofertaTemplate.ts` construye los `components`.
+- **Apagadas**: `PLANTILLA_OFERTA_APROVADA` y `PLANTILLA_DISPONIBILITAT_APROVADA` = `false` en `src/lib/plantillas.ts`; con
+  ellas en `false` todo va como antes (texto en la ventana; si no, correo). Encendida, la multiproducto manda la plantilla
+  sola (`EnviamentDisponibilitat`, `potPlantillaGrup`); la simple sigue pidiendo confirmación («Enviar com a plantilla»).
+- La respuesta a un botón de plantilla (`type:"button"`, `button.payload`) la normaliza `leerRespuesta` (`_shared/intake.ts`)
+  al mismo id que un botón interactivo.

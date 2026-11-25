@@ -1,12 +1,25 @@
 // El equipo de Redestina (`lib/equip.ts`, 09-11-2026): el orden, los recuentos, qué se ofrece
-// de cada cuenta y la traducción de los errores de `canviar_rol_equip()`.
+// de cada cuenta y la traducción de los errores de `canviar_rol_equip()`. Y el alta (deuda 169):
+// la validación del formulario, dónde va cada código de `alta-equip` y el cliente, que nunca lanza.
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  ACCIONS_HIST, GRUPS_ACCIO, GRUP_TAULA, ROLS_EQUIP, accionsMembre, agrupaAccions, clauErrorEquip, clauRol, destiPerDefecte,
+  ACCIONS_AUDITORIA, ACCIONS_HIST, CODIS_EQUIP, altaMembreEquip, campErrorAlta, clauErrorAlta, correuValid,
+  normalitzaCorreu, validaAltaMembre, GRUPS_ACCIO, GRUP_TAULA, ROLS_EQUIP, accionsMembre, agrupaAccions, clauErrorEquip, clauRol, destiPerDefecte,
   destinsPossibles, esBaixada, filtraEquip, persona, personesAuditoria, normalitzaTelefon, ordenaEquip, recompteRols, rolEquipDe, telefonValid, type MembreEquip,
 } from '../src/lib/equip'
 import { DICTS } from '../src/lib/i18n'
+
+// El cliente de Supabase no se crea: la sesión es la que diga cada prueba y `fetch` se simula.
+const sessio = vi.hoisted(() => ({ token: 'jwt-prova' as string | null }))
+vi.mock('../src/lib/supabase', () => ({
+  supabase: {
+    auth: {
+      getSession: async () => ({ data: { session: sessio.token ? { access_token: sessio.token } : null } }),
+    },
+  },
+  supabaseUrl: 'https://prova.supabase.co',
+}))
 
 function membre(over: Partial<MembreEquip>): MembreEquip {
   return {
@@ -301,5 +314,124 @@ describe('auditoría: persona y personesAuditoria', () => {
       { user_id: 'a', text: 'Anna (a@x.org)', esborrat: false },
       { user_id: 'b', text: 'Bet (b@x.org)', esborrat: true },
     ])
+  })
+})
+
+describe('alta: validación del formulario', () => {
+  const bo = { email: 'nova@espigoladors.cat', nom: 'Nova Persona', telefon: '' }
+  it('nombre, correo y sin teléfono: nada que decir', () => {
+    expect(validaAltaMembre(bo)).toEqual({})
+    expect(validaAltaMembre({ ...bo, telefon: '+34 600 11 22 33' })).toEqual({})
+  })
+  it('cada campo, su clave', () => {
+    expect(validaAltaMembre({ ...bo, nom: '   ' })).toEqual({ nom: 'eq.e_nom_buit' })
+    expect(validaAltaMembre({ ...bo, nom: 'x'.repeat(121) })).toEqual({ nom: 'eq.e_nom_massa_llarg' })
+    expect(validaAltaMembre({ ...bo, email: 'no-es-un-correu' })).toEqual({ email: 'eq.e_correu_invalid' })
+    expect(validaAltaMembre({ ...bo, telefon: '123' })).toEqual({ telefon: 'eq.e_telefon_invalid' })
+    expect(validaAltaMembre({ email: '', nom: '', telefon: '0600' })).toEqual({
+      nom: 'eq.e_nom_buit', email: 'eq.e_correu_invalid', telefon: 'eq.e_telefon_invalid',
+    })
+  })
+  it('el correo se normaliza (espacios y mayúsculas) y se valida con forma mínima', () => {
+    expect(normalitzaCorreu('  Nova@Espigoladors.CAT ')).toBe('nova@espigoladors.cat')
+    expect(correuValid(' A@b.cat ')).toBe(true)
+    for (const c of ['', 'a@b', 'a b@c.cat', '@b.cat', 'a@.cat', 'a@@b.cat']) expect(correuValid(c), c).toBe(false)
+  })
+})
+
+describe('alta: los códigos de alta-equip', () => {
+  it('ningún código es parte de otro (se buscan por includes)', () => {
+    for (const a of CODIS_EQUIP) for (const b of CODIS_EQUIP) if (a !== b) expect(b.includes(a), `${a} ⊂ ${b}`).toBe(false)
+  })
+  it('clauErrorEquip reconoce los códigos nuevos', () => {
+    for (const c of ['compte_existent', 'correu_invalid', 'nom_buit', 'telefon_invalid', 'rol_invalid', 'correu_fallit', 'compte_inexistent']) {
+      expect(clauErrorEquip(`error: ${c}`)).toBe(`eq.e_${c}`)
+    }
+    // `compte_inexistent` no se confunde con `compte_existent`.
+    expect(clauErrorEquip('compte_inexistent')).toBe('eq.e_compte_inexistent')
+  })
+  it('clauErrorAlta: «ya es del equipo», sesión, permiso, red y el genérico tienen clave propia', () => {
+    expect(clauErrorAlta('compte_equip')).toBe('eq.e_alta_compte_equip')
+    expect(clauErrorAlta('compte_existent')).toBe('eq.e_compte_existent')
+    expect(clauErrorAlta('te_membresies')).toBe('eq.e_te_membresies')
+    expect(clauErrorAlta('correu_fallit')).toBe('eq.e_correu_fallit')
+    expect(clauErrorAlta('unauthorized')).toBe('eq.e_alta_sessio')
+    expect(clauErrorAlta('http_401')).toBe('eq.e_alta_sessio')
+    expect(clauErrorAlta('forbidden')).toBe('eq.e_alta_forbidden')
+    expect(clauErrorAlta('xarxa')).toBe('eq.e_alta_xarxa')
+    expect(clauErrorAlta('http_500')).toBe('eq.e_alta_error')
+    expect(clauErrorAlta('')).toBe('eq.e_alta_error')
+  })
+  it('cada clave del alta existe en los dos idiomas', () => {
+    const codis = ['compte_equip', 'compte_existent', 'te_membresies', 'correu_invalid', 'nom_buit', 'telefon_invalid',
+      'rol_invalid', 'correu_fallit', 'compte_inexistent', 'unauthorized', 'forbidden', 'xarxa', 'http_500']
+    for (const c of codis) {
+      const clau = clauErrorAlta(c)
+      expect(DICTS.ca[clau], clau).toBeTruthy()
+      expect(DICTS.es[clau], clau).toBeTruthy()
+    }
+  })
+  it('cada código va bajo su campo o arriba', () => {
+    expect(campErrorAlta('correu_invalid')).toBe('email')
+    expect(campErrorAlta('compte_equip')).toBe('email')
+    expect(campErrorAlta('compte_existent')).toBe('email')
+    expect(campErrorAlta('te_membresies')).toBe('email')
+    expect(campErrorAlta('nom_buit')).toBe('nom')
+    expect(campErrorAlta('telefon_invalid')).toBe('telefon')
+    expect(campErrorAlta('rol_invalid')).toBe('rol')
+    for (const c of ['correu_fallit', 'forbidden', 'unauthorized', 'xarxa', 'http_500']) expect(campErrorAlta(c), c).toBeNull()
+  })
+  it('el alta es una acción del historial y de la auditoría, la primera', () => {
+    expect(ACCIONS_HIST[0]).toBe('alta')
+    expect(ACCIONS_AUDITORIA).toContain('alta')
+  })
+})
+
+describe('altaMembreEquip: el cliente nunca lanza', () => {
+  const dades = { email: ' Nova@X.org ', nom: ' Nova ', telefon: '+34 600 11 22 33', rol: 'admin' as const, idioma: 'es' as const }
+  afterEach(() => { vi.unstubAllGlobals(); sessio.token = 'jwt-prova' })
+
+  function respon(status: number, cos: unknown) {
+    const f = vi.fn(async () => new Response(JSON.stringify(cos), { status, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', f)
+    return f
+  }
+
+  it('manda el contrato con el JWT y devuelve lo que dice el servidor', async () => {
+    const f = respon(200, { ok: true, user_id: 'u1', email: 'nova@x.org', rol: 'admin', simulat: true })
+    const r = await altaMembreEquip(dades)
+    expect(r).toEqual({ ok: true, user_id: 'u1', email: 'nova@x.org', rol: 'admin', simulat: true })
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://prova.supabase.co/functions/v1/alta-equip')
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer jwt-prova')
+    expect(JSON.parse(init.body as string)).toEqual({
+      email: 'nova@x.org', nombre: 'Nova', telefon: '34600112233', rol: 'admin', idioma: 'es',
+    })
+  })
+  it('sin teléfono, no se manda', async () => {
+    const f = respon(200, { ok: true, user_id: 'u1', email: 'nova@x.org', rol: 'admin' })
+    const r = await altaMembreEquip({ ...dades, telefon: '' })
+    expect(r).toMatchObject({ ok: true, simulat: false })
+    const [, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(JSON.parse(init.body as string)).not.toHaveProperty('telefon')
+  })
+  it('un error del servidor vuelve con su código', async () => {
+    respon(409, { error: 'compte_existent' })
+    expect(await altaMembreEquip(dades)).toEqual({ ok: false, error: 'compte_existent' })
+    respon(502, { error: 'correu_fallit' })
+    expect(await altaMembreEquip(dades)).toEqual({ ok: false, error: 'correu_fallit' })
+    respon(500, null)
+    expect(await altaMembreEquip(dades)).toEqual({ ok: false, error: 'http_500' })
+    respon(401, { message: 'Invalid JWT' })
+    expect(await altaMembreEquip(dades)).toEqual({ ok: false, error: 'unauthorized' })
+  })
+  it('sin sesión no llama; sin red, `xarxa`', async () => {
+    sessio.token = null
+    const f = respon(200, { ok: true })
+    expect(await altaMembreEquip(dades)).toEqual({ ok: false, error: 'unauthorized' })
+    expect(f).not.toHaveBeenCalled()
+    sessio.token = 'jwt-prova'
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
+    expect(await altaMembreEquip(dades)).toEqual({ ok: false, error: 'xarxa' })
   })
 })

@@ -19,6 +19,7 @@
 // que da igual cuando se pregunte.
 import { esTelefonoTest, modoTestActivo, whatsappActivo } from "./gate.ts";
 import type { ClienteSupabase } from "./cliente.ts";
+import { PLANTILLES_META, textConsolaPlantilla } from "./plantillasMeta.ts";
 
 function apiVersion(): string {
   return Deno.env.get("WHATSAPP_API_VERSION") ?? "v23.0";
@@ -245,8 +246,13 @@ export async function sendText(
 // Texto legible de las plantillas para la CONSOLA (el destinatario recibe el
 // contenido real que renderiza Meta; aquí solo dejamos algo entendible en el hilo,
 // no el nombre "crudo" de la plantilla).
+// Las de oferta (`oferta_excedent`, `oferta_disponibilitat`) salen de su definición
+// (`plantillasMeta.ts`): con los valores del envío si los hay, y si no, con los `{{n}}`.
 const TEXTO_PLANTILLA: Record<string, string> = {
   hello_world: "Hello world! (plantilla de Meta, només en anglès al número de prova)",
+  ...Object.fromEntries(
+    Object.keys(PLANTILLES_META).map((nom) => [nom, textConsolaPlantilla(nom) ?? `[plantilla: ${nom}]`]),
+  ),
 };
 
 export async function sendTemplate(
@@ -261,7 +267,8 @@ export async function sendTemplate(
     type: "template",
     template: { name: nombre, language: { code: idioma }, components },
   });
-  const bodyConsola = TEXTO_PLANTILLA[nombre] ?? `[plantilla: ${nombre}]`;
+  const bodyConsola = textConsolaPlantilla(nombre, components) ?? TEXTO_PLANTILLA[nombre] ??
+    `[plantilla: ${nombre}]`;
   if (r.ok) await registrarSaliente(supabase, to, "template", bodyConsola, r.waMessageId, r.data);
   else if (!r.desactivado) await registrarFallo(supabase, to, "template", bodyConsola, r);
   return r;

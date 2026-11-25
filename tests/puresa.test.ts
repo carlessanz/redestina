@@ -48,6 +48,9 @@ const HOJA = [
   // Fase 6a del plan DIC 26 (25-11-2026): el alta multiproducto (`productes[]`, el máximo y las
   // claves de cada producto), la misma en `crear-oferta` y en el formulario del panel.
   'disponibilitat',
+  // 25-11-2026: las plantillas de Meta de la oferta (texto que se presenta y se rellena), las
+  // mismas en el panel (`ofertaTemplate.ts`), en la consola (`whatsapp.ts`) y en el script.
+  'plantillasMeta',
 ]
 
 /** El código sin comentarios: «sin red ni Deno.» en un comentario no es un uso. */

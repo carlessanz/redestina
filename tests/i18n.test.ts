@@ -166,8 +166,8 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
     // Desde el 25-11-2026 (proceso 0.1) solo dos; el `tecnic` de la historia va por `eq.rol_retirat_`.
     { que: 'usuario_roles.rol', prefijo: 'eq.rol_', valores: ['super_admin', 'admin'] },
     { que: 'equip_rols_hist (roles retirados, clauRol)', prefijo: 'eq.rol_retirat_', valores: ['tecnic'] },
-    { que: 'RPC del equip codi', prefijo: 'eq.e_', valores: ['rol_invalid', 'no_et_pots_canviar', 'usuari_inexistent', 'no_es_de_lequip', 'ultim_super_admin', 'no_et_pots_tocar', 'cal_desti', 'desti_igual', 'desti_no_equip', 'telefon_invalid', 'nom_massa_llarg', 'compte_equip', 'te_membresies', 'error'] },
-    { que: 'equip_rols_hist.accio', prefijo: 'eq.h_', valores: ['rol', 'activa', 'desactiva', 'edita', 'esborra', 'traspas'] },
+    { que: 'RPC del equip codi', prefijo: 'eq.e_', valores: ['rol_invalid', 'no_et_pots_canviar', 'usuari_inexistent', 'no_es_de_lequip', 'ultim_super_admin', 'no_et_pots_tocar', 'cal_desti', 'desti_igual', 'desti_no_equip', 'telefon_invalid', 'nom_massa_llarg', 'compte_equip', 'te_membresies', 'error', 'compte_existent', 'compte_inexistent', 'correu_invalid', 'nom_buit', 'correu_fallit'] },
+    { que: 'equip_rols_hist.accio', prefijo: 'eq.h_', valores: ['alta', 'rol','activa', 'desactiva', 'edita', 'esborra', 'traspas'] },
     { que: 'equip_auditoria().accio (mou_accions)', prefijo: 'eq.h_', valores: ['mou_accions'] },
     { que: 'equip_traspassos.motiu', prefijo: 'eq.motiu_', valores: ['traspas', 'desactiva', 'esborra'] },
     { que: 'GRUPS_ACCIO (lib/equip)', prefijo: 'eq.g_', valores: ['albarans', 'canalitzacions', 'certificats', 'consentiments', 'convenis', 'costos', 'diagnostic', 'documents', 'enllacos', 'espigolades', 'ofertes', 'signatures', 'prevencio', 'configuracio', 'fitxes', 'accessos', 'notes', 'altres'] },

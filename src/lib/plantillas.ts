@@ -28,12 +28,20 @@ const PLANTILLES: Record<'productor' | 'entitat' | 'fallback', PlantillaRef> = {
 
 // Plantilla de oferta a entidades, usada para enviar la oferta FUERA de la ventana
 // de 24 h (única vía de Meta para iniciar sin que el receptor haya escrito).
-// Contenido y mapeo de las 7 variables en
-// supabase/functions/_shared/plantillas-meta.md (§1). Requiere aprobación en Meta
-// + número de producción; hasta entonces el flag queda false y la app no la envía
-// (evita el error 132001 "plantilla no existe" en el número de test).
+// Texto y variables en supabase/functions/_shared/plantillasMeta.ts (explicado en
+// plantillas-meta.md §1; revisada el 25-11-2026: modalidad, precio y botones). Requiere
+// aprobación en Meta + número de producción; hasta entonces el flag queda false y la app
+// no la envía (evita el error 132001 "plantilla no existe" en el número de test).
+// ⚠️ Este módulo no importa nada (lo compila `tests/plantillas.test.ts` suelto): los
+//    nombres se repiten aquí y el test comprueba que coinciden con plantillasMeta.ts.
 export const PLANTILLA_OFERTA_APROVADA = false
 export const PLANTILLA_OFERTA: PlantillaRef = { name: 'oferta_excedent', language: 'ca' }
+
+// Plantilla de una DISPONIBILIDAD multiproducto (plantillas-meta.md §1bis, 25-11-2026): un
+// mensaje con la lista de productos y un botón al Mercat. Con el flag a true y la ventana
+// cerrada, `EnviamentDisponibilitat` la manda a quien tiene opt-in antes de caer al correo.
+export const PLANTILLA_DISPONIBILITAT_APROVADA = false
+export const PLANTILLA_DISPONIBILITAT: PlantillaRef = { name: 'oferta_disponibilitat', language: 'ca' }
 
 /** Devuelve la plantilla de primer contacto según el rol del destinatario. */
 export function plantillaPrimerContacte(rol: RolContacte): PlantillaRef {

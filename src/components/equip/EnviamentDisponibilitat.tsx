@@ -5,9 +5,12 @@
 // alguna oferta del grupo, y `ofertes_encaixen` dice en cuáles (se enseñan en su fila). El canal
 // lo decide el servidor (§8bis) y los interruptores (§8) dejan gris lo que no puede salir.
 //
-// 🔴 El mensaje del grupo es TEXTO: no hay plantilla de Meta para él (checkpoint de negocio), así
-//    que WhatsApp solo sale con la ventana de 24 h abierta; si `whatsapp-send` contesta
-//    `window_closed`, se manda por correo (`correuDisponibilitat`, con el botón al Mercat).
+// 🔴 El mensaje del grupo es TEXTO, así que WhatsApp solo sale con la ventana de 24 h abierta; si
+//    `whatsapp-send` contesta `window_closed`, se manda por correo (`correuDisponibilitat`, con el
+//    botón al Mercat). La plantilla de Meta `oferta_disponibilitat` (plantillas-meta.md §1bis) está
+//    LISTA pero APAGADA (`PLANTILLA_DISPONIBILITAT_APROVADA = false`, checkpoint 2): con el flag
+//    encendido, la ventana cerrada y opt-in, sale la plantilla antes que el correo. Con el flag
+//    apagado no cambia nada.
 //
 // Queda constancia por oferta, como en el envío de una sola: una fila `pendent` de
 // `oferta_respuestas` por cada oferta del mensaje. Por WhatsApp nace con `dialeg_pas = 'fet'`: el
@@ -25,7 +28,11 @@ import { registrarEnviamentManual } from '../../lib/canalitzacio'
 import { textError } from '../../lib/textError'
 import { algunCanal, motiuCanal, motiuTallServidor } from '../../lib/canals'
 import { useCanals } from '../../hooks/useAppContext'
-import { canalsGrup, esOberta, missatgeEntitat, type OfertaGrup } from '../../lib/disponibilitat'
+import {
+  canalsGrup, componentsPlantillaGrup, esOberta, missatgeEntitat, plantillaDirectaGrup, potPlantillaGrup,
+  type OfertaGrup,
+} from '../../lib/disponibilitat'
+import { PLANTILLA_DISPONIBILITAT, PLANTILLA_DISPONIBILITAT_APROVADA } from '../../lib/plantillas'
 import { PAS_RANKING } from '../../lib/rankingEntitats'
 import type { DadesDisponibilitat } from '../../hooks/useDisponibilitat'
 import BotoAmbMotiu from '../proces/BotoAmbMotiu'
@@ -113,21 +120,38 @@ export default function EnviamentDisponibilitat({ grup, onEnviat }: {
     if (!pla.primer) { toast.error(t('od.no_channel', { name: ent.nombre })); return }
 
     if (pla.primer === 'whatsapp' && ent.telefono) {
-      const r = await sendWhatsApp({ to: ent.telefono, type: 'text', body: m.text })
+      const telefon = ent.telefono
+      // La plantilla (fuera de la ventana): solo con el flag encendido y opt-in; si no, no se
+      // llama nunca y todo sigue como siempre.
+      const perPlantilla = () => sendWhatsApp({
+        to: telefon, type: 'template', template: PLANTILLA_DISPONIBILITAT.name,
+        language: PLANTILLA_DISPONIBILITAT.language, components: componentsPlantillaGrup(m.files, grup.ctx),
+      })
+      let ambPlantilla = plantillaDirectaGrup(ent, PLANTILLA_DISPONIBILITAT_APROVADA)
+      let r = ambPlantilla ? await perPlantilla() : await sendWhatsApp({ to: telefon, type: 'text', body: m.text })
+      let code = (r.data as { code?: string } | null)?.code
+      if (!r.ok && !ambPlantilla && code === 'window_closed' && potPlantillaGrup(ent, PLANTILLA_DISPONIBILITAT_APROVADA)) {
+        ambPlantilla = true
+        r = await perPlantilla()
+        code = (r.data as { code?: string } | null)?.code
+      }
       if (r.ok) {
+        // Igual que el texto: una fila por oferta, `dialeg_pas = 'fet'` (se responde por el enlace).
         if (await registra(ent, m.files, 'whatsapp')) {
           if (r.simulat) toast.info(t('od.wa_simulat'))
-          else toast.success(t('mp.enviat_wa', { name: ent.nombre }))
+          else toast.success(ambPlantilla ? t('mp.enviat_plantilla', { name: ent.nombre }) : t('mp.enviat_wa', { name: ent.nombre }))
         }
         return
       }
-      const code = (r.data as { code?: string } | null)?.code
-      if (code === 'window_closed' && pla.alternativa) {
+      // Sin ventana (o la plantilla sin opt-in): al correo si lo hay.
+      const tancada = code === 'window_closed' || (ambPlantilla && code === 'no_opt_in')
+      if (tancada && pla.alternativa) {
         toast.info(t('mp.finestra_tancada', { name: ent.nombre }))
       } else {
         const tall = motiuTallServidor(code)
         if (tall) toast.error(t(tall))
         else if (code === 'window_closed') toast.error(t('mp.finestra_sense_correu', { name: ent.nombre }))
+        else if (code === 'no_opt_in') toast.error(t('od.no_optin_toast', { name: ent.nombre }))
         else if (code === 'opt_out') toast.error(t('od.optout_toast', { name: ent.nombre }))
         else if (code === 'no_test_user') toast.error(t('od.not_test_toast', { name: ent.nombre }))
         else if (code === 'no_test_recipient') toast.error(t('od.no_test_meta', { name: ent.nombre }))

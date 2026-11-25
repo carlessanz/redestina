@@ -185,7 +185,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   const { grup } = useDisponibilitat(exc.disponibilitat_id, `${exc.estado}|${exc.texto_oferta ?? ''}`)
   // Fase 6b: el diálogo de asignación conjunta del grupo (nivel 1).
   const [assignaGrup, setAssignaGrup] = useState(false)
-  // Productor y municipi para las variables de la plantilla oferta_excedent.
+  // Productor (para la cabecera de la ficha) y municipi (variable de la plantilla oferta_excedent).
   const [datosOferta, setDatosOferta] = useState<{ productor: string | null; municipi: string | null }>(
     { productor: null, municipi: null },
   )
@@ -548,11 +548,15 @@ export default function OfferDetail({ excedente, onBack }: Props) {
       { phone: ent.telefono, name: ent.nombre },
       { onConflict: 'phone', ignoreDuplicates: true },
     )
+    // La plantilla revisada (plantillas-meta.md §1): sin el nombre del productor (D3), con la
+    // modalidad, el precio y los botones «M'interessa» / «Ara no» (`accept:si|no`).
     const components = construirComponentsOferta({
       producto: exc.producto, variedad: exc.variedad,
-      productor: datosOferta.productor, municipi: datosOferta.municipi,
-      kg: exc.kg_total, caixes: exc.num_caixes,
-      disponible: exc.disponible_hasta, horari: exc.horari_recollida,
+      municipi: datosOferta.municipi, comarca: exc.comarca,
+      kg: exc.kg_total, caixes: exc.num_caixes, format: exc.format_entrega,
+      disponible: exc.disponible_hasta, dies: exc.dies_recollida, horari: exc.horari_recollida,
+      modalitats: exc.modalitats && exc.modalitats.length > 0 ? exc.modalitats : exc.modalitat,
+      preuMinim: exc.preu_minim,
     })
     const r = await sendWhatsApp({
       to: ent.telefono, type: 'template',

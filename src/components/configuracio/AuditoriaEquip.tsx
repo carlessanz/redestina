@@ -1,5 +1,5 @@
 // Auditoría del equipo (09-11-2026, 20270516100000, solo super_admin): todo lo que se ha hecho con
-// las cuentas del equipo —cambios de rol, activar/desactivar, editar, borrar y cada traspaso de
+// las cuentas del equipo —el alta (deuda 169), cambios de rol, activar/desactivar, editar, borrar y cada traspaso de
 // acciones—, con la fecha, quién lo hizo y a quién, con nombre y correo.
 //
 // Lo que pidió Carles: traspasar es solo para que otra persona pueda seguir lo pendiente; la
@@ -57,6 +57,8 @@ export default function AuditoriaEquip({ refresc }: { refresc: number }) {
       })
     }
     if (a.accio === 'esborra') return t('eq.h_esborra', { per, email, rol: nomRol(a.rol_abans) })
+    // El alta (deuda 169) dice con qué rol entra la cuenta.
+    if (a.accio === 'alta') return t('eq.h_alta', { per, email, rol: nomRol(a.rol_despres) })
     return t(`eq.h_${a.accio}`, { per, email })
   }
 

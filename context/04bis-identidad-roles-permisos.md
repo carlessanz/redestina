@@ -1006,3 +1006,14 @@ equivalencias, `fixar_preu_manual`, `fixar_origen_cost_producte`, `crear_product
 `fixar_font_preus` (super_admin). Propuesta: Gencat (el mes o su último) → Mercabarna (último día, mes cerrado) → manual;
 `font_mes`: su mes; alta, solo Mercabarna: precio del día. **D2**: `preus_canalitzacions_mes` (equipo); nadie escribe
 `preu_*` ni el coste de una conciliada o certificada (`42501`, `canalizaciones_protegeix_preu`).
+
+## Alta del equipo (25-11-2026, deuda 169, `20270621100000_alta_equip.sql`)
+
+`alta_membre_equip(p_user uuid, p_rol text, p_autor uuid) returns jsonb {user_id, email, rol}` — **interna**, sin
+EXECUTE para `public`, `anon` ni `authenticated` (el arnés la deniega a las nueve cuentas, también al super_admin); la
+llama la Edge Function `alta-equip` con la service key (`context/09`). Comprueba en orden: sesión → `42501`; `p_autor`
+super_admin activo → si no `42501`; `22023 rol_invalid`; candado `pg_advisory_xact_lock(hashtext('equip_rols'))` (el de
+`canviar_rol_equip`); `compte_inexistent`; `compte_equip`; `te_membresies` (mismo código que el trigger
+`usuario_roles_no_membre`). Inserta `usuario_roles` (`otorgado_por = p_autor`) y `equip_rols_hist` (`accio='alta'`,
+`rol_abans` null, `rol_despres`, `per`/`per_email` del autor). `equip_rols_hist.accio` admite `alta` desde esta migración;
+`equip_auditoria()` la devuelve tal cual y la interfaz la pinta con `eq.h_alta`.

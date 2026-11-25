@@ -889,3 +889,21 @@ snapshot, nunca la firma de hoy, y solo descarga rutas que empiezan por `equip/`
 estampar la firma de la apoderada). En `albara1p`, con `signant_equip` el pie es la caja «Per Espigoladors» /
 «Por Espigoladors» (firma, nombre, identidad de la Fundació; el rol no se imprime); sin él, el pie de siempre.
 La firma de la apoderada solo la estampa el Superadmin (`context/04bis`). Deuda 205: PNG huérfano al borrar la cuenta.
+
+## Alta de cuentas del equipo desde la app (`alta-equip`, 25-11-2026, deuda 169)
+
+- **Quién**: solo el super_admin, **siempre** (también con `roles_activos` apagado; patrón de `cortina-config`). El
+  Dinamitzador y los externos reciben 403; sin sesión, 401.
+- **Contrato**: `POST /functions/v1/alta-equip` `{ email, nombre, telefon?, rol: 'super_admin'|'admin', idioma?: 'ca'|'es' }`
+  → 200 `{ ok, user_id, email, rol, simulat }`. Errores `{ error, code }`: 400 `correu_invalid` · `nom_buit` ·
+  `nom_massa_llarg` · `rol_invalid` · `idioma_invalid` · `telefon_invalid`; 409 `compte_equip` (ya del equipo) ·
+  `compte_existent` (el correo es de otra cuenta: **no se convierte en equipo**, decisión de Carles) · `te_membresies`;
+  502 `correu_fallit`; 500 `error_intern`.
+- **Orden**: `createUser({email_confirm:true})` con contraseña aleatoria que no se guarda → `perfiles` (trigger + nombre,
+  `telefono` E.164 sin `+`, `idioma`) → `alta_membre_equip(p_user, p_rol, p_autor)` (solo `service_role`; apunte `alta`
+  en `equip_rols_hist`) → `generateLink({type:'recovery'})` → correo con `plantillaEmail()` y `transaccional: true`
+  (un acceso no es una notificación: sale con el modo test y los interruptores apagados, como `enviar-acceso`).
+- **Compensación**: si falla la RPC o el correo, quita el rol y el apunte **antes** de `deleteUser` (si no, el trigger
+  `equip_arxiva_persona` archivaría como ex-miembro a quien nunca lo fue) y borra su fila de `equip_persones_arxiu`.
+- Logs con `enmascararEmail`, nunca el enlace. Interfaz: Configuració › Equip › «Afegeix una persona»
+  (`DialegAltaMembre`, `altaMembreEquip()` de `src/lib/equip.ts`, que no lanza).

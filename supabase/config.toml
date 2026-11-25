@@ -231,6 +231,14 @@ verify_jwt = true
 import_map = "./functions/donar-acces/deno.json"
 entrypoint = "./functions/donar-acces/index.ts"
 
+# Alta de una cuenta del EQUIPO (deuda 169): cuenta + `alta_membre_equip()` + correo para crear la
+# contraseña. Con JWT y, dentro, solo el super_admin (siempre, también con `roles_activos` apagado).
+[functions.alta-equip]
+enabled = true
+verify_jwt = true
+import_map = "./functions/alta-equip/deno.json"
+entrypoint = "./functions/alta-equip/index.ts"
+
 # Sistema documental (§4). Genera el PDF de un documento ya emitido y lo sube al bucket
 # privado. No verifica JWT porque la llaman el trigger de encolado y el job de reintento
 # por pg_net, que no tienen sesión; se protege con el secreto compartido

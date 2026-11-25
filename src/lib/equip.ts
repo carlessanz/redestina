@@ -2,17 +2,21 @@
 // («Superadmin») y `admin` («Dinamitzador»)—, que NO son los usuarios de las organizaciones.
 // El `tecnic` se retiró el 25-11-2026 (proceso 0.1): la base lo pasó a `admin` y ya no lo admite,
 // pero la historia (`equip_rols_hist`, la auditoría) lo conserva, y por eso existe `RolHistoric`. Vocabulario y cálculos de la pantalla
-// «Configuració › Equip», sin React ni Supabase (prueba en `tests/equip.test.ts`).
+// «Configuració › Equip», sin React (prueba en `tests/equip.test.ts`). Todo es puro salvo
+// `altaMembreEquip`, el cliente de la Edge Function `alta-equip` (deuda 169), que nunca lanza.
 //
-// Las escribe `canviar_rol_equip()` (`20270513100000`) y, desde `20270514100000`, editar, activar,
+// El alta la hace `alta-equip` (Admin API + `alta_membre_equip()`, `20270621100000`, apunte 'alta');
+// los cambios, `canviar_rol_equip()` (`20270513100000`) y, desde `20270514100000`, editar, activar,
 // desactivar, borrar y traspasar acciones (`*_membre_equip`, `traspassar_accions_equip`); las lee
 // `equip_membres()`. Todas son solo del super_admin. Quién puede qué (reglas de la base, que esta
 // pantalla solo anticipa para no ofrecer botones que acabarían en error):
 //   · no puedes cambiarte el rol, ni activarte, desactivarte o borrarte a ti mismo;
 //   · el equipo nunca se queda sin un super_admin activo;
 //   · borrar a quien ha hecho cosas EXIGE decir a quién pasan (`cal_desti`);
-//   · una cuenta del equipo no tiene organizaciones (ni, por tanto, ofertas);
-//   · aquí no se dan de alta cuentas ni se convierte una externa en equipo.
+//   · una cuenta del equipo no tiene organizaciones (ni, por tanto, ofertas), y por eso el alta
+//     no convierte en equipo el correo de una cuenta de organización (`compte_existent`).
+
+import { supabase, supabaseUrl } from './supabase'
 
 /** El CHECK de `usuario_roles.rol`, del que más permisos tiene al que menos. */
 export const ROLS_EQUIP = ['super_admin', 'admin'] as const
@@ -50,7 +54,7 @@ export interface MembreEquip {
 }
 
 /** Qué se hizo en una fila de `equip_rols_hist` (el CHECK de `accio`). */
-export const ACCIONS_HIST = ['rol', 'activa', 'desactiva', 'edita', 'esborra', 'traspas'] as const
+export const ACCIONS_HIST = ['alta', 'rol', 'activa', 'desactiva', 'edita', 'esborra', 'traspas'] as const
 export type AccioHist = (typeof ACCIONS_HIST)[number]
 
 /** Una fila de `equip_rols_hist`. */
@@ -66,7 +70,7 @@ export interface CanviRol {
 }
 
 /** Lo que puede aparecer en `equip_auditoria()`: lo de `equip_rols_hist` más cada traspaso (`mou_accions`). */
-export const ACCIONS_AUDITORIA = ['rol', 'activa', 'desactiva', 'edita', 'esborra', 'mou_accions'] as const
+export const ACCIONS_AUDITORIA = ['alta', 'rol', 'activa', 'desactiva', 'edita', 'esborra', 'mou_accions'] as const
 export type AccioAuditoria = (typeof ACCIONS_AUDITORIA)[number]
 
 /**
@@ -266,12 +270,19 @@ export function esBaixada(abans: RolEquip, despres: RolAAssignar): boolean {
   return ORDRE[despres] > (ORDRE[abans] ?? 9)
 }
 
-/** Los códigos que levanta `canviar_rol_equip()` y que la pantalla sabe explicar. */
-const CODIS = new Set([
+/**
+ * Los códigos que levantan las RPC del equipo y `alta-equip`, y que la pantalla sabe explicar.
+ * Se buscan por `includes` en orden: ningún código es parte de otro (`compte_existent` no está
+ * dentro de `compte_inexistent`; lo comprueba el test).
+ */
+export const CODIS_EQUIP = [
   'rol_invalid', 'no_et_pots_canviar', 'usuari_inexistent', 'no_es_de_lequip', 'ultim_super_admin',
   'no_et_pots_tocar', 'cal_desti', 'desti_igual', 'desti_no_equip', 'telefon_invalid', 'nom_massa_llarg',
   'compte_equip', 'te_membresies',
-])
+  // Alta (`alta-equip`, deuda 169).
+  'compte_existent', 'compte_inexistent', 'correu_invalid', 'nom_buit', 'correu_fallit',
+] as const
+const CODIS = new Set<string>(CODIS_EQUIP)
 
 /** Clave i18n de un error de las RPC del equip: `eq.e_<codi>` o `eq.e_error`. */
 export function clauErrorEquip(missatge: string | null | undefined): string {
@@ -286,4 +297,131 @@ export function clauErrorEquip(missatge: string | null | undefined): string {
  */
 export function rolEquipDe(rol: string | null | undefined): RolEquip | null {
   return (ROLS_EQUIP as readonly string[]).includes(rol ?? '') ? (rol as RolEquip) : null
+}
+
+// ── Alta de una cuenta del equipo (deuda 169) ─────────────────────────────────────────────────
+
+/** Los idiomas de la cuenta (`perfiles.idioma`): deciden el del correo de acceso. */
+export const IDIOMES_EQUIP = ['ca', 'es'] as const
+export type IdiomaEquip = (typeof IDIOMES_EQUIP)[number]
+
+/** Lo que pide el formulario de alta. */
+export interface DadesAltaMembre {
+  email: string
+  nom: string
+  telefon: string
+  rol: RolEquip
+  idioma: IdiomaEquip
+}
+
+/** El campo del formulario al que pertenece un error (o `null`: va arriba, sobre el formulario). */
+export type CampAlta = 'email' | 'nom' | 'telefon' | 'rol'
+
+/** Máximo del nombre (la misma regla que `editar_membre_equip`: `nom_massa_llarg`). */
+export const MAX_NOM_EQUIP = 120
+
+/** El correo como lo guarda Auth: sin espacios y en minúsculas. */
+export function normalitzaCorreu(s: string): string {
+  return s.trim().toLowerCase()
+}
+
+/** ¿Tiene forma de correo? Lo justo para no mandar basura: el servidor vuelve a validarlo. */
+export function correuValid(s: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalitzaCorreu(s))
+}
+
+/**
+ * Los errores del formulario de alta, por campo (clave i18n), antes de llamar al servidor. Vacío =
+ * se puede enviar. El teléfono es opcional y sigue `telefonValid`.
+ */
+export function validaAltaMembre(d: Pick<DadesAltaMembre, 'email' | 'nom' | 'telefon'>): Partial<Record<CampAlta, string>> {
+  const e: Partial<Record<CampAlta, string>> = {}
+  const nom = d.nom.trim()
+  if (!nom) e.nom = 'eq.e_nom_buit'
+  else if (nom.length > MAX_NOM_EQUIP) e.nom = 'eq.e_nom_massa_llarg'
+  if (!correuValid(d.email)) e.email = 'eq.e_correu_invalid'
+  if (!telefonValid(d.telefon)) e.telefon = 'eq.e_telefon_invalid'
+  return e
+}
+
+/** Dónde se enseña un código de `alta-equip`: bajo su campo, o arriba (`null`). */
+export function campErrorAlta(codi: string): CampAlta | null {
+  switch (codi) {
+    case 'correu_invalid':
+    case 'compte_equip':
+    case 'compte_existent':
+    case 'te_membresies':
+      return 'email'
+    case 'nom_buit':
+    case 'nom_massa_llarg':
+      return 'nom'
+    case 'telefon_invalid':
+      return 'telefon'
+    case 'rol_invalid':
+      return 'rol'
+    default:
+      return null
+  }
+}
+
+/**
+ * La clave i18n de un código de `alta-equip`. `compte_equip` aquí quiere decir «ya es del equipo»
+ * (en las RPC de membresías, otra cosa), y el genérico no es el de cambiar el rol: los dos tienen
+ * su clave propia del alta. Sin sesión, sin permiso o sin red, también.
+ */
+export function clauErrorAlta(codi: string): string {
+  if (codi === 'compte_equip') return 'eq.e_alta_compte_equip'
+  if (codi === 'unauthorized' || codi === 'http_401') return 'eq.e_alta_sessio'
+  if (codi === 'forbidden' || codi === 'http_403') return 'eq.e_alta_forbidden'
+  if (codi === 'xarxa') return 'eq.e_alta_xarxa'
+  const clau = clauErrorEquip(codi)
+  return clau === 'eq.e_error' ? 'eq.e_alta_error' : clau
+}
+
+/** Lo que devuelve `altaMembreEquip`: nunca lanza. */
+export type ResultatAlta =
+  | { ok: true; user_id: string; email: string; rol: RolEquip; simulat: boolean }
+  | { ok: false; error: string }
+
+/**
+ * «Afegeix una persona» (Configuració › Equip, solo super_admin): `alta-equip` crea la cuenta,
+ * le da el rol y le manda el correo para crear la contraseña. Con el JWT de la sesión, como
+ * `donarAcces` (`acces.ts`). Nunca lanza: devuelve `{ ok: false, error: <codi> }` con el código
+ * del servidor (`compte_existent`, `correu_fallit`…), `http_<status>` si no lo trae, o `xarxa`.
+ */
+export async function altaMembreEquip(d: DadesAltaMembre): Promise<ResultatAlta> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return { ok: false, error: 'unauthorized' }
+    const telefon = normalitzaTelefon(d.telefon)
+    const res = await fetch(`${supabaseUrl}/functions/v1/alta-equip`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        email: normalitzaCorreu(d.email),
+        nombre: d.nom.trim(),
+        ...(telefon ? { telefon } : {}),
+        rol: d.rol,
+        idioma: d.idioma,
+      }),
+    })
+    const cos = (await res.json().catch(() => null)) as
+      { ok?: boolean; error?: string; code?: string; user_id?: string; email?: string; rol?: RolEquip; simulat?: boolean } | null
+    if (!res.ok || !cos?.ok) {
+      if (res.status === 401) return { ok: false, error: 'unauthorized' }
+      return { ok: false, error: cos?.error ?? cos?.code ?? `http_${res.status}` }
+    }
+    return {
+      ok: true,
+      user_id: cos.user_id ?? '',
+      email: cos.email ?? normalitzaCorreu(d.email),
+      rol: cos.rol ?? d.rol,
+      simulat: cos.simulat === true,
+    }
+  } catch {
+    return { ok: false, error: 'xarxa' }
+  }
 }

@@ -2,12 +2,15 @@
 // —`super_admin` («Superadmin») y `admin` («Dinamitzador»); el `tecnic` se retiró el 25-11-2026—,
 // aparte de los usuarios de las organizaciones, y el cambio de rol. Antes subir a alguien a super_admin era SQL a mano con la service key.
 //
+// Alta (deuda 169): «Afegeix una persona» abre `DialegAltaMembre`, que crea la cuenta por la Edge
+// Function `alta-equip` y le manda el correo para crear la contraseña.
+//
 // Por cuenta: cambiar el rol, editar nombre y teléfono, activar/desactivar y borrar (20270514100000).
 // Desactivar y borrar preguntan antes qué se hace con lo que esa cuenta ha hecho (`DialegTraspasMembre`).
 //
 // Lo que impone la base y esta pantalla solo anticipa para no ofrecer un botón que acabaría en
-// error: nada de esto se hace sobre uno mismo, el equipo nunca se queda sin un super_admin activo,
-// y aquí no se dan de alta cuentas (nota al pie). Cada cambio queda en la auditoría del equipo
+// error: nada de esto se hace sobre uno mismo y el equipo nunca se queda sin un super_admin activo.
+// Cada cambio (también el alta) queda en la auditoría del equipo
 // (`AuditoriaEquip`, debajo), que conserva nombres y correos aunque la cuenta se borre.
 //
 // Dos pestañas (09-11-2026): «Actius» por defecto y «Desactivats» aparte, para que las cuentas que
@@ -15,7 +18,7 @@
 // los destinos del traspaso) se calculan siempre sobre TODAS las cuentas, no sobre la pestaña.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Pencil, Power, PowerOff, Trash2 } from 'lucide-react'
+import { Pencil, Power, PowerOff, Trash2, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
@@ -30,10 +33,12 @@ import { useConfirma } from '../DialegConfirma'
 import Desplegable from '../Desplegable'
 import CarregantSeccio from '../CarregantSeccio'
 import BotoIcona from '../BotoIcona'
+import DialegAltaMembre from './DialegAltaMembre'
 import DialegEditaMembre from './DialegEditaMembre'
 import DialegTraspasMembre, { type ModeMembre } from './DialegTraspasMembre'
 import AuditoriaEquip from './AuditoriaEquip'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
@@ -138,6 +143,7 @@ export default function SeccioEquip() {
   const [edita, setEdita] = useState<MembreEquip | null>(null)
   const [traspas, setTraspas] = useState<{ m: MembreEquip; mode: ModeMembre } | null>(null)
   const [pestanya, setPestanya] = useState<'actius' | 'inactius'>('actius')
+  const [alta, setAlta] = useState(false)
 
   const carrega = useCallback(async () => {
     const m = await supabase.rpc('equip_membres')
@@ -214,9 +220,18 @@ export default function SeccioEquip() {
   return (
     <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2" data-testid="seccio-equip">
       <Card>
-        <CardHeader>
-          <CardTitle>{t('eq.title')}</CardTitle>
-          <p className="text-sm text-muted-foreground">{t('eq.subtitle')}</p>
+        <CardHeader className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 basis-60 space-y-1.5">
+            <CardTitle>{t('eq.title')}</CardTitle>
+            <p className="text-sm text-muted-foreground">{t('eq.subtitle')}</p>
+          </div>
+          <Button
+            className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
+            disabled={ocupat} onClick={() => { setPestanya('actius'); setAlta(true) }} data-testid="eq-alta"
+          >
+            <UserPlus aria-hidden />
+            {t('eq.alta_obre')}
+          </Button>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2 rounded-md border border-border bg-muted/40 p-3 text-sm">
@@ -254,11 +269,16 @@ export default function SeccioEquip() {
               </TabsContent>
             </Tabs>
           )}
-          <p className="text-xs text-muted-foreground">{t('eq.nota_alta')}</p>
         </CardContent>
       </Card>
 
       <AuditoriaEquip refresc={refresc} />
+      <DialegAltaMembre
+        obert={alta}
+        onTanca={() => setAlta(false)}
+        onFet={() => { setAlta(false); void carrega() }}
+        onRecarrega={() => void carrega()}
+      />
       <DialegEditaMembre
         membre={edita}
         onTanca={() => setEdita(null)}

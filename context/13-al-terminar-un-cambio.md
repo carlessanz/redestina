@@ -435,3 +435,7 @@
   de `disponibilitats` y `sollicituds_recollida`, vacías en producción). Antes: 1 cuenta `tecnic` (pasa a `admin`) y 3
   jornadas de espigolada abiertas de fichas `es_test` (queda 1 heredada, con canalización). CORS al dominio en 13
   funciones, `firma-equip` 401 sin sesión, Vercel `success`, cortina encendida (401).
+- **25-11-2026 · alta del equipo (deuda 169, `20270621100000` + `alta-equip`) y plantillas de Meta apagadas**: clon
+  **2.668/2.668 y 43 sin datos** (+7 checks: `alta_membre_equip` denegada a todas las cuentas). Vitest **2.600 (118
+  ficheros, 1 saltada)** + 65 de Deno. E2E nuevos `equip-alta` 6/6; regresión `equip`, `equip-gestio`,
+  `multiproducte-circuit` y `missatges` en verde (22/22).

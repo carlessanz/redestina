@@ -22,6 +22,8 @@ import {
   PLANTILLES_CA_APROVADES,
   PLANTILLA_OFERTA_APROVADA,
   PLANTILLA_OFERTA,
+  PLANTILLA_DISPONIBILITAT_APROVADA,
+  PLANTILLA_DISPONIBILITAT,
   type PlantillaRef,
   type RolContacte,
 } from '../src/lib/plantillas'
@@ -157,12 +159,17 @@ describe('los interruptores de producción', () => {
   // de subir el flag (dar de alta el texto legible en `TEXTO_PLANTILLA`, cambiar
   // `WHATSAPP_PHONE_ID`, vaciar `meta_test_recipients` y decidir sobre el modo test). Que
   // esta suite se pare es el recordatorio de que el flag no viaja solo.
-  it('hoy los dos flags están apagados (checkpoint §12.2 sin cerrar)', () => {
+  it('hoy los tres flags están apagados (checkpoint §12.2 sin cerrar)', () => {
     expect(PLANTILLES_CA_APROVADES).toBe(false)
     expect(PLANTILLA_OFERTA_APROVADA).toBe(false)
+    expect(PLANTILLA_DISPONIBILITAT_APROVADA).toBe(false)
   })
 
   it('la plantilla de oferta apunta a `oferta_excedent` en català', () => {
     expect(PLANTILLA_OFERTA).toEqual({ name: 'oferta_excedent', language: 'ca' })
+  })
+
+  it('la plantilla multiproducto apunta a `oferta_disponibilitat` en català', () => {
+    expect(PLANTILLA_DISPONIBILITAT).toEqual({ name: 'oferta_disponibilitat', language: 'ca' })
   })
 })

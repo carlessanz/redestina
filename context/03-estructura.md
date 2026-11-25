@@ -481,6 +481,9 @@ supabase/
     firma-equip/               GET·POST·DELETE (JWT + equipo; 25-11-2026): la firma propia de la cuenta del
                                equipo en `activos/equip/<uid>/firma-<ts>.<png|jpg>` (≤1 MB, por bytes);
                                `fixar_firma_equip()`; devuelve {ruta, url (10 min), actualitzada_at}.
+    alta-equip/                POST (JWT + super_admin siempre; 25-11-2026, deuda 169): cuenta nueva del equipo →
+                               perfil → `alta_membre_equip()` → enlace `recovery` por correo transaccional;
+                               `correu.ts` puro (validación, teléfono E.164, correo ca/es). Compensa si falla.
     pujar-document-signat/     POST multipart (JWT; 05-11-2026): el PDF/JPG/PNG firmado que vuelve
                                (CD, CR, REC, ENT, CONV); formato por bytes (`_shared/pujada.ts`),
                                `puc_signar_document` antes de leerlo, `registrar_document_signat` (§9)

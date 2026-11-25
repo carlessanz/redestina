@@ -25,6 +25,10 @@ Redestina en producción real quedan pasos de configuración y negocio.
    actualizar el secreto `WHATSAPP_PHONE_ID` con el número de producción, vaciar
    `meta_test_recipients` y (opcional) apagar el modo test. Un solo commit. Los pasos en Meta,
    con rutas de clic y textos listos para pegar, están en `docs/Guía producción WhatsApp — Redestina.md`.
+   **25-11-2026: el código ya está listo y apagado** (`context/08bis`): `oferta_excedent` revisada y `oferta_disponibilitat`
+   nueva en `_shared/plantillasMeta.ts`. Con el número y la WABA de producción: `scripts/plantillas-meta.ts crear <nombre> --enviar`
+   para las dos; al aprobarse, `PLANTILLA_OFERTA_APROVADA` y `PLANTILLA_DISPONIBILITAT_APROVADA` a `true` (`plantillas.test.ts`
+   falla a propósito para recordarlo). El dominio va fijo en la URL del botón: si cambia, hay que recrear la plantilla.
 3. **Opt-in real de las entidades**: `false` en las 111 que se importaron —hoy borradas (§6)—;
    el toggle deja la mecánica, pero recoger el consentimiento es trabajo de negocio, y habrá que
    hacerlo sobre las fichas que se reimporten.
@@ -886,7 +890,10 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      ninguna `aprovada` (pendiente o rechazada); las fichas del equipo sin cuenta no tienen membresías y
      entran—. Probado en el clon: una entidad sin `estat` sale; una con «Signat» y sin convenio sale
      pendiente; con su membresía en `pendent`, desaparece. La ayuda del campo (`ef.hi_estat`) lo dice.
-169. **No hay alta de cuentas del equipo ni cambio de correo en la interfaz** (09-11-2026). Configuració › Equip cambia el rol, edita,
+169. ~~Alta de cuentas del equipo~~ **resuelta el 25-11-2026** (`alta-equip` + `alta_membre_equip`, `20270621100000`;
+     una cuenta externa existente NO pasa a equipo: 409 `compte_existent`, decisión de Carles). **Sigue abierto el cambio
+     de correo** de una cuenta (Admin API, `scripts/crear-usuario.ts`). Texto original:
+     **No hay alta de cuentas del equipo ni cambio de correo en la interfaz** (09-11-2026). Configuració › Equip cambia el rol, edita,
      activa, desactiva y borra las cuentas que ya existen, pero crear una cuenta nueva del equipo (o cambiarle el correo) sigue siendo
      `scripts/crear-usuario.ts` (Admin API con la service key). Hacerlo desde la pantalla pide una Edge Function con
      `service_role` (cuenta + perfil + rol + enlace de acceso por `recuperar-password`) y decidir si una cuenta

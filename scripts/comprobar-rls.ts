@@ -630,6 +630,19 @@ const REINICI_COMUNS: Check[] = [
   },
 ];
 
+// Alta de cuentas del equipo (20270621100000, deuda 169): `alta_membre_equip` la llama solo la
+// Edge Function `alta-equip` con la service key. Ninguna sesión —tampoco la del super_admin, que
+// da de alta por la función— tiene EXECUTE: 42501 antes de entrar, sin escribir nada.
+const ALTA_EQUIP_COMUNS: Check[] = [
+  {
+    tabla: "alta_membre_equip",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_user: "00000000-0000-0000-0000-000000000000", p_rol: "admin", p_autor: "00000000-0000-0000-0000-000000000000" },
+    descripcion: "NO dona d'alta comptes de l'equip directament (nomes service_role, per alta-equip) (deuda 169)",
+  },
+];
+
 const IMPORTACIO_INTERNES: Check[] = [
   {
     tabla: "alta_fitxa_interna",
@@ -1462,6 +1475,7 @@ const DOCUMENTAL_EXTERN: Check[] = [
   ...NATURALESA_COMUNS,
   ...SUBCAUSES_COMUNS,
   ...REINICI_COMUNS,
+  ...ALTA_EQUIP_COMUNS,
   { tabla: "fixar_naturalesa", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "empresa" }, descripcion: "NO fixa la naturalesa d'una organitzacio que no es seva (A5)" },
   { tabla: "desactivar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO desactiva cap organització" },
   { tabla: "afegir_paper_org_equip", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_paper: "entidad" }, descripcion: "NO afegeix papers per la porta de l'equip" },
@@ -2195,6 +2209,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     ...NATURALESA_COMUNS,
     ...SUBCAUSES_COMUNS,
     ...REINICI_COMUNS,
+    ...ALTA_EQUIP_COMUNS,
     { tabla: "fixar_naturalesa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "empresa" }, descripcion: "pot fixar la naturalesa de qualsevol organitzacio (autoritza; 22023 organitzacio_inexistent) (A5)" },
     { tabla: "fixar_naturalesa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "no_existeix" }, descripcion: "una naturalesa desconeguda es 22023 (A5)" },
     { tabla: "desactivar_acces_org", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot treure l'accés a una entitat (22023 si no existeix)" },
@@ -2582,6 +2597,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     ...NATURALESA_COMUNS,
     ...SUBCAUSES_COMUNS,
     ...REINICI_COMUNS,
+    ...ALTA_EQUIP_COMUNS,
     { tabla: "fixar_naturalesa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "empresa" }, descripcion: "pot fixar la naturalesa de qualsevol organitzacio (autoritza; 22023 organitzacio_inexistent) (A5)" },
     { tabla: "fixar_naturalesa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "no_existeix" }, descripcion: "una naturalesa desconeguda es 22023 (A5)" },
     { tabla: "desactivar_acces_org", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot treure l'accés a una entitat (22023 si no existeix)" },

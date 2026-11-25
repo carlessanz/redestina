@@ -24,6 +24,7 @@ import type { Paso } from "./camposOferta.ts";
 import { TOTES, ambPreu, modalitatsDe } from "./modalitats.ts";
 import type { ClienteSupabase } from "./cliente.ts";
 import { enmascararTelefono } from "./enmascarar.ts";
+import { idDeBotoPlantilla } from "./plantillasMeta.ts";
 import { de } from "./textIntake.ts";
 import {
   ID_CANVIA_LLOC, confirmaLlocHabitual, llocHabitual, preguntaLlocHabitual, principalPrimer, titolLlocLista,
@@ -70,10 +71,22 @@ export interface MensajeEntrante {
     button_reply?: Pulsacion | null;
     list_reply?: Pulsacion | null;
   } | null;
+  /**
+   * La pulsación de una respuesta rápida de una PLANTILLA (`type: "button"`): Meta no la manda
+   * como `interactive`, sino con el `payload` que se puso al enviar y el texto del botón.
+   */
+  button?: { payload?: string | null; text?: string | null } | null;
   location?: { latitude?: number | null; longitude?: number | null } | null;
 }
 
-/** Extrae lo que ha respondido el usuario, sea texto o pulsación interactiva. */
+/**
+ * Extrae lo que ha respondido el usuario, sea texto o pulsación interactiva.
+ *
+ * Las dos formas de pulsar un botón acaban igual: `interactive.button_reply` (los botones del
+ * mensaje de dentro de la ventana) y `button` (las respuestas rápidas de una plantilla, como las
+ * de `oferta_excedent`, cuyo `payload` es `accept:si|no`, plantillas-meta.md §1). El `payload`
+ * hace de `id`, así que el diálogo de oferta (`respuestas.ts`) las trata igual.
+ */
 export function leerRespuesta(
   message: MensajeEntrante | null | undefined,
 ): { texto: string | null; id: string | null } {
@@ -81,6 +94,10 @@ export function leerRespuesta(
     const i = message.interactive ?? {};
     const r = i.button_reply ?? i.list_reply;
     return { texto: r?.title ?? null, id: r?.id ?? null };
+  }
+  if (message?.type === "button") {
+    const b = message.button ?? {};
+    return { texto: b.text ?? null, id: idDeBotoPlantilla(b.payload, b.text) };
   }
   return { texto: message?.text?.body ?? null, id: null };
 }

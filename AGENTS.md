@@ -28,19 +28,16 @@ Detalle por §: 1 `context/01-proyecto.md` · 1bis `context/01bis-vision-funcion
 
 ## 1. Proyecto
 
-**Redestina** (antes PDApp / P0MA) — plataforma de canalización de excedentes agrícolas de la
-Fundació Espigoladors, con WhatsApp Cloud API como canal. Un productor ofrece un excedente, el
-sistema lo convierte en una **oferta** con identificador propio, prioriza **entidades**
-receptoras y registra las **canalizaciones** hasta el cierre con kg reales, albaranes y
-certificados. Dos fases construidas: **1. infraestructura WhatsApp** y **2. Redestina**
-(intake, priorización, canalización, cierre, sistema documental, paneles por rol).
+**Redestina** (antes PDApp / P0MA): canalización de excedentes agrícolas de la Fundació Espigoladors (WhatsApp Cloud
+API y correo). Un excedente se convierte en **oferta** con identificador propio, se priorizan **entidades** y se
+registran las **canalizaciones** hasta el cierre con kg reales, albaranes y certificados.
 
 - Meta en **pruebas** (`WHATSAPP_ENVIO_REAL=true`): solo entrega a los ≤5 de `meta_test_recipients`
   (el resto, `131030`). Mensajería siempre individual.
 - **Documentación fuera del repo**: `docs/` (ignorado; funcionales y credenciales) y la carpeta de
   Drive `…/03-Redestina/` (se escribe solo en `3. Claude Code/`, nunca datos personales; detalle en
   `CLAUDE.md`; jerarquía de documentos en `context/01`).
-- **Planes vivos** (`3. Claude Code/`): **plan DIC 26** (`2026-11-25-plan-trabajo-dic-26.md`, fases 0-6); plan 1 CRM (1E solo en el clon).
+- **Planes** (`3. Claude Code/`): **DIC 26** publicado el 25-11 (`2026-11-25-plan-trabajo-dic-26.md`); plan 1 CRM (1E solo en el clon).
 - Vocabulario: la tabla `excedentes` es la «oferta» de los textos («AFCV» en el funcional).
 
 ## 1bis. Visión funcional (objetivo ↔ construido)
@@ -114,7 +111,7 @@ src/
   lib/ (módulos PUROS con test: procesOferta, seguentPas, filtres, missatgesOferta, i18n…; lista en `context/03`)
   types.ts · index.css
 scripts/  comprobar-rls.ts (arnés) · aplicar-migracion.ts · local/ (clon) · sql/prova-*.sql · data/ (ignorado)
-supabase/ config.toml · migrations/ · functions/ (_shared/ con pdf/ y los módulos comunes; 27 funciones, lista en `context/03`)
+supabase/ config.toml · migrations/ · functions/ (_shared/ con pdf/ y los módulos comunes; 28 funciones, lista en `context/03`)
 docs/ (ignorado por git)
 ```
 
@@ -136,9 +133,8 @@ tipo por organización; solo guarda identidad y `canal_preferido`, escrito por
 `organizaciones.naturalesa` (entitat_social·empresa) + `naturalesa_origen` (suggerida·confirmada); la sugiere un trigger
 por el NIF (`naturalesa_suggerida()`, `context/04`) y **solo la confirmada surte efecto** (P8, §8; `naturalesaEfectiva()`). Regla en tabla `modalitat_naturalesa_compat`. `productor_ubicaciones`
 (lugares; A4: `dies_setmana`, `franges` ≤4 y **un solo `es_principal`**, índice + trigger; **heredan días y franja de la
-oferta al publicarla si no los tienen**, fase 4; los días de la oferta limitan al receptor: `22023 dia_fora_dies`). **Operativa (A4, T4)**: producción y comercialización; `productores_operativa` **poda** lo que no cuelga. Fiscal: `regim_iva`, `*_fiscal` (si hay domicilio fiscal,
-convenio y certificados lo usan: `dada_fiscal()`), `contacte_facturacio_*`; `data_alta` («Data d'alta a
-l'organització», editable, trigger si falta) y `created_at` («Alta a la plataforma», solo lectura), equipo.
+oferta al publicarla si no los tienen**, fase 4; los días de la oferta limitan al receptor: `22023 dia_fora_dies`). **Operativa (A4, T4)**: producción y comercialización; `productores_operativa` **poda** lo que no cuelga. Fiscal: `regim_iva`, `*_fiscal`
+(`dada_fiscal()`), `contacte_facturacio_*`; `data_alta` (editable) ≠ `created_at` (alta en la app).
 
 **Estado de las fichas** (1A; **B1**): `estat_crm` (potencial · en_desenvolupament ·
 actiu · inactiu) **MANDA** y `activo = (estat_crm = 'actiu')` lo deriva `trg_fitxa_estat` (`update of
@@ -248,7 +244,8 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
 - 🔴 **Matriz 0.1 (DIC 26)**: configuración, equipo, whitelists, plantillas, invitar, importar y borrar → Superadmin; lo
   operativo → los dos (`pot_aprovar()` ≡ `es_intern()`). **Firma institucional = Superadmin**: `contrafirmar_convenio`
   siempre; CD/CR reales y sus rectificaciones; cerrar firmas de CONV/CD/CR. Las de albarán, los dos. **Firma propia**:
-  `firma-equip` → `fixar_firma_equip()` (servidor); el albarán congela `albaranes.signant_equip` al emitir (`context/04bis`).
+  `firma-equip` → `fixar_firma_equip()` (servidor); el albarán congela `albaranes.signant_equip` al emitir (`context/04bis`). **Alta del equipo**:
+  `alta-equip` → `alta_membre_equip()` (solo servidor; historial `alta`).
 - **`roles_activos` ENCENDIDO en producción** (fail-open; un entorno recreado nace apagado:
   `scripts/roles-activos.ts`). `hola@carlessanz.com` es `super_admin`; las otras dos, `admin`.
 - Helpers `stable security definer set search_path = public, pg_temp` con `revoke execute …
@@ -310,10 +307,8 @@ precio) → intake (recordatorio a los 10 min: `intake-recordatorios`). Un recha
 ## 6. Datos maestros
 
 Catálogos por migración (`20260721120300_seed_catalogos.sql`). Fichas, dos vías (detalle en §6.1-6.2):
-- **`scripts/import-ara-2026.ts`** (1E; núcleo `scripts/ara2026/nucli.ts`): ARA 2026 en CSV en
-  `scripts/data/2026/` (nunca en git), por cabecera, **todo inactivo** (D2; `estatCrmDeHoja`), `ref_externa = ARA26:<hoja>:<línea>`,
-  NIF inválido o repetido → sin NIF y nota, segunda pasada solo rellena huecos; fuera del clon solo
-  `--dry-run` salvo `--produccio` (el clon lleva las 721: `context/06`).
+- **`scripts/import-ara-2026.ts`** (1E): CSV de `scripts/data/2026/` (nunca en git), **todo inactivo**, `ref_externa =
+  ARA26:<hoja>:<línea>`; fuera del clon solo `--dry-run` salvo `--produccio` (detalle en `context/06`).
 - **Importador del panel** (`/equip/entitats/importa`, super_admin; §6.2, §6.4): `lib/importEntitats.ts` →
   `previsualitzar_importacio_entitats` → `importar_entitats`; nueva = **`potencial`**. 🔴 **D11: idempotente y
   ACTUALIZA** (ID Redestina → NIF → `AIRTABLE:` → hash `IMP:`; con ID o NIF nunca crea; celda vacía no toca). Nunca
@@ -421,7 +416,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270620100600`. Tabla operativa nueva → `v_ordre` del vaciado (§6).
+  Compatibles hacia atrás con el frontend publicado. Última: `20270621100000`. Tabla operativa nueva → `v_ordre` del vaciado (§6).
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -433,7 +428,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   general `notificacions_actives`, `email_activo`, `whatsapp_activo`; canal efectivo = general
   **y** canal; apagar el general apaga los dos. 🔴 **Cortan lo AUTOMÁTICO** (triggers, jobs, avisos,
   el PDF al generarse; un solo punto por canal: `sendEmail()` y `enviar()`, 503 con su código); **no**
-  lo transaccional (`enviar-acceso`, `recuperar-password`: `{transaccional:true}`) **ni lo MANUAL**:
+  lo transaccional (`enviar-acceso`, `recuperar-password`, `alta-equip`: `{transaccional:true}`) **ni lo MANUAL**:
   una lista cerrada de botones del equipo sale si quien pulsa lo acepta (`acceptaEnviament`;
   tabla en `context/08`); lo masivo, la oferta y el correo libre, no. La interfaz
   esconde o deja gris lo de un canal apagado (`motiuCanal()`). **En producción, los tres apagados.** Automático también:
@@ -466,7 +461,9 @@ un alta manda el acceso por correo (`enviar-acceso`).
 El **correo es el canal por defecto**; WhatsApp solo cuando se puede (`_shared/canal.ts`, puro):
 interruptor apagado → correo; móvil y ventana abierta → texto; móvil y opt-in → plantilla; si no,
 correo; sin ninguno, `cap`. `canal_preferido` se respeta si es viable. Lo decide el servidor
-(`priorizar-entidades` devuelve `canal`, `motiu_canal`); `enviar-acceso` acepta `canal:'auto'`.
+(`priorizar-entidades` devuelve `canal`, `motiu_canal`); `enviar-acceso` acepta `canal:'auto'`. **Plantillas de oferta**
+(simple y multiproducto, `_shared/plantillasMeta.ts`): **apagadas** hasta que Meta las apruebe (`PLANTILLA_*_APROVADA`,
+checkpoint 2; `scripts/plantillas-meta.ts`).
 
 ## 8ter. Cuando Meta rechaza
 
@@ -486,6 +483,8 @@ correo; sin ninguno, `cap`. `canal_preferido` se respeta si es viable. Lo decide
 - `donar-acces` (1D, **solo super_admin**): cuenta si falta → `concedir_acces_org` → enlace `recovery` (si falla,
   `revertir_acces_org`); correo apagado 409 salvo `manual`; modo test, solo `es_test`; deuda 152. **Crear o importar
   fichas no envía nada** (`correus-alta.e2e.ts`).
+- `alta-equip` (deuda 169, **solo super_admin**): cuenta → rol → `recovery` por correo transaccional; un correo con
+  cuenta da 409 (`compte_existent`/`compte_equip`, no se convierte); si el correo falla, lo deshace todo (`context/09`).
 - **Firma electrónica simple en todos los documentos**: el servidor compone y hashea lo firmado
   (`409 document_canviat`), nombre, cargo y DNI, trazo PNG ≤1 MB, IP y UA en `evidencias`; vías correo,
   asistida y panel. `pujar-document-signat`: formato por **bytes** (`_shared/pujada.ts`), permiso antes de leer.
@@ -542,7 +541,7 @@ altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_
 
 **Deuda abierta (110 vivas; siguiente: 220; los números no se reutilizan)**. Casi todas, decisiones con precio o a la espera (§12bis). Defectos o trabajo pendiente (qué es cada una, en `context/12`): **5** · **126** · **127** · **135** · **136** ·
 **138** · **143** · **146** · **149** · **151-156** · **157-164** (flecos de la firma) · **165-167** y **171** (importador) ·
-**169** (alta del equipo) · **170** · **172**/**179** (`drop` pendientes) · **173** · **181-189** · **191** · **192** (modelo
+**169** (cambio de correo) · **170** · **172**/**179** (`drop` pendientes) · **173** · **181-189** · **191** · **192** (modelo
 heredado y espigoladas) · **193·195-203** · **204** · **205** · **206** · **207·209-212** (operación a posteriori) · **213-218** (multiproducto) · **219** (dos pruebas SQL antiguas).
 Decisiones de negocio pendientes (en `context/12`): **69**, **131**,
 **133·134** (frenos), **137**, **141**, **148**. El resto (entradas 4–116), en §12bis.
@@ -552,10 +551,10 @@ Decisiones de negocio pendientes (en `context/12`): **69**, **131**,
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.534 de Vitest (116 ficheros, 1 saltada) + 65 de Deno.**
+   **Referencia: 2.600 de Vitest (118 ficheros, 1 saltada) + 65 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.660/2.660 y 44 sin datos (25-11); producción 2.612/2.612 y 92 (25-11-2026).** `prueba-numeracion.ts` si toca la numeración; `scripts/sql/prova-signatura-institucional.sql` si toca roles o firmas.
+   **Referencia: clon 2.668/2.668 y 43 sin datos (25-11); producción 2.612/2.612 y 92 (25-11-2026).** `prueba-numeracion.ts` si toca la numeración; `scripts/sql/prova-signatura-institucional.sql` si toca roles o firmas.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; el circuito: `circuit-tomaquet`).
 5. Publicar con `/publicar` (base → funciones → frontend).
 6. Estilos solo con tokens; un token nuevo va a `tokens.json`, `index.css` y `preview.html`.
