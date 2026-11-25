@@ -551,7 +551,7 @@ Decisiones de negocio pendientes (en `context/12`): **69**, **131**,
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.600 de Vitest (118 ficheros, 1 saltada) + 65 de Deno.**
+   **Referencia: 2.603 de Vitest (118 ficheros, 1 saltada) + 65 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
    **Referencia: clon 2.668/2.668 y 43 sin datos (25-11); producción 2.621/2.621 y 90 (25-11-2026).** `prueba-numeracion.ts` si toca la numeración; `scripts/sql/prova-signatura-institucional.sql` si toca roles o firmas.

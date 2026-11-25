@@ -58,6 +58,23 @@ describe('el destino tras entrar', () => {
     expect(destiSegur(RUTA_ENTRADA)).toBe('/')
     expect(destiSegur(null)).toBe('/')
   })
+  it('conserva el fragmento de un enlace de acceso (#access_token=…)', () => {
+    expect(destiSegur('/#access_token=a.b.c&type=recovery')).toBe('/#access_token=a.b.c&type=recovery')
+    expect(destiSegur('/restablir#x=1')).toBe('/restablir#x=1')
+  })
+  it('la página lleva el script que añade el fragmento al destino y a los enlaces de idioma', async () => {
+    const r = await gestiona(new Request(`${BASE}/`, { headers: { 'sec-fetch-mode': 'navigate' } }))
+    const html = await r.text()
+    expect(html).toContain('location.hash')
+    expect(html).toContain("input[name=desti]")
+  })
+  it('con contraseña equivocada, el fragmento sigue en el destino y no rompe los enlaces de idioma', async () => {
+    const cos = new URLSearchParams({ contrasenya: 'dolenta', desti: '/#access_token=a&type=recovery' })
+    const r = await gestiona(new Request(`${BASE}${RUTA_ENTRADA}`, { method: 'POST', body: cos }))
+    const html = await r.text()
+    expect(html).toContain('value="/#access_token=a&amp;type=recovery"')
+    expect(html).toContain('href="/?idioma=es"')
+  })
 })
 
 describe('la petición', () => {

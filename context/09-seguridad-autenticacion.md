@@ -14,7 +14,7 @@ verde con el logo y un campo de contraseña; acertarla deja una cookie **`redest
 de **7 días** (`HttpOnly; Secure; SameSite=Lax`).
 
 - **La comprueba el SERVIDOR**, con Vercel Routing Middleware (`middleware.js` en la raíz, que
-  delega en `cortina/cortina.ts`, puro y con 12 pruebas en `tests/cortina.test.ts`). Una
+  delega en `cortina/cortina.ts`, puro y con sus pruebas en `tests/cortina.test.ts`). Una
   contraseña comprobada en el navegador viajaría dentro del bundle; y así el bundle —que con
   `VITE_ACCESSOS_TEST` lleva las contraseñas de las cuentas de prueba— tampoco se sirve.
 - **La contraseña no está en git**: solo `HASH_TOKEN` = SHA-256 del token, y el token es
@@ -80,6 +80,14 @@ de **7 días** (`HttpOnly; Secure; SameSite=Lax`).
   contraseña, firma de convenio, confirmación de albarán, factura— y la página `/verificar` del
   sello **piden primero la contraseña**. Es lo que se pidió («que nadie pueda entrar»); para
   abrirlos a terceros habrá que retirar la cortina o eximir esas rutas.
+- 🔴 **El fragmento `#` del enlace sobrevive a la cortina (25-11-2026).** Los enlaces de
+  Supabase («crea/restableix la contrasenya» de `alta-equip`, `recuperar-password`,
+  `donar-acces`) llevan el token en `#access_token=…`, que el navegador **nunca manda al
+  servidor**: quien abría el enlace sin la cookie pasaba la cortina y llegaba a la app sin
+  token. Ahora el script de la página añade `location.hash` al campo oculto `desti` (y a los
+  enlaces CA/ES, cuyo `href` se compone sin `?` ni `#`), y el 303 lleva el fragmento en el
+  `Location`. En la página de error el fragmento ya viaja dentro de `desti` y no se duplica.
+  `destiSegur()` lo acepta tal cual (sigue empezando por `/`). Pruebas en `tests/cortina.test.ts`.
 - **En `npm run dev` también sale**: el plugin `cortinaDev()` de `vite.config.ts` engancha la
   misma `gestiona()` al servidor de desarrollo.
 - 🔴 **`middleware.js` es JavaScript ya empaquetado, no `.ts`, y no es estilo**: el primer

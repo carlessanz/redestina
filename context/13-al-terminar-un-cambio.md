@@ -442,3 +442,6 @@
   Publicado el mismo día (`e6116ea`; `20270621100000` + `alta-equip` y las 7 funciones que importan `_shared/whatsapp.ts`,
   `intake.ts` o `plantillasMeta.ts`): producción **2.621/2.621 y 90 sin datos** (+9 sobre 2.612); CORS al dominio en
   `alta-equip`, 401 sin sesión.
+- **25-11-2026 · la cortina conserva el fragmento `#` de los enlaces de acceso** (`cortina/cortina.ts`, solo frontend y
+  middleware): Vitest **2.603 (118 ficheros, 1 saltada)** (+3 en `tests/cortina.test.ts`) + 65 de Deno; script comprobado
+  en el navegador (destino y enlaces de idioma con el fragmento; sin duplicarlo en la página de error).

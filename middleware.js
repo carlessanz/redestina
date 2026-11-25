@@ -137,7 +137,7 @@ function senseIdioma(url) {
 }
 function paginaCortina({ desti, error, idioma = "ca" }) {
   const t = TEXTOS[idioma];
-  const enllac = (l) => `${escapa(desti.split("?")[0] || "/")}?idioma=${l}`;
+  const enllac = (l) => `${escapa(desti.split(/[?#]/)[0] || "/")}?idioma=${l}`;
   const opcio = (l, nom) => l === idioma ? `<span class="idioma actiu" aria-current="true" lang="${l}">${nom}</span>` : `<a class="idioma" href="${enllac(l)}" lang="${l}" hreflang="${l}">${nom}</a>`;
   return `<!doctype html>
 <html lang="${idioma}">
@@ -237,6 +237,17 @@ function paginaCortina({ desti, error, idioma = "ca" }) {
       i.focus();
     });
     try { localStorage.setItem('redestina-lang', '${idioma}'); } catch (e) {}
+    // El fragmento del enlace (#access_token=\u2026 de \xABcrear/restablir la contrasenya\xBB) no llega
+    // nunca al servidor: sin esto se perd\xEDa al pasar la cortina y el enlace no serv\xEDa (25-11-2026).
+    // Se a\xF1ade al destino del formulario y a los enlaces de idioma. En la p\xE1gina de error ya viene
+    // dentro del destino (location.hash est\xE1 vac\xEDo: la URL es la del formulario).
+    var d = document.querySelector('input[name=desti]');
+    var h = location.hash && location.hash.length > 1 ? location.hash
+      : (d && d.value.indexOf('#') >= 0 ? d.value.slice(d.value.indexOf('#')) : '');
+    if (h) {
+      if (d && d.value.indexOf('#') < 0) d.value += h;
+      document.querySelectorAll('a.idioma').forEach(function (a) { a.setAttribute('href', a.getAttribute('href') + h); });
+    }
   })();
 </script>
 </body>
