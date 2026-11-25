@@ -2852,3 +2852,27 @@ y el E2E lo comprueba.
 - E2E: `rols-dinamitzador.e2e.ts` (chip, contrafirma, Configuració, firma propia); ajustados `gestio-autonoma`
   (el interés de nivel 2 se registra por SQL porque el equipo ya asigna en un acto), `proposar-canvis` (c),
   `recollida`, `entitats-estat`, `equip` y `equip-gestio`.
+
+## Interaccions i seguiment (proceso 1.2, plan DIC 26, 25-11-2026)
+
+Organitzacions → «Interaccions i seguiment» (`/equip/interaccions`, `RoleGuard intern`, `nav.interaccions`, icono
+`NotebookPen`, `barra: false`). Lee las MISMAS filas de `notes_internes` (sin copia) por `interaccions_llistat()` /
+`interaccions_opcions()`; el hilo sigue en la ficha (pestaña «Gestió interna», `NotesInternes`).
+
+- Vistas (`?vista=`, la URL limpia es Pendents): **Pendents** (Data seguiment · Entitat · Tipus · Comentari = próximo paso
+  · Fet; lo vencido en `aviso`), **Historial** (Data · Entitat · Tipus · Comentari · Responsable; debajo, el próximo paso
+  con su estado y el resultado) y **Previsions de producte** (Disponibilitat · Entitat · Producte · Quantitat · Ubicació).
+  Contador por pestaña con los filtros puestos (`p_limit=1`). La fila lleva a la ficha en `?pestanya=intern`.
+- Filtros (`useFiltresLlistat('equip-interaccions')`): período, entidad (buscador sobre `v_organizaciones`), municipio o
+  zona (`p_zona`), tipo (incluye el heredado `seguiment`), responsable, producto, estado del seguimiento y disponibilidad
+  prevista. Buscador con espera, contador de peticiones y paginación de 25, como Entrades i sortides. Lógica pura:
+  `lib/interaccions.ts`. Claves `ixs.*` (`int.*` ya era «Els meus interessos»).
+- `FormulariInteraccio` (`components/fitxa/`): un solo formulario para la ficha (entidad fija) y para el diálogo «Afegir
+  interacció» (`SelectorEntitat`). Tipos: prospecció, captació, operativa, incidència, documentació, altres. Próximo paso
+  y fecha de seguimiento, los dos o ninguno. Bloque plegable «Previsió de producte»: producto, kg, fecha y lugar (de los
+  productores de la organización o texto libre). 🔴 No crea oferta y no sale por ningún canal.
+- «Fet» (ficha y Pendents) abre `DialegSeguimentFet`: resultado opcional ≤ 1.000 → `tancar_seguiment`.
+- La ficha pinta lo vencido en `error` (1.5) y la sección en `aviso`: diferencia conocida, cambiar `COLOR_SEGUIMENT` si se
+  quiere igualar.
+- Pruebas: `tests/interaccions.test.ts`, `tests/notesInternes.test.ts` (vocabulario contra `20270616100000`),
+  `tests/e2e/interaccions.e2e.ts` y `crm.e2e.ts`.

@@ -73,8 +73,7 @@ Prevenció (expediente provisional; el plan básico, retirado), espigueo, catál
 
 - Router como capa raíz con rutas públicas y privadas (§6quater). Sin librería de estado.
   `vercel.json` lleva el rewrite de SPA.
-- **Contrato de alturas**: shell `h-dvh overflow-hidden`; `main` `min-h-0 flex-1` scrollea con
-  `scrollbar-gutter: stable`; ninguna pantalla escribe `h-dvh`. Flag de ruta `fullBleed` (Mensajería).
+- **Contrato de alturas** (`context/02`): solo el shell es `h-dvh`; `main` scrollea; `fullBleed` (Mensajería).
 - 🔴 **Un solo ancho**: el del shell, `w-[96%]` + `max(0.5rem, safe-area)`; ningún `max-w` de página. **Diálogos al 80 %** (`ui/dialog`; confirmar, `max-w-lg`).
 - **Barra inferior de móvil: cuatro entradas como máximo** (`barra: false`, `labelBarraKey`).
 - **PWA sin service worker** (`selfDestroying`); `/version.json` + `useVersioNova` avisan de versión.
@@ -152,8 +151,9 @@ cambio va a `fitxa_estat_hist` (solo equipo). Nace: `crear_entitat` actiu, impor
 en_desenvolupament (`aprovar_registre` intenta actiu). Una entidad inactiva no entra en el Mercat (`modalitats_compatibles_meves()`), ni en
 `priorizar-entidades`, ni en los selectores, y `comprova_interes()` la rechaza (`entitat_inactiva`).
 **Un contacto por ficha (D3)**: `organizacion_contactos` se conserva sin uso (deuda 146). **1C**: vista
-`v_entitats_llistat` (`security_invoker`) para «Entitats». **1F + 1.5**: `notes_internes` (CRM) solo
-por RPC; lectura `es_intern()` (externo: 0 filas); la vista suma el último contacto y los seguimientos.
+`v_entitats_llistat` (`security_invoker`) para «Entitats». **1F + 1.5 + 1.2**: `notes_internes` (CRM = las
+interacciones; tipo `prospeccio`, `resultat`, previsión `previsio_*` todo o nada) solo por RPC; lectura `es_intern()`
+(externo: 0 filas); la vista suma el último contacto y los seguimientos.
 
 **Ofertas**: `excedentes` (`id_excedente` `E-AAMMDD-XXX-YYY-N`; `estado` **esborrany** (sin `E-…` ni texto
 hasta publicar; `dades_esborrany`; solo → publicada; borrar: `esborrar_esborrany_oferta`) · borrador (espigolada) · publicada ·
@@ -189,9 +189,7 @@ sin borrado salvo `reiniciar_documentos_prova()` y `reiniciar_dades_operatives()
 (firmar y confirmar sin cuenta: solo el hash; canales email·asistido·panel·whatsapp),
 `evidencias`, `parametros_documentales` (fila única, **sembrada provisional**;
 `datos_provisionales` bloquea el modo real), buckets `documentos`/`activos` sin políticas
-(descarga por Edge Function) y `fotos-ofertes` con políticas propias. Ruta
-`<org>/<ejercicio>/<CARPETA>/<numero>-v<n>.pdf`. Jobs: trigger `documentos_encola_generacion` +
-`pg_cron` `documentos-pendientes` (5 intentos, dos contadores). **Cinco columnas fuera del GRANT
+(descarga por Edge Function) y `fotos-ofertes` con políticas propias (ruta y jobs, en `context/04`). **Cinco columnas fuera del GRANT
 de SELECT**: `enlaces_token.token_hash/codigo_hash`, `evidencias.documento_identidad`,
 `parametros_documentales.apoderada_dni`, `documentos.envio` → `select('*')` da `42501`; toda
 columna nueva de `documentos` nace sin SELECT. **Firma** (`context/04`): la contraparte firma CD·CR·REC·ENT
@@ -276,6 +274,8 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   Lectura: `diagnostic_estat`, `diagnostic_datos` (la usa `diagnostic-pdf`). `fixar_lloc_principal` (A4).
 - **Entrades i sortides (6.7)**: `entrades_sortides(<9 filtros>, p_limit, p_offset)` y `…_resum(…, p_per)`, del equipo,
   solo lectura; la fila, solo en la interna `sortides_base()`; el estado, `estat_recollida_canalitzacio()` (con `operacio_detall`).
+- **Interacciones (1.2)**: `afegir_nota_interna(…, previsión)`, `tancar_seguiment(p_id, p_resultat)`; lectura del equipo
+  `interaccions_llistat(p_vista, <12 filtros>, p_limit, p_offset)` → `{total, files}` e `interaccions_opcions()`.
 - **Precios (D1)**: `preus_proposta_mes`, `noms_fonts_preus` (equipo); validar mes/periodo, `fixar_preu_referencia`
   (motivo si difiere), equivalencias, `fixar_preu_manual`, `fixar_origen_cost_producte`, `crear_producte`, `marcar_carrega_preus` (`pot_aprovar`);
   `fixar_font_preus` (super_admin). Propuesta: Gencat (el mes o su último) → Mercabarna (último día, mes cerrado) → manual; `font_mes`: su mes; alta, solo Mercabarna: precio del día. **D2**: `preus_canalitzacions_mes`
@@ -333,7 +333,7 @@ La oferta del panel se **precarga** de la Operativa (`predeterminats`).
 
 | Panel | Rutas | Qué ve |
 | --- | --- | --- |
-| Equip | `/equip/tauler · canalitzacio[/:id] · ofertes[/:id] · espigolades · aprovacions · missatgeria · albarans · entrades-sortides · productes · tancament · entitats[/nova · /importa · /:orgId] · convenis · documents · diagnostics · plans · configuracio` | Todo; badges de `pendents_equip()` |
+| Equip | `/equip/tauler · canalitzacio[/:id] · ofertes[/:id] · espigolades · aprovacions · missatgeria · albarans · entrades-sortides · productes · tancament · entitats[/nova · /importa · /:orgId] · interaccions · convenis · documents · diagnostics · plans · configuracio` | Todo; badges de `pendents_equip()` |
 | Productor | `/productor/inici · ofertes · ofertes/nova · ofertes/:id · documents` | Sus ofertas, embudo, alta (descriptor del intake) |
 | Receptor | `/receptor/mercat · interessos · historic · impacte · documents` | Ofertas compatibles (RLS con `modalitat_receptor_compat`), interés, histórico |
 | Organització | `/organitzacio · perfil-recepcio · diagnostic · pla` | Ficha propia por secciones (el equipo no la ve) |
@@ -368,7 +368,10 @@ Lo que manda hoy, en una línea cada uno:
   **declarado** (Superadmin); **Ciclo guiado** `/equip/canalitzacio/:id`. **Roles (0.1)**: aviso `AvisSignaturaInstitucional`
   donde el Dinamitzador no firma; «La meva signatura» en el menú de la cuenta (`DialegMevaSignatura`, `lib/firmaEquip.ts`).
 - Doble rol: el panel activo, por la URL (`useOrganitzacio`); el ofertante no ve el `E-…`.
-- **Ficha «Entitat» (1C)**: `lib/campsFitxa.ts` define los campos (paridad SQL); `EntitatDetall`, seis pestañas (`?pestanya=`).
+- **Ficha «Entitat» (1C)**: `lib/campsFitxa.ts` define los campos (paridad SQL); `EntitatDetall`, seis pestañas (`?pestanya=`), bloques
+  `fitxa/Seccio`, aviso de cambios sin guardar (`useCanvisPendents`; también «La meva organització»).
+- **Interaccions i seguiment** (1.2): `/equip/interaccions` lee las MISMAS filas de `notes_internes`
+  (`?vista=pendents|historial|previsions`); `FormulariInteraccio` único (ficha y sección); «Fet» pide el resultado; la previsión **no crea oferta**.
 - **Estado CRM (B1)**: «Estat i papers» (`BlocRols`, `lib/estatCrm.ts`); «Entitats» filtra (`?rol=`).
 - **Naturalesa (A5)**: `SelectorNaturalesa` (equipo; el titular, una vez); P8 en el interés asistido.
 
@@ -409,7 +412,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270615100200`. Tabla operativa nueva → `v_ordre` del vaciado (§6).
+  Compatibles hacia atrás con el frontend publicado. Última: `20270616100100`. Tabla operativa nueva → `v_ordre` del vaciado (§6).
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -430,10 +433,8 @@ un alta manda el acceso por correo (`enviar-acceso`).
 - 🔴 **Las notas internas (`notes_internes`) nunca salen por ningún canal**: ni correo, WhatsApp,
   documento, aviso ni ficha del actor; ninguna Edge Function ni plantilla las lee.
 - `WHATSAPP_ENVIO_REAL` (secreto; `"true"` exacto o simula) y `RESEND_ENVIO_REAL` (ídem).
-- **Reglas de envío** en `whatsapp-send`: `exigirEquipo` 401 → campos 400 → interruptor 503 →
-  gate `es_test` 403 `no_test_user` → `meta_test_recipients` 403 → contacto 404 → ventana 24 h
-  409 `window_closed` (texto) / opt-in 403 `no_opt_in` (plantilla); BAIXA corta todo
-  (403 `opt_out`).
+- **Reglas de envío** de `whatsapp-send` (orden de los códigos en `context/08`): equipo, interruptor, `es_test`,
+  whitelist, ventana 24 h (texto) u opt-in (plantilla); BAIXA corta todo (403 `opt_out`).
 - **Modo test** (`app_settings.test_mode`, fail-safe activado): con él solo reciben las fichas
   `es_test`; aplicado en los quince puntos de envío **y en las dos puertas de salida** (`enviar()`,
   `sendEmail()`); `esCuentaPermitida` para acceso y recuperación (pasa el equipo). Documentos
@@ -461,8 +462,7 @@ correo; sin ninguno, `cap`. `canal_preferido` se respeta si es viable. Lo decide
 
 ## 8ter. Cuando Meta rechaza
 
-`wa_messages.status='error'` (wamid `err-…`); `scripts/diagnostico-whatsapp.ts` distingue `190`
-(token caducado), `100/33` (sin acceso al `phone_id`), `131030` (fuera de los ≤5 de test), `131047`.
+`wa_messages.status='error'` (wamid `err-…`); `scripts/diagnostico-whatsapp.ts` distingue los códigos (`context/08ter`).
 
 ## 9. Seguridad (detalle en `context/09-…md`)
 
@@ -473,15 +473,12 @@ correo; sin ninguno, `cap`. `canal_preferido` se respeta si es viable. Lo decide
   recuperación por `recuperar-password` + `admin.generateLink` + Resend; `enable_signup=false` y el
   **mailer nativo apagado** (nunca `resetPasswordForEmail`, `inviteUserByEmail` ni magic links). Resend
   con `espigoladors.com`; `plantillaEmail()` (`_shared/resend.ts`) es el único maquetado.
-- `enviar-acceso`: enlace por correo, **solo el código de 6 cifras por WhatsApp** (canjeado en
-  `/login` con `verifyOtp`). `registro` público: crea cuenta + ficha + membresía **pendiente**,
-  deduplica por correo/teléfono exactos (principales deniegan `409`, secundarias → revisión),
-  anti-abuso proporcionado, no manda correo (aprobar sí). RGPD: privacidad obligatoria + dos
-  consentimientos (`consentiments`, huella del texto del servidor).
-- `donar-acces` (1D, JWT + **solo super_admin**; era `alta-assistida`): cuenta si no la hay →
-  `concedir_acces_org` → enlace `recovery` por correo; si falla, `revertir_acces_org`. Correo apagado
-  409 salvo `manual` (§8); modo test, solo `es_test`. Sin consentimientos (deuda 152). Invitar = botón con el
-  avión (`Send`); **crear o importar fichas no envía nada** (`tests/e2e/correus-alta.e2e.ts`).
+- `enviar-acceso`: enlace por correo, **solo el código de 6 cifras por WhatsApp** (`verifyOtp`). `registro`
+  público: cuenta + ficha + membresía **pendiente**, deduplicación y anti-abuso (`context/09`), sin correo (aprobar
+  sí); RGPD: privacidad + dos consentimientos (`consentiments`).
+- `donar-acces` (1D, **solo super_admin**): cuenta si falta → `concedir_acces_org` → enlace `recovery` (si falla,
+  `revertir_acces_org`); correo apagado 409 salvo `manual`; modo test, solo `es_test`; deuda 152. **Crear o importar
+  fichas no envía nada** (`correus-alta.e2e.ts`).
 - **Firma electrónica simple en todos los documentos**: el servidor compone y hashea lo firmado
   (`409 document_canviat`), nombre, cargo y DNI, trazo PNG ≤1 MB, IP y UA en `evidencias`; vías correo,
   asistida y panel. `pujar-document-signat`: formato por **bytes** (`_shared/pujada.ts`), permiso antes de leer.
@@ -498,8 +495,7 @@ Edge Functions: `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_VERIFY_TOKEN`,
 orígenes, `*` dentro de uno; **redesplegar al cambiarlo**), `RECORDATORIOS_SECRET`,
 `DOCUMENTOS_SECRET` (y en `app_config`), `RESEND_API_KEY`, `RESEND_ENVIO_REAL`, `RESEND_FROM`,
 `APP_URL`, `SB_SECRET_KEY`, `URL_PUBLICA_STORAGE`, `ANTIABUS_*` y `MAILPIT_URL` (solo clon). Auth:
-`site_url` y `uri_allow_list` por Management API (matcher de GoTrue con `/**`; el de las
-funciones sin). Scripts: `SUPABASE_URL`, `SB_SECRET_KEY`.
+`site_url` y `uri_allow_list` por Management API (`context/10`). Scripts: `SUPABASE_URL`, `SB_SECRET_KEY`.
 
 ## 10bis · 10ter. Nombres retirados
 
@@ -555,10 +551,10 @@ Decisiones de negocio pendientes (en `context/12`): **69**, **131**,
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.302 de Vitest (106 ficheros, 1 saltada) + 65 de Deno.**
+   **Referencia: 2.365 de Vitest (109 ficheros, 1 saltada) + 65 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.450/2.450 y 45 sin datos (25-11); producción 2.301/2.301 y 142 (20-11-2026).** `prueba-numeracion.ts` si toca la numeración; `scripts/sql/prova-signatura-institucional.sql` si toca roles o firmas.
+   **Referencia: clon 2.508/2.508 y 41 sin datos (25-11); producción 2.301/2.301 y 142 (20-11-2026).** `prueba-numeracion.ts` si toca la numeración; `scripts/sql/prova-signatura-institucional.sql` si toca roles o firmas.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; el circuito: `circuit-tomaquet`).
 5. Publicar con `/publicar` (base → funciones → frontend).
 6. Estilos solo con tokens; un token nuevo va a `tokens.json`, `index.css` y `preview.html`.

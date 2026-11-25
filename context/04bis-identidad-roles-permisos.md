@@ -936,3 +936,13 @@ actualitzada_at}`, equipo) y la interna `signant_equip_actual()`. `emitir_albara
 (52 casos). Arnés: el perfil `equip` es ahora `admin` (`crear-usuarios-prueba.ts`, «Dinamitzador Redestina»);
 `PREUS_DINAMITZADOR`, `ASSIGNACIO_SUPER` y `PROPOSTA_SUPER` en el `equip`; `FIRMA_EQUIP_*`; el «denegar» de
 `fijar_tipo_caja` usa tara −1 (con tara 1 escribía `TEST-ARNES` en cuanto la guarda dejaba pasar).
+
+### Interaccions i seguiment (proceso 1.2, `20270616100000`·`100100`, 25-11-2026)
+
+| RPC | Quién | Notas |
+| --- | --- | --- |
+| `afegir_nota_interna(p_org, p_canal, p_text, p_data, p_tipus, p_responsable, p_propera_accio, p_propera_data, p_previsio_producte, p_previsio_kg, p_previsio_data, p_previsio_ubicacio_id, p_previsio_ubicacio)` | `es_intern()` | drop + create; los argumentos nuevos con valor por defecto (las llamadas de 1F/1.5 siguen valiendo). `22023 previsio_incompleta`, `kg_invalid`, `producte_desconegut`, `previsio_ubicacio_massa_llarga` |
+| `tancar_seguiment(p_id, p_resultat)` | `es_intern()` | idempotente; `resultat_massa_llarg` |
+| `interaccions_llistat(…)` / `interaccions_opcions()` | `es_intern()` (externo `42501`) | solo lectura; la fila, en la interna `interaccions_base` (solo `service_role`) |
+
+Arnés: externos denegados, equipo permitido (clon 2.508/2.508 y 41 sin datos).

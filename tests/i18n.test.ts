@@ -246,7 +246,8 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
     { que: 'importació · informe CSV', prefijo: 'ie.inf_', valores: ['fila', 'nom', 'nif', 'accio', 'organitzacio', 'camps', 'canvis', 'avisos', 'errors', 'conveni'] },
     { que: 'importació · identificada_per', prefijo: 'ie.per_', valores: ['id', 'nif', 'airtable', 'ref', 'decisio'] },
     { que: 'notes_internes.canal', prefijo: 'ni.canal_', valores: ['telefon', 'whatsapp', 'email', 'visita', 'reunio', 'altres'] },
-    { que: 'notes_internes.tipus', prefijo: 'ni.tipus_', valores: ['seguiment', 'captacio', 'operativa', 'incidencia', 'documentacio', 'altres'] },
+    // Proceso 1.2 (20270616100000): `prospeccio` nueva; `seguiment` heredado, que se sigue rotulando.
+    { que: 'notes_internes.tipus', prefijo: 'ni.tipus_', valores: ['prospeccio', 'captacio', 'operativa', 'incidencia', 'documentacio', 'altres', 'seguiment'] },
     { que: 'estatSeguiment() (salvo «previst», que no se rotula)', prefijo: 'ni.seg_', valores: ['vencut', 'avui', 'fet'] },
     { que: 'seguimentDe() del listado Entitats', prefijo: 'el.seg_', valores: ['vencut', 'avui', 'pendent', 'cap'] },
     // El expediente de prevención (fase 11): los CHECK de sus tablas, compuestos en la vista.

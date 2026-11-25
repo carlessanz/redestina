@@ -209,7 +209,9 @@ export async function triaCercador(control: Locator, escriu: string, valor?: str
  * escribir `escriu` (vacío = la lista sin filtrar, hasta el máximo del componente).
  */
 export async function suggerimentsDe(control: Locator, escriu = ''): Promise<string[]> {
-  // Sin foco previo: tras un «Escape» el campo lo conserva y un clic ya no reabre la lista.
+  // Desde el 25-11-2026 un clic con el foco puesto también reabre la lista (antes, tras un
+  // «Escape» el campo conservaba el foco y el clic no hacía nada). Se sigue partiendo de un foco
+  // nuevo para que lo escrito antes no cuente como consulta.
   await control.blur()
   await control.click()
   await control.fill(escriu)

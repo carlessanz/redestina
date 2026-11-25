@@ -24,8 +24,12 @@
 // Las preferencias de recepción (modalidades, perfil del tipo) se editan en «El meu perfil
 // de recepció» (`PerfilRecepcio`): aquí solo el puntero, para que no haya dos formularios
 // del mismo dato.
+//
+// NO PERDER LO ESCRITO (Taula mestra 1.1, 25-11-2026), como la ficha del equipo: salir con cambios
+// sin guardar pregunta (`useCanvisPendents`), y «Desar» dice cuántos hay y sin ninguno queda gris.
+// Las secciones son el bloque común `fitxa/Seccio` (1.3).
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
@@ -37,8 +41,11 @@ import { errorCorreu, errorCp, errorNif, errorTelefon } from '../lib/validacio'
 import { activitatsPerPaper, carregaTipusActivitat, type TipusActivitat } from '../lib/organitzacio'
 import { carregaMunicipis } from '../lib/municipis'
 import {
-  campsDeTaula, normalitzaValor, potEditar as potEditarCamp, type Bloc, type CampFitxa, type Taula,
+  campsDeTaula, mateixValor, normalitzaValor, potEditar as potEditarCamp, type Bloc, type CampFitxa, type Taula,
 } from '../lib/campsFitxa'
+import Seccio from '../components/fitxa/Seccio'
+import DialegCanvisPendents from '../components/DialegCanvisPendents'
+import { useCanvisPendents } from '../hooks/useCanvisPendents'
 import BlocCamps from '../components/fitxa/BlocCamps'
 import CanalPreferit, { type TriaCanal } from '../components/fitxa/CanalPreferit'
 import LlocsRecollida from '../components/LlocsRecollida'
@@ -67,21 +74,6 @@ const BLOCS_ACTOR: { bloc: Bloc; titolKey: string; pestanya: Pestanya }[] = [
 ]
 const PESTANYA_DE_BLOC = new Map<Bloc, Pestanya>(BLOCS_ACTOR.map((b) => [b.bloc, b.pestanya]))
 
-/** Una sección de una pestaña, con la raya de separación salvo la primera. */
-function Seccio({ titol, ajuda, children, testid }: { titol?: string; ajuda?: string; children: ReactNode; testid?: string }) {
-  return (
-    <section className="space-y-3 border-t border-border pt-6 first:border-t-0 first:pt-0" data-testid={testid}>
-      {titol && (
-        <div>
-          <h3 className="text-base font-semibold">{titol}</h3>
-          {ajuda && <p className="mt-1 text-sm text-muted-foreground">{ajuda}</p>}
-        </div>
-      )}
-      {children}
-    </section>
-  )
-}
-
 /** Lo que se edita en «El meu perfil de recepció», no aquí. */
 const A_PERFIL_RECEPCIO = new Set(['modalitats_interes'])
 
@@ -99,6 +91,8 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
   const organitzacio = useOrganitzacio(tipus)
   const [fila, setFila] = useState<Fila | null>(null)
   const [valors, setValors] = useState<Fila>({})
+  /** Lo último leído o guardado: contra esto se cuentan los cambios sin guardar. */
+  const [inicial, setInicial] = useState<Fila>({})
   const [canal, setCanal] = useState<TriaCanal>('auto')
   const [canalDesat, setCanalDesat] = useState<TriaCanal>('auto')
   /** A5: la naturalesa vive en la organización; el titular la confirma mientras no lo esté. */
@@ -144,6 +138,7 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
     setCarregant(true)
     setFila(null)
     setValors({})
+    setInicial({})
     setErrors({})
     setCanal('auto')
     setCanalDesat('auto')
@@ -161,6 +156,7 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
         const v: Fila = {}
         for (const c of campsDeTaula(tabla, 'tots')) v[c.clau] = f[c.columnes[tabla] as string]
         setValors(v)
+        setInicial(v)
       }
       // La preferencia vive en la organización, no en la ficha (§4).
       const idOrgFitxa = (f?.organizacion_id as string | null) ?? null
@@ -200,13 +196,25 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
     return () => { viu = false }
   }, [cp, teMunicipi, potEditar])
 
+  // Cuántos cambios sin guardar hay: los campos que edita el actor y el canal.
+  const nPendents = useMemo(() => {
+    if (!potEditar) return 0
+    let n = 0
+    for (const c of camps) {
+      if (potEditarCamp(c, 'tots') && !mateixValor(normalitzaValor(c, valors[c.clau]), normalitzaValor(c, inicial[c.clau]))) n += 1
+    }
+    return n + (canal !== canalDesat ? 1 : 0)
+  }, [potEditar, camps, valors, inicial, canal, canalDesat])
+  const avis = useCanvisPendents({ n: nPendents, desa: () => desa() })
+
   function setCamp(clau: string, valor: unknown) {
     setValors((f) => ({ ...f, [clau]: valor }))
     if (errors[clau]) setErrors((e) => { const n = { ...e }; delete n[clau]; return n })
   }
 
-  async function desa() {
-    if (!organitzacio || !fila) return
+  /** Guarda la ficha. `true` si ha ido bien: lo usa «Desa i surt». */
+  async function desa(): Promise<boolean> {
+    if (!organitzacio || !fila) return false
     // Antes de llamar a nadie: lo que está mal escrito, dicho campo por campo.
     const nous: Record<string, string> = {}
     for (const c of camps) {
@@ -232,7 +240,7 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
         el?.focus({ preventScroll: true })
       }
       requestAnimationFrame(enfoca)
-      return
+      return false
     }
 
     setDesant(true)
@@ -247,7 +255,7 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
       { p_id: organitzacio.id, p_dades: dades },
     )
     // El motivo de la RPC (un valor fuera de lista) y no un «Hi ha hagut un error».
-    if (error) { setDesant(false); toast.error(textError(t, error.message)); return }
+    if (error) { setDesant(false); toast.error(textError(t, error.message)); return false }
     // Lo que devuelve la base ya trae población y área derivadas del municipio.
     if (data) {
       const f = data as Fila
@@ -255,6 +263,7 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
       const v: Fila = {}
       for (const c of campsDeTaula(tabla, 'tots')) v[c.clau] = f[c.columnes[tabla] as string]
       setValors(v)
+      setInicial(v)
     }
 
     // Dos escrituras porque son dos tablas y dos listas blancas; la del canal solo si ha
@@ -263,7 +272,7 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
       const { data: o, error: errCanal } = await supabase.rpc('actualizar_meu_canal', {
         p_tipo: tipus, p_ficha: organitzacio.id, p_canal: canal === 'auto' ? null : canal,
       })
-      if (errCanal) { setDesant(false); toast.error(textError(t, errCanal.message)); return }
+      if (errCanal) { setDesant(false); toast.error(textError(t, errCanal.message)); return false }
       const org = o as { canal_preferido: TriaCanal | null } | null
       setCanalDesat((org?.canal_preferido ?? 'auto') as TriaCanal)
     }
@@ -272,6 +281,7 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
     toast.success(t('rec.saved'))
     // La banda de «ficha incompleta» y su marca en el menú viven en AppShell.
     refrescaAvisos()
+    return true
   }
 
   if (!organitzacio) return <p className="text-sm text-muted-foreground">{t('po.no_org')}</p>
@@ -290,12 +300,23 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
           </p>
         </div>
         {potEditar && (
-          <Button onClick={() => void desa()} disabled={desant} className="min-h-11 whitespace-normal">
-            {desant ? t('c.saving') : t('c.save')}
-          </Button>
+          <>
+            {/* El número va fuera del nombre accesible («Desar»): lo dice la descripción. */}
+            <Button onClick={() => void desa()} disabled={desant || nPendents === 0} className="min-h-11 whitespace-normal"
+              data-testid="desa-fitxa" aria-describedby={nPendents > 0 ? `desa-${tipus}-n` : undefined}>
+              {desant ? t('c.saving') : t('c.save')}
+              {!desant && nPendents > 0 && (
+                <span aria-hidden data-testid="desa-fitxa-compte"
+                  className="rounded-full bg-primary-foreground px-1.5 text-xs font-semibold tabular-nums text-primary">
+                  {nPendents}
+                </span>
+              )}
+            </Button>
+            {nPendents > 0 && <span id={`desa-${tipus}-n`} className="sr-only">{t('csd.n_pendents', { n: nPendents })}</span>}
+          </>
         )}
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-3 sm:px-5">
         <Tabs value={pestanya} onValueChange={(v) => triaPestanya(v as Pestanya)}>
           <div className="min-w-0 overflow-x-auto pb-1">
             <TabsList variant="line" className="w-max">
@@ -364,6 +385,7 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
           ))}
         </Tabs>
       </CardContent>
+      <DialegCanvisPendents {...avis.dialeg} />
     </Card>
   )
 }

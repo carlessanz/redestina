@@ -12,7 +12,7 @@
 
 import {
   Apple, ArrowLeftRight, Building2, Calculator, ClipboardCheck, ClipboardList, FileSignature, FileText, FolderOpen, Handshake, History,
-  Home, Inbox, LayoutDashboard, Leaf, Receipt,
+  Home, Inbox, LayoutDashboard, Leaf, NotebookPen, Receipt,
   MessageSquare, Package, PlusCircle, Settings2, ShieldCheck, Sprout, Store, Truck, Workflow,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -123,6 +123,10 @@ const EQUIP: NavGrup[] = [
     items: [
       // Una sola entrada desde 1C (plan 1, D1): el listado «Entitats» cubre los dos papeles.
       { to: '/equip/entitats', labelKey: 'nav.entitats', icon: Building2 },
+      // «Interaccions i seguiment» (proceso 1.2): las interacciones de TODAS las fichas en un
+      // sitio (las mismas filas de `notes_internes` que el hilo de cada ficha), con los
+      // pendientes, el historial y las previsiones de producto. `barra: false`, como el resto.
+      { to: '/equip/interaccions', labelKey: 'nav.interaccions', icon: NotebookPen, barra: false },
       // Papeleo POR ORGANIZACIÓN (la campaña va por fichas), no una etapa de la oferta.
       // Sin badge: los «per contrasignar» ya suman en Aprovacions.
       { to: '/equip/convenis', labelKey: 'nav.convenis', icon: FileSignature },

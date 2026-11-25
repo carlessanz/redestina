@@ -41,6 +41,8 @@ import {
   type Paper, type ResultatCerca, type ValorsAlta,
 } from '../../lib/novaEntitat'
 import BlocCamps from '../../components/fitxa/BlocCamps'
+// Fuera del componente, siempre (Taula mestra 1.1 y 1.3): el bloque común de las fichas.
+import Seccio from '../../components/fitxa/Seccio'
 import SelectorNaturalesa from '../../components/fitxa/SelectorNaturalesa'
 import { naturalesaSuggerida, type Naturalesa } from '../../lib/naturalesa'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
@@ -60,19 +62,6 @@ const rolKey = (p: Paper) => (p === 'productor' ? 'ef.paper_ofertant' : 'ef.pape
 const nomDe = (r: ResultatCerca) => r.nom_comercial || r.razon_social || r.persona_contacte || '—'
 
 type EstatCerca = 'buit' | 'cercant' | 'ok' | 'error'
-
-// Fuera del componente, siempre: definida dentro, cada render crea un tipo de componente
-// nuevo, React desmonta la sección entera y el campo pierde el foco en cada tecla («cada vez
-// que pongo una letra me saca de la sección», Taula mestra 1.1, 09-11-2026). Lo vigila
-// `tests/componentsNiats.test.ts`.
-function Seccio({ titol, children, testid }: { titol: string; children: React.ReactNode; testid?: string }) {
-  return (
-    <section className="space-y-3 border-t border-border pt-6 first:border-t-0 first:pt-0" data-testid={testid}>
-      <h3 className="text-base font-semibold">{titol}</h3>
-      {children}
-    </section>
-  )
-}
 
 export default function NovaEntitat() {
   const { t } = useT()
@@ -359,9 +348,8 @@ export default function NovaEntitat() {
         )}
 
         {pas === 2 && (
-          <CardContent className="space-y-6" data-testid="ne-pas2">
-            <Seccio titol={t('ne.rols')} testid="ne-rols">
-              <p className="text-sm text-muted-foreground">{t('ne.rols_h')}</p>
+          <CardContent className="space-y-6 px-3 sm:px-5" data-testid="ne-pas2">
+            <Seccio titol={t('ne.rols')} ajuda={t('ne.rols_h')} testid="ne-rols">
               <div className="flex flex-wrap gap-2">
                 {(['productor', 'entidad'] as const).map((p) => (
                   <Button key={p} type="button" variant={papers.includes(p) ? 'default' : 'outline'}
@@ -381,8 +369,7 @@ export default function NovaEntitat() {
                 onCanviat={(v) => setNatTriada(v.naturalesa)} />
             </Seccio>
 
-            <Seccio titol={t('ef.sec_contacte')}>
-              <p className="text-sm text-muted-foreground">{t('ef.h_contacte')}</p>
+            <Seccio titol={t('ef.sec_contacte')} ajuda={t('ef.h_contacte')}>
               <BlocCamps {...blocProps} camps={campsAlta('contacte', rols)} />
             </Seccio>
 

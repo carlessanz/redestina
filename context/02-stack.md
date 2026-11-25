@@ -318,3 +318,16 @@ y las listas de documentos, convenios y albaranes de los paneles externos). Cóm
   las E2E buscan por él (`getByRole('button', {name})`). En castellano, infinitivo («Abrir…»).
 - **Lo que no se convierte**: las acciones de cabecera o de bloque (Nova…, calcular, emitir
   todos, enviar la tanda, filtros). Solo las de cada fila.
+
+## Ficha de entidad: bloques y cambios sin guardar (plan DIC 26, procesos 1.1 y 1.3, 25-11-2026)
+
+- **`components/fitxa/Seccio.tsx`**, único (sustituye las tres copias de `EntitatDetall`, `PerfilOrganitzacio` y
+  `NovaEntitat`): bloque `rounded-xl border bg-muted/30`, cabecera `bg-muted/60`, título `font-titulos text-lg`. Conserva
+  los `data-testid` `bloc-*`.
+- **`hooks/useCanvisPendents`** (`useBlocker` + `beforeunload`) + `DialegCanvisPendents` (Desa i surt · Surt sense desar ·
+  Continua editant), en la ficha del equipo y en «La meva organització». `lib/canvisPendents.ts` (puro):
+  `fusionaRecarrega` —recargar refresca lo no tocado y no desmonta las pestañas—, `clausCanviades`, `mateixJson`.
+- El «Desa» muestra cuántos cambios hay (`desa-fitxa-compte`).
+- `CercadorOpcions`: la lista se reabre al clicar aunque el campo conserve el foco, y el tope por defecto pasa a 300 (el
+  catálogo entero).
+- Pruebas: `tests/canvisPendents.test.ts`, `tests/e2e/fitxa-entitat-ux.e2e.ts`.

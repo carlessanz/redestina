@@ -2078,3 +2078,19 @@ también `validar_recollida` y `rectificar_albaran` con la misma sesión) con la
 emisión) y `trg_albaranes_inmutable` lo protege. Si emite el servidor o un job, la clave no existe y el PDF `albara1p`
 conserva el pie «Atentament, Equip de Redestina»; si existe, el pie es la caja «Per Espigoladors» con la firma propia
 (`perfiles.firma_ruta`, `context/09`). Lo emitido antes no se tocó (sin backfill).
+
+### Interaccions i seguiment (plan DIC 26, proceso 1.2, `20270616100000`·`100100`, 25-11-2026)
+
+La sección nueva del equipo lee **las mismas filas** de `notes_internes` que el hilo de la ficha: no hay tabla ni copia.
+
+- `tipus` gana `prospeccio`; `seguiment` se conserva como valor heredado (se lee y se acepta, la interfaz no lo ofrece);
+  el valor por defecto pasa a `operativa`.
+- `resultat` (≤ 1.000): lo que salió del próximo paso; solo con `seguiment_fet_at` (lo escribe `tancar_seguiment`).
+- **Previsión de producto** en la propia interacción: `previsio_producte` (FK `productos(nombre)`), `previsio_kg`,
+  `previsio_data` — los tres o ninguno— y, opcional, `previsio_ubicacio_id` (FK `productor_ubicaciones`, `set null`) o
+  `previsio_ubicacio` (texto ≤ 200). Índices por `data` y parcial por `previsio_data`. 🔴 **No crea oferta** y, como toda
+  nota interna, no sale por ningún canal.
+- Lectura global: interna `interaccions_base(…)` + `interaccions_llistat(p_vista pendents|historial|previsions, p_desde,
+  p_hasta, p_org, p_zona, p_tipus, p_responsable, p_producte, p_prev_desde, p_prev_hasta, p_estat, p_cerca, p_limit,
+  p_offset)` → `{total, files}` e `interaccions_opcions()` (responsables, productos, tipos). Solo `es_intern()`.
+- Prueba con rollback: `scripts/sql/prova-interaccions.sql` (54 casos).

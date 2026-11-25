@@ -21,8 +21,19 @@
 // punto marca la que tiene cambios, un error de validación salta a la suya y la activa va en
 // `?pestanya=`. Cada bloque de `campsFitxa` cae en una pestaña (`PESTANYA_DE_BLOC`). El estado
 // (global y por papel) va en Gestió interna desde el 04-11-2026, con el CRM completo (1.5).
+//
+// NO PERDER LO ESCRITO (Taula mestra 1.1, 25-11-2026):
+//   · con cambios sin guardar, salir de la ficha (menú, «Tornar», atrás) pregunta con
+//     `useCanvisPendents` + `DialegCanvisPendents` (Desa i surt · Surt sense desar · Continua
+//     editant), y cerrar o recargar la pestaña lo pregunta el navegador;
+//   · los bloques que guardan AL MOMENTO (estado y papeles, acceso, enlace con otra organización)
+//     piden `recarrega()`, que ya NO desmonta las pestañas ni pisa lo escrito: refresca la foto
+//     inicial y solo los campos no tocados (`fusionaRecarrega`). Solo la primera carga (o otra
+//     organización) enseña «Carregant»; tras «Desa», la recarga es completa;
+//   · «Desa» dice cuántos cambios hay pendientes y, sin ninguno, queda gris.
+// Diseño de las pestañas (1.3): cada sección es un bloque `fitxa/Seccio`.
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router'
 import { ArrowLeft, ClipboardList, Mail, MessageCircle, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -55,6 +66,10 @@ import { CLAUS_PREFERENCIES, PREFERENCIES_RECEPCIO, campsPerfil } from '../../li
 import { naturalesaEfectiva } from '../../lib/naturalesa'
 import SelectorNaturalesa, { type ValorNaturalesa } from '../../components/fitxa/SelectorNaturalesa'
 import EnllacOrganitzacio from '../../components/EnllacOrganitzacio'
+import Seccio from '../../components/fitxa/Seccio'
+import DialegCanvisPendents from '../../components/DialegCanvisPendents'
+import { useCanvisPendents } from '../../hooks/useCanvisPendents'
+import { clausCanviades, fusionaRecarrega, mateixJson, type Igual } from '../../lib/canvisPendents'
 import DocumentacioOrganitzacio from '../../components/equip/DocumentacioOrganitzacio'
 import AlbaransFitxa from '../../components/fitxa/AlbaransFitxa'
 import LlocsRecollida from '../../components/LlocsRecollida'
@@ -83,21 +98,15 @@ const PESTANYA_DE_BLOC: Record<Bloc, Pestanya> = {
   documentacio: 'documentacio', intern: 'intern',
 }
 
-/**
- * Una sección de una pestaña. Fuera del componente a propósito: definida dentro, cada render
- * era un tipo nuevo y React desmontaba y volvía a montar todo lo de dentro a cada tecla.
- */
-function Seccio({ titol, ajuda, children, testid }: { titol: string; ajuda?: string; children: ReactNode; testid?: string }) {
-  return (
-    <section className="space-y-3 border-t border-border pt-6 first:border-t-0 first:pt-0" data-testid={testid}>
-      <div>
-        <h3 className="text-base font-semibold">{titol}</h3>
-        {ajuda && <p className="mt-1 text-sm text-muted-foreground">{ajuda}</p>}
-      </div>
-      {children}
-    </section>
-  )
+/** ¿Un campo de la ficha sigue igual? Con la normalización de `campsFitxa` ('' = null, listas…). */
+const CAMP_PER_CLAU = new Map(CAMPS_FITXA.map((c) => [c.clau, c]))
+const igualCamp: Igual = (clau, a, b) => {
+  const c = CAMP_PER_CLAU.get(clau)
+  return c ? mateixValor(normalitzaValor(c, a), normalitzaValor(c, b)) : mateixJson(clau, a, b)
 }
+
+/** Lo cargado la última vez: la foto contra la que se mira qué ha tocado el usuario. */
+interface Foto { id: string; inicial: Fila; perfil: Fila; canal: TriaCanal }
 
 /** El error de un campo, como clave i18n, o null. */
 function errorDe(c: CampFitxa, valor: string): string | null {
@@ -144,11 +153,17 @@ export default function EntitatDetall() {
   const [correuObert, setCorreuObert] = useState(false)
   // Sube cuando algo cambia fuera del formulario (estado de un papel, papel nuevo): se recarga.
   const [versio, setVersio] = useState(0)
-  const recarrega = () => setVersio((v) => v + 1)
+  // 'conserva': la pide un bloque que guarda al momento; lo escrito y no guardado se queda.
+  // 'total': tras «Desa», todo sale de la base (los triggers pueden haber derivado valores).
+  const modeRecarrega = useRef<'conserva' | 'total'>('conserva')
+  const foto = useRef<Foto | null>(null)
+  const recarrega = useCallback(() => { modeRecarrega.current = 'conserva'; setVersio((v) => v + 1) }, [])
+  const recarregaTot = () => { modeRecarrega.current = 'total'; setVersio((v) => v + 1) }
+  // `t` dentro del efecto de carga sin volver a cargar al cambiar de idioma.
+  const tRef = useRef(t)
+  useEffect(() => { tRef.current = t }, [t])
   const [cataleg, setCataleg] = useState<TipusActivitat[]>([])
   useEffect(() => { void carregaTipusActivitat().then(setCataleg) }, [])
-
-  const { esborra, ocupat: esborrant, error: errorEsborrat, dialegs } = useEsborrarFitxa(() => navigate(LLISTA), recarrega)
 
   // La pestaña activa, en la URL: un enlace o «atrás» vuelven al mismo sitio.
   const [params, setParams] = useSearchParams()
@@ -194,27 +209,46 @@ export default function EntitatDetall() {
     return triades.filter((c) => valides.has(c))
   }
 
-  // Las pestañas con cambios sin guardar (el punto de la barra).
-  const pendents = useMemo(() => {
+  // Las pestañas con cambios sin guardar (el punto de la barra) y cuántos cambios hay (el «Desa»).
+  const { pendents, nPendents } = useMemo(() => {
     const out = new Set<Pestanya>()
+    let n = 0
     for (const c of CAMPS_FITXA) {
       if (!taules.some((tb) => c.columnes[tb]) || !potEditar(c, 'equip')) continue
-      if (!mateixValor(normalitzaValor(c, valors[c.clau]), normalitzaValor(c, inicial[c.clau]))) out.add(PESTANYA_DE_BLOC[c.bloc])
+      if (!igualCamp(c.clau, valors[c.clau], inicial[c.clau])) { out.add(PESTANYA_DE_BLOC[c.bloc]); n += 1 }
     }
-    if (JSON.stringify(perfil) !== JSON.stringify(perfilInicial)) out.add('diagnostic')
-    if (canal !== canalDesat) out.add('contacte')
-    return out
+    const nPerfil = clausCanviades(perfil, perfilInicial).length
+    if (nPerfil > 0) { out.add('diagnostic'); n += nPerfil }
+    if (canal !== canalDesat) { out.add('contacte'); n += 1 }
+    return { pendents: out, nPendents: n }
   }, [taules, valors, inicial, perfil, perfilInicial, canal, canalDesat])
+
+  // Salir con cambios pendientes pregunta (menú, «Tornar», atrás, cerrar la pestaña).
+  const avis = useCanvisPendents({ n: nPendents, desa: () => desa() })
+  const { esborra, ocupat: esborrant, error: errorEsborrat, dialegs } = useEsborrarFitxa(
+    // Borrada la ficha, no queda nada que guardar: se sale sin preguntar.
+    () => { avis.permetSortida(); navigate(LLISTA) },
+    recarrega,
+  )
 
   useEffect(() => {
     if (!id) return
     let viu = true
-    setCarregant(true)
-    setErrors({})
+    // La primera carga (o la de otra organización) enseña «Carregant»; una recarga, no: las
+    // pestañas siguen montadas y lo escrito en ellas, también.
+    const primera = foto.current?.id !== id
+    const conserva = !primera && modeRecarrega.current === 'conserva'
+    modeRecarrega.current = 'conserva'
+    if (primera) { setCarregant(true); setErrors({}) }
+    else if (!conserva) setErrors({})
     void (async () => {
       const { data: o, error } = await supabase.from('v_organizaciones').select(COLS_ORG).eq('id', id).maybeSingle()
       if (!viu) return
-      if (error) { setErrCarrega(true); setCarregant(false); return }
+      if (error) {
+        // Una recarga que falla no tira la ficha: se dice y se queda lo que hay.
+        if (!primera) { toast.error(tRef.current('c.load_error')); return }
+        setErrCarrega(true); setCarregant(false); return
+      }
       if (!o) {
         // Un id de FICHA (enlaces de antes de 1C): se resuelve la organización y se redirige.
         for (const taula of ['productores', 'entidades'] as const) {
@@ -250,18 +284,27 @@ export default function EntitatDetall() {
         v[c.clau] = r.valor
         if (r.altre) d[c.clau] = r.altre
       }
+      const pr = ((fe?.perfil_receptor as Record<string, unknown> | null) ?? {})
+      const tria = (vista.canal_preferido ?? 'auto') as TriaCanal
+      const anterior = foto.current
+      foto.current = { id, inicial: v, perfil: pr, canal: tria }
       setOrg(vista)
       setProd(fp)
       setEnt(fe)
-      setValors(v)
+      if (conserva && anterior) {
+        // Lo que el usuario no había tocado sale de la base; lo tocado se queda como está.
+        setValors((ara) => fusionaRecarrega(anterior.inicial, v, ara, igualCamp))
+        setPerfil((ara) => fusionaRecarrega(anterior.perfil, pr, ara))
+        setCanal((ara) => (ara === anterior.canal ? tria : ara))
+      } else {
+        setValors(v)
+        setPerfil(pr)
+        setCanal(tria)
+      }
       setInicial(v)
       setDiscrepancies(d)
-      const pr = ((fe?.perfil_receptor as Record<string, unknown> | null) ?? {})
-      setPerfil(pr)
       setPerfilInicial(pr)
       setNat({ naturalesa: vista.naturalesa ?? null, origen: vista.naturalesa_origen ?? null })
-      const tria = (vista.canal_preferido ?? 'auto') as TriaCanal
-      setCanal(tria)
       setCanalDesat(tria)
       setErrCarrega(false)
       setCarregant(false)
@@ -292,11 +335,12 @@ export default function EntitatDetall() {
       if (taula === 'productores' && col === 'name' && nou == null) continue
       out[col] = nou
     }
-    if (taula === 'entidades' && JSON.stringify(perfil) !== JSON.stringify(perfilInicial)) out.perfil_receptor = perfil
+    if (taula === 'entidades' && clausCanviades(perfil, perfilInicial).length > 0) out.perfil_receptor = perfil
     return out
   }
 
-  async function desa() {
+  /** Guarda lo que ha cambiado. `true` si ha ido bien (o no había nada): lo usa «Desa i surt». */
+  async function desa(): Promise<boolean> {
     // Lo mal escrito, campo por campo, antes de llamar a nadie.
     const nous: Record<string, string> = {}
     for (const c of CAMPS_FITXA) {
@@ -325,7 +369,7 @@ export default function EntitatDetall() {
         el?.focus({ preventScroll: true })
       }
       requestAnimationFrame(enfoca)
-      return
+      return false
     }
 
     setDesant(true)
@@ -336,8 +380,8 @@ export default function EntitatDetall() {
       const fid = taula === 'productores' ? org?.productor_id : org?.entidad_id
       // `.select('id')`: un UPDATE que la RLS no deja pasar no da error, devuelve cero filas.
       const { data, error } = await supabase.from(taula).update(dades).eq('id', fid as string).select('id')
-      if (error) { setDesant(false); toast.error(error.code === '23505' ? t('rec.err_unique') : textError(t, error.message)); return }
-      if (!data || data.length === 0) { setDesant(false); toast.error(t('c.error')); return }
+      if (error) { setDesant(false); toast.error(error.code === '23505' ? t('rec.err_unique') : textError(t, error.message)); return false }
+      if (!data || data.length === 0) { setDesant(false); toast.error(t('c.error')); return false }
       canvis += 1
     }
     if (canal !== canalDesat && org) {
@@ -346,13 +390,14 @@ export default function EntitatDetall() {
         p_ficha: org.productor_id ?? org.entidad_id,
         p_canal: canal === 'auto' ? null : canal,
       })
-      if (error) { setDesant(false); toast.error(textError(t, error.message)); return }
+      if (error) { setDesant(false); toast.error(textError(t, error.message)); return false }
       canvis += 1
     }
     setDesant(false)
-    if (canvis === 0) { toast.info(t('ef.cap_canvi')); return }
+    if (canvis === 0) { toast.info(t('ef.cap_canvi')); return true }
     toast.success(t('rec.saved'))
-    recarrega()
+    recarregaTot()
+    return true
   }
 
   function enviaMissatge() {
@@ -430,7 +475,18 @@ export default function EntitatDetall() {
                 <Mail className="size-4" /> {t('c.email_action')}
               </BotoAmbMotiu>
             )}
-            <Button onClick={() => void desa()} disabled={desant}>{desant ? t('c.saving') : t('c.save')}</Button>
+            {/* El número va fuera del nombre accesible («Desar»): lo dice la descripción. */}
+            <Button onClick={() => void desa()} disabled={desant || nPendents === 0} data-testid="desa-fitxa"
+              aria-describedby={nPendents > 0 ? 'desa-fitxa-n' : undefined}>
+              {desant ? t('c.saving') : t('c.save')}
+              {!desant && nPendents > 0 && (
+                <span aria-hidden data-testid="desa-fitxa-compte"
+                  className="rounded-full bg-primary-foreground px-1.5 text-xs font-semibold tabular-nums text-primary">
+                  {nPendents}
+                </span>
+              )}
+            </Button>
+            {nPendents > 0 && <span id="desa-fitxa-n" className="sr-only">{t('csd.n_pendents', { n: nPendents })}</span>}
           </div>
         </CardHeader>
       </Card>
@@ -450,7 +506,7 @@ export default function EntitatDetall() {
 
         {/* 1 · Dades de l'entitat (Taula mestra 1.3, «informació administrativa»). */}
         <TabsContent value="dades" forceMount className={contingut}>
-          <Card><CardContent className="space-y-6">
+          <Card><CardContent className="space-y-6 px-3 sm:px-5">
             <Seccio titol={t('org.sec_identitat')} testid="bloc-identitat">
               <BlocCamps {...blocProps} camps={camps('identitat')} activitats={activitats}
                 placeholderNom={String(valors.persona_contacte ?? '') || undefined} />
@@ -468,7 +524,7 @@ export default function EntitatDetall() {
 
         {/* 2 · Contacte i accés (1.3, «contacto persona»; 1.4). */}
         <TabsContent value="contacte" forceMount className={contingut}>
-          <Card><CardContent className="space-y-6">
+          <Card><CardContent className="space-y-6 px-3 sm:px-5">
             <Seccio titol={t('ef.sec_contacte')} ajuda={t('ef.h_contacte')} testid="bloc-contacte">
               <BlocCamps {...blocProps} camps={camps('contacte')} />
               <AccesEntitat orgId={org.id} correu={correu}
@@ -482,7 +538,7 @@ export default function EntitatDetall() {
 
         {/* 3 · Operativa (1.3, «informació operativa»): lo de cada papel. */}
         <TabsContent value="operativa" forceMount className={contingut}>
-          <Card><CardContent className="space-y-6">
+          <Card><CardContent className="space-y-6 px-3 sm:px-5">
             {rols.ofertant && (
               <Seccio titol={t('ef.sec_ofertant')} testid="bloc-ofertant">
                 <BlocCamps {...blocProps} camps={camps('ofertant')} />
@@ -510,7 +566,7 @@ export default function EntitatDetall() {
             preferencias primero, condiciones de su tipo después—, guardado con el «Desa» de la
             ficha. */}
         <TabsContent value="diagnostic" forceMount className={contingut}>
-          <Card><CardContent className="space-y-6">
+          <Card><CardContent className="space-y-6 px-3 sm:px-5">
             {org.productor_id && (
               <Seccio titol={t('ef.sec_diagnostic')} testid="bloc-diagnostic">
                 <ResumDiagnostic productorId={org.productor_id} veu="equip" />
@@ -547,7 +603,7 @@ export default function EntitatDetall() {
 
         {/* 5 · Documentació (7.1, 7.2): lo que emite Redestina, por tipo, y el archivo externo. */}
         <TabsContent value="documentacio" forceMount className={`${contingut} space-y-4`}>
-          <Card><CardContent className="space-y-6">
+          <Card><CardContent className="space-y-6 px-3 sm:px-5">
             <Seccio titol={t('ef.doc_convenis')} testid="bloc-documentacio">
               {org.productor_id && (
                 <div className="space-y-2">
@@ -603,15 +659,15 @@ export default function EntitatDetall() {
         {/* 6 · Gestió interna (1.5): el estado de la entidad, el CRM, lo que solo ve el equipo y
             el borrado al final. */}
         <TabsContent value="intern" forceMount className={contingut}>
-          <Card><CardContent className="space-y-6">
+          <Card><CardContent className="space-y-6 px-3 sm:px-5">
             <Seccio titol={t('ef.sec_estat')} testid="bloc-rols">
               <BlocRols org={org} potAprovar={potAprovar} onCanviat={recarrega} />
             </Seccio>
             {/* El CRM (1F + 1.5): interacciones, próximas acciones y seguimientos pendientes.
                 Trae su propio título, así que no va dentro de una `Seccio`. */}
-            <section className="border-t border-border pt-6" data-testid="bloc-notes">
+            <Seccio testid="bloc-notes">
               <NotesInternes orgId={org.id} potEsborrar={potEsborrar} onCompte={setNNotes} />
-            </section>
+            </Seccio>
             {/* Las acciones del diagnóstico (A3): estado y nota de seguimiento al momento. Solo
                 si la organización hace de productora (el diagnóstico es suyo). */}
             {org.productor_id && (
@@ -625,7 +681,7 @@ export default function EntitatDetall() {
               {/* Con quién comparte organización, que es donde se deshace un enlace equivocado. */}
               <EnllacOrganitzacio tipus={org.productor_id ? 'productor' : 'entidad'}
                 fitxa={org.productor_id ?? org.entidad_id} potAprovar={potAprovar} onCanviat={recarrega} />
-              <div className="border-t pt-4">
+              <div className="border-t border-border pt-4">
                 {errorEsborrat && <p className="mb-2 text-sm text-destructive">{errorEsborrat}</p>}
                 <BotoAmbMotiu variant="destructive" disabled={esborrant || !potEsborrar}
                   motiu={potEsborrar ? undefined : t('rec.no_permission_delete')}
@@ -648,6 +704,7 @@ export default function EntitatDetall() {
           id: (org.productor_id ?? org.entidad_id) as string,
         }} />
       {dialegs}
+      <DialegCanvisPendents {...avis.dialeg} />
     </div>
   )
 }

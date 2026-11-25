@@ -34,6 +34,7 @@ import Documents from '../routes/equip/Documents'
 import Albarans from '../routes/equip/Albarans'
 import AlbaraDetall from '../routes/equip/AlbaraDetall'
 import EntradesSortides from '../routes/equip/EntradesSortides'
+import Interaccions from '../routes/equip/Interaccions'
 import Canalitzacio from '../routes/equip/Canalitzacio'
 import CanalitzacioDetall from '../routes/equip/CanalitzacioDetall'
 import { EspigoladaDetall, Espigolades, NovaEspigolada } from '../routes/equip/Espigolades'
@@ -156,6 +157,8 @@ export const router = createBrowserRouter([
                   // La ficha ÚNICA por organización (1C): `:id` es el de la organización; un id de
                   // ficha de antes se resuelve y redirige.
                   { path: 'entitats/:id', element: <EntitatDetall />, handle: { titleKey: 'nav.entitats' } },
+                  // «Interaccions i seguiment» (proceso 1.2): `?vista=pendents|historial|previsions`.
+                  { path: 'interaccions', element: <Interaccions />, handle: { titleKey: 'nav.interaccions' } },
                   { path: 'missatgeria', element: <Missatgeria />, handle: { titleKey: 'nav.messaging', fullBleed: true } },
                   { path: 'documents', element: <Documents />, handle: { titleKey: 'nav.documents' } },
                   { path: 'albarans', element: <Albarans />, handle: { titleKey: 'nav.albarans' } },

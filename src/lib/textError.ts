@@ -117,6 +117,10 @@ const CODIS: Record<string, string> = {
   falta_rao_social: 'org.err_falta_rao_social',
   entitat_inactiva: 'org.err_entitat_inactiva',
   tipus_activitat_desconegut: 'org.err_activitat',
+  // La previsión de producto de una interacción (proceso 1.2, 20270616100000). ANTES que
+  // `ubicacio_massa_llarga`, que está contenido en `previsio_ubicacio_massa_llarga`.
+  previsio_ubicacio_massa_llarga: 'ni.err_lloc_llarg',
+  previsio_incompleta: 'ni.err_previsio_incompleta',
   // Població real, àrea i ubicació (20270505100000).
   comarca_desconeguda: 'org.err_comarca',
   ubicacio_massa_llarga: 'org.err_ubicacio',
@@ -141,6 +145,11 @@ const CODIS: Record<string, string> = {
   nota_massa_llarga: 'ni.err_massa_llarga',
   nota_futura: 'ni.err_futura',
   nota_inexistent: 'ni.err_inexistent',
+  // Proceso 1.2 (20270616100000). `kg_invalid` va DESPUÉS de `kg_invalids` (arriba), que lo contiene.
+  resultat_massa_llarg: 'ni.err_resultat_llarg',
+  kg_invalid: 'ni.err_kg',
+  producte_desconegut: 'ni.err_producte',
+  organitzacio_inexistent: 'ni.err_org_inexistent',
 }
 
 /** Códigos que algunas Edge Functions y envoltorios devuelven COMO mensaje. */

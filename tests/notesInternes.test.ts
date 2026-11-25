@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  CANALS_NOTA, MAX_ACCIO, MAX_TEXT_NOTA, TIPUS_NOTA, dataPerEnviar, estatSeguiment, faTemps, seguimentPerEnviar, textValid,
+  CANALS_NOTA, MAX_ACCIO, MAX_PREVISIO_UBICACIO, MAX_RESULTAT, MAX_TEXT_NOTA, TIPUS_NOTA, TIPUS_NOTA_LLEGITS,
+  dataPerEnviar, esTipusNota, estatSeguiment, faTemps, kgDeText, previsioPerEnviar, resultatValid, seguimentPerEnviar, textValid,
 } from '../src/lib/notesInternes'
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -68,12 +69,79 @@ describe('seguimentPerEnviar', () => {
   })
 })
 
+describe('kgDeText', () => {
+  it('admite coma decimal; vacío o texto → null', () => {
+    expect(kgDeText('12,5')).toBe(12.5)
+    expect(kgDeText(' 300 ')).toBe(300)
+    expect(kgDeText('')).toBeNull()
+    expect(kgDeText('molts')).toBeNull()
+    expect(kgDeText('-3')).toBeNull()
+  })
+})
+
+describe('previsioPerEnviar', () => {
+  const buida = { producte: '', kg: '', data: '', ubicacioId: '', ubicacioText: '' }
+
+  it('nada escrito → sin previsión', () => {
+    expect(previsioPerEnviar(buida)).toBeNull()
+    expect(previsioPerEnviar({ ...buida, producte: '  ' })).toBeNull()
+  })
+
+  it('producto, kg y fecha: los tres o ninguno; un lugar solo tampoco vale', () => {
+    expect(previsioPerEnviar({ ...buida, producte: 'Tomàquet' })).toBe('incompleta')
+    expect(previsioPerEnviar({ ...buida, producte: 'Tomàquet', kg: '100' })).toBe('incompleta')
+    expect(previsioPerEnviar({ ...buida, kg: '100', data: '2026-12-01' })).toBe('incompleta')
+    expect(previsioPerEnviar({ ...buida, ubicacioText: 'el camp' })).toBe('incompleta')
+    expect(previsioPerEnviar({ ...buida, producte: 'Tomàquet', kg: '100', data: '1/12/2026' })).toBe('incompleta')
+  })
+
+  it('kg > 0', () => {
+    expect(previsioPerEnviar({ ...buida, producte: 'Tomàquet', kg: '0', data: '2026-12-01' })).toBe('kg')
+    expect(previsioPerEnviar({ ...buida, producte: 'Tomàquet', kg: 'molts', data: '2026-12-01' })).toBe('kg')
+  })
+
+  it('el lugar: uno de la ficha o el texto libre (≤ 200), nunca los dos', () => {
+    const base = { ...buida, producte: ' Tomàquet ', kg: '12,5', data: '2026-12-01' }
+    expect(previsioPerEnviar(base)).toEqual({ p_previsio_producte: 'Tomàquet', p_previsio_kg: 12.5, p_previsio_data: '2026-12-01' })
+    expect(previsioPerEnviar({ ...base, ubicacioId: 'u1', ubicacioText: 'ignorat' }))
+      .toEqual({ p_previsio_producte: 'Tomàquet', p_previsio_kg: 12.5, p_previsio_data: '2026-12-01', p_previsio_ubicacio_id: 'u1' })
+    expect(previsioPerEnviar({ ...base, ubicacioText: ' el camp ' }))
+      .toEqual({ p_previsio_producte: 'Tomàquet', p_previsio_kg: 12.5, p_previsio_data: '2026-12-01', p_previsio_ubicacio: 'el camp' })
+    expect(previsioPerEnviar({ ...base, ubicacioText: 'a'.repeat(MAX_PREVISIO_UBICACIO) })).not.toBe('ubicacio_llarga')
+    expect(previsioPerEnviar({ ...base, ubicacioText: 'a'.repeat(MAX_PREVISIO_UBICACIO + 1) })).toBe('ubicacio_llarga')
+  })
+})
+
+describe('resultatValid y esTipusNota', () => {
+  it('el resultado, vacío o dentro del tope', () => {
+    expect(resultatValid('')).toBe(true)
+    expect(resultatValid('a'.repeat(MAX_RESULTAT))).toBe(true)
+    expect(resultatValid('a'.repeat(MAX_RESULTAT + 1))).toBe(false)
+  })
+
+  it('el tipo heredado se lee pero no se ofrece', () => {
+    expect(esTipusNota('seguiment')).toBe(true)
+    expect(esTipusNota('prospeccio')).toBe(true)
+    expect(esTipusNota('visita')).toBe(false)
+    expect((TIPUS_NOTA as readonly string[]).includes('seguiment')).toBe(false)
+    expect(TIPUS_NOTA_LLEGITS).toContain('seguiment')
+  })
+})
+
 describe('el vocabulario coincide con la base', () => {
-  it('TIPUS_NOTA y MAX_ACCIO son los de 20270504100000', () => {
-    const sql = readFileSync(join(RAIZ, 'supabase/migrations/20270504100000_crm_seguiments_i_estat_org.sql'), 'utf-8')
+  it('TIPUS_NOTA, MAX_RESULTAT y MAX_PREVISIO_UBICACIO son los de 20270616100000', () => {
+    const sql = readFileSync(join(RAIZ, 'supabase/migrations/20270616100000_interaccions_seguiment.sql'), 'utf-8')
     const lista = `(${TIPUS_NOTA.map((c) => `'${c}'`).join(', ')})`
     expect(sql).toContain(`tipus in ${lista}`)
-    expect(sql).toContain(`'seguiment') not in ${lista}`)
+    expect(sql).toContain(`not in ${lista}`)
+    expect(sql).toContain(`between 1 and ${MAX_RESULTAT}`)
+    expect(sql).toContain(`> ${MAX_RESULTAT}`)
+    expect(sql).toContain(`between 1 and ${MAX_PREVISIO_UBICACIO}`)
+    expect(sql).toContain(`> ${MAX_PREVISIO_UBICACIO}`)
+  })
+
+  it('MAX_ACCIO es el de 20270504100000', () => {
+    const sql = readFileSync(join(RAIZ, 'supabase/migrations/20270504100000_crm_seguiments_i_estat_org.sql'), 'utf-8')
     expect(sql).toContain(`between 1 and ${MAX_ACCIO}`)
     expect(sql).toContain(`> ${MAX_ACCIO}`)
   })

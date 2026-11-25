@@ -20,6 +20,13 @@
 //   · `buidaEnTriar` deja el campo en blanco tras elegir (modo «añadir»: la lista de
 //     productos habituales, donde lo elegido se pinta aparte como chip);
 //   · `className` llega al campo (p. ej. `md:h-7` en la barra de filtros).
+//
+// 25-11-2026 (Taula mestra 1.1, «al añadir el 2º producto no salen las sugerencias»): tras
+// elegir, la lista se cierra pero el campo CONSERVA el foco (el clic en la sugerencia no se lo
+// quita), así que el siguiente clic no disparaba `onFocus` y no se reabría hasta teclear. Ahora
+// un clic con el foco puesto reabre la lista (también tras un Escape), y sin teclear se ve el
+// catálogo entero con scroll: el tope por defecto pasa de 50 —que cortaba los ~91 productos—
+// a 300, que solo frena las listas de cientos de fichas.
 
 import { useEffect, useMemo, useState } from 'react'
 import { Input } from '@/components/ui/input'
@@ -49,7 +56,7 @@ export interface PropsCercadorOpcions {
   disabled?: boolean
   /** Cuántas letras hacen falta antes de sugerir (0 = con el foco ya se ve la lista). */
   minLletres?: number
-  /** Cuántas sugerencias como mucho. */
+  /** Cuántas sugerencias como mucho (por defecto 300: el catálogo de productos cabe entero). */
   maxim?: number
   /** ¿Se busca también en `detall`? Por defecto, sí. */
   cercaDetall?: boolean
@@ -67,7 +74,7 @@ export interface PropsCercadorOpcions {
 
 export default function CercadorOpcions({
   id, name, opcions, valor, onChange, invalid, placeholder, disabled,
-  minLletres = 0, maxim = 50, cercaDetall = true, detallSota = true, buit, buidaEnTriar = false, className, ...aria
+  minLletres = 0, maxim = 300, cercaDetall = true, detallSota = true, buit, buidaEnTriar = false, className, ...aria
 }: PropsCercadorOpcions) {
   const triada = useMemo(
     () => (valor ? opcions.find((o) => o.valor === valor) ?? null : null),
@@ -125,6 +132,9 @@ export default function CercadorOpcions({
         placeholder={placeholder}
         onChange={(e) => { setText(e.target.value); setEscrit(true); setObert(true); setActiu(0) }}
         onFocus={() => { setObert(true); setEscrit(false); setActiu(0) }}
+        // Con el foco ya puesto (tras elegir o tras un Escape), el clic no vuelve a disparar
+        // `onFocus`: es el clic el que reabre la lista. Sin teclear, se sugiere todo.
+        onClick={() => { if (!obert) { setObert(true); setActiu(0) } }}
         onKeyDown={(e) => {
           if (e.key === 'ArrowDown') { e.preventDefault(); setObert(true); setActiu((i) => Math.min(i + 1, suggeriments.length - 1)) }
           else if (e.key === 'ArrowUp') { e.preventDefault(); setActiu((i) => Math.max(i - 1, 0)) }

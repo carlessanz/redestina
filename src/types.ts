@@ -1764,3 +1764,61 @@ export interface ResumSortides {
   total: XifresSortides
   grups: GrupSortides[]
 }
+
+// --- «Interaccions i seguiment» (proceso 1.2, 20270616100000 + 20270616100100) ---
+//
+// La sección global del equipo `/equip/interaccions` sobre las MISMAS filas de `notes_internes`
+// que registra la ficha. Lo devuelven `interaccions_llistat()` (`{total, files}`) e
+// `interaccions_opcions()`; la lectura defensiva vive en `lib/interaccions.ts`.
+
+/** Las tres vistas de la sección (`?vista=`, `p_vista`). */
+export type VistaInteraccions = 'pendents' | 'historial' | 'previsions'
+/** El filtro de estado del seguimiento (`p_estat`): `pendent` incluye los vencidos. */
+export type EstatSeguimentFiltre = 'pendent' | 'vencut' | 'fet' | 'sense'
+/** Una interacción, como la devuelve `interaccions_llistat()`. */
+export interface FilaInteraccio {
+  id: string
+  organizacion_id: string
+  organitzacio: string | null
+  municipi: string | null
+  municipi_ine: string | null
+  comarca: string | null
+  /** El momento del contacto (`timestamptz`). */
+  data: string
+  /** Uno de los seis de ahora o el heredado `seguiment`. */
+  tipus: string
+  canal: string
+  text: string
+  autor_id: string | null
+  autor_nom: string | null
+  responsable_id: string | null
+  responsable_nom: string | null
+  propera_accio: string | null
+  /** `AAAA-MM-DD`. */
+  propera_data: string | null
+  /** El de cada fila: `sense` · `pendent` · `vencut` · `fet`. */
+  estat_seguiment: EstatSeguimentFiltre
+  seguiment_fet_at: string | null
+  fet_per_nom: string | null
+  resultat: string | null
+  previsio_producte: string | null
+  previsio_kg: number | null
+  /** `AAAA-MM-DD`. */
+  previsio_data: string | null
+  previsio_ubicacio_id: string | null
+  /** El alias o municipio del lugar de la ficha o, si no, el texto libre. */
+  previsio_ubicacio_nom: string | null
+  created_at: string
+}
+export interface PaginaInteraccions {
+  /** Todo lo filtrado de la vista, no solo la página. */
+  total: number
+  files: FilaInteraccio[]
+}
+/** Los valores de los desplegables de filtro: solo lo que aparece en alguna interacción. */
+export interface OpcionsInteraccions {
+  responsables: { id: string; nom: string }[]
+  productes: string[]
+  zones: string[]
+  municipis: { ine: string; nom: string }[]
+}

@@ -256,3 +256,5 @@ nunca las puertas (`/`, `/login`, `/admin`, `/restablir`, `/panell`, `/sense-acc
 contraseña. No se guarda justo después de cerrar sesión (`haSortit` de `useSessio`), para que otra cuenta no herede la
 pantalla. `RoleGuard`: si la cuenta tiene algún panel pero no el pedido, aviso `acces.altre_panell` y a su panel.
 **Límite**: `sessionStorage` es de la pestaña; un enlace de correo abierto en otra pestaña no lo trae.
+
+`/equip/interaccions` (25-11-2026, proceso 1.2): privada, bajo `RoleGuard intern`; no es pública.

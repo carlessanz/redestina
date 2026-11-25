@@ -93,7 +93,7 @@ test('la Dinamitzadora afegeix dues notes i el fil les ordena', async ({ page })
   await page.getByRole('option', { name: 'WhatsApp' }).click()
   await bloc.locator('#nota-data').fill(faDies(3))
   await bloc.locator('#nota-text').fill(`E2E 1F ${marca} primera`)
-  await bloc.getByRole('button', { name: /Afegeix la nota|Añade la nota/ }).click()
+  await bloc.getByRole('button', { name: /Afegeix la interacció|Añade la interacción/ }).click()
   await expect(bloc.getByTestId('nota')).toHaveCount(1)
 
   // 2) Hoy, por teléfono (canal por defecto; la fecha vuelve a hoy tras guardar).
@@ -101,7 +101,7 @@ test('la Dinamitzadora afegeix dues notes i el fil les ordena', async ({ page })
   await page.getByRole('option', { name: /^Telèfon$|^Teléfono$/ }).click()
   await expect(bloc.locator('#nota-data')).toHaveValue(faDies(0))
   await bloc.locator('#nota-text').fill(`E2E 1F ${marca} segona`)
-  await bloc.getByRole('button', { name: /Afegeix la nota|Añade la nota/ }).click()
+  await bloc.getByRole('button', { name: /Afegeix la interacció|Añade la interacción/ }).click()
 
   const notes = bloc.getByTestId('nota')
   await expect(notes).toHaveCount(2)
@@ -171,10 +171,10 @@ test('1.5: tipus, propera acció i seguiments pendents', async ({ page }) => {
   await bloc.locator('#nota-text').fill(`E2E 1F ${marca} incidència`)
   // Solo el texto, sin fecha: no se manda.
   await bloc.locator('#nota-accio').fill('Trucar per confirmar')
-  await bloc.getByRole('button', { name: /Afegeix la nota|Añade la nota/ }).click()
+  await bloc.getByRole('button', { name: /Afegeix la interacció|Añade la interacción/ }).click()
   await expect(page.getByText(/necessita el text i la data|necesita el texto y la fecha/).first()).toBeVisible()
   await bloc.locator('#nota-accio-data').fill(faDies(-7))
-  await bloc.getByRole('button', { name: /Afegeix la nota|Añade la nota/ }).click()
+  await bloc.getByRole('button', { name: /Afegeix la interacció|Añade la interacción/ }).click()
   await expect(bloc.getByTestId('nota')).toHaveCount(2)
   await expect(bloc.getByTestId('nota').first().getByTestId('nota-tipus')).toHaveText(/Incidència|Incidencia/)
   const pendents = bloc.getByTestId('seguiment')
@@ -200,10 +200,15 @@ test('1.5: tipus, propera acció i seguiments pendents', async ({ page }) => {
   // «Fet» la cierra y deja de estar pendiente.
   await page.goto(`/equip/entitats/${org}?pestanya=intern`)
   await expect(pendents).toHaveCount(2, { timeout: 20_000 })
+  // Desde el proceso 1.2, «Fet» pide el resultado (opcional) en un diálogo corto.
   await pendents.first().getByRole('button', { name: /^Fet$|^Hecho$/ }).click()
+  const dialeg = page.getByRole('dialog')
+  await dialeg.locator('#dialeg-motiu').fill('Conveni enviat per correu')
+  await dialeg.getByRole('button', { name: /Marca com a fet|Marcar como hecho/ }).click()
   await expect(pendents).toHaveCount(1)
-  expect(sql(`select (seguiment_fet_at is not null) || '|' || (seguiment_fet_per is not null) from notes_internes
-                where text = 'E2E 1F ${marca} vençuda'`)).toBe('true|true')
+  await expect(bloc.getByTestId('nota-resultat').first()).toContainText('Conveni enviat per correu')
+  expect(sql(`select (seguiment_fet_at is not null) || '|' || (seguiment_fet_per is not null) || '|' || resultat from notes_internes
+                where text = 'E2E 1F ${marca} vençuda'`)).toBe('true|true|Conveni enviat per correu')
   expect(sql(`select seguiments_pendents from v_entitats_llistat where id = '${org}'`)).toBe('1')
 })
 
