@@ -108,7 +108,7 @@ function dues(): FetsCanal {
   }
 }
 
-/** Una espigolada repartida: la jornada creó el REC y el reparto las salidas. */
+/** Un lote HEREDADO de una jornada (`origen = 'espigolament'`): la jornada creó el REC y el reparto las salidas. */
 function espigolada(): FetsCanal {
   return {
     ...base(),
@@ -213,7 +213,7 @@ describe('claves i18n', () => {
     for (const c of casos) for (const p of escalaCanal(c)) claus.add(clauPas(p))
     expect(claus.has('certificat_ct')).toBe(true)
     expect(claus.has('certificat_mixt')).toBe(true)
-    for (const k of ['albarans_venda', 'albarans_validar', 'albarans_espigolada']) {
+    for (const k of ['albarans_venda', 'albarans_validar']) {
       expect(claus.has(k), k).toBe(true)
     }
     for (const clau of claus) {
@@ -340,36 +340,28 @@ describe('el orden de las comprobaciones es la regla de negocio', () => {
   })
 })
 
-describe('una espigolada no recorre las seis fases', () => {
-  const f: FetsCanal = {
-    ...base(),
-    oferta: { estado: 'publicada', kg_total: 50, origen: 'espigolament' },
-    conveni_gen: { id: 'c1', estado: 'vigent' },
-  }
-
-  it('sus fases 2-4 salen HECHAS con su motivo, nunca pendientes', () => {
+// Fase 3 del plan de noviembre (25-11-2026): la espigolada es una oferta de DONACIÓN con el
+// producto en el campo y recorre las seis fases como cualquier otra. Sin `canal.bl_espigolada`.
+describe('una espigolada recorre las seis fases como cualquier donación', () => {
+  it('una oferta de espigolada de hoy (origen asistido) no se salta ningún paso', () => {
+    const f: FetsCanal = {
+      ...base(),
+      oferta: { estado: 'publicada', kg_total: 50, origen: 'asistido', modalitat: 'donacio' },
+      conveni_gen: { id: 'c1', estado: 'vigent' },
+    }
     const escala = escalaCanal(f)
-    for (const pas of ['oferta_publicar', 'distribuir', 'interes', 'conv_rec', 'aprovar'] as const) {
-      const p = escala.find((x) => x.pas === pas)!
-      expect(p.estat, `${pas} debería estar hecho en una espigolada`).toBe('fet')
-      expect(p.motiuKey).toBe('canal.bl_espigolada')
-    }
+    expect(escala.find((p) => p.pas === 'distribuir')!.estat).toBe('ara')
+    for (const p of escala) expect(p.motiuKey, p.pas).not.toBe('canal.bl_espigolada')
+    expect(puntCanal(f).fase).toBe(2)
   })
 
-  it('entra al ciclo por la fase de lliurament', () => {
-    expect(puntCanal(f).fase).toBe(4)
-  })
-
-  it('no le toca ni hora ni registro: sus albaranes los emite el equipo', () => {
+  it('un lote heredado de una jornada tampoco tiene ya pasos de jornada, pero sigue siendo donación', () => {
     const escala = escalaCanal(espigolada())
-    for (const pas of ['recollida_hora', 'recollida_registrar'] as const) {
-      const p = escala.find((x) => x.pas === pas)!
-      expect(p.estat, pas).toBe('fet')
-      expect(p.motiuKey).toBe('canal.bl_espigolada')
+    for (const p of escala) {
+      expect(p.motiuKey, p.pas).not.toBe('canal.bl_espigolada')
+      expect(clauPas(p), p.pas).not.toBe('albarans_espigolada')
     }
-    const alb = escala.find((x) => x.pas === 'albarans')!
-    expect(clauPas(alb)).toBe('albarans_espigolada')
-    expect(alb.estat).toBe('ara')
+    expect(certificatsDelLot(espigolada())).toEqual({ donacio: true, transaccio: false })
   })
 })
 

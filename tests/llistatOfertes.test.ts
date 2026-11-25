@@ -3,8 +3,10 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  CLAUS_PAS_LLISTAT, ESTATS_ACTIUS, ESTATS_HISTORIC, filtreCercaHistoric, kgDeLaFila, kgPerOferta, limitsDies,
+  CLAUS_PAS_LLISTAT, ESTATS_ACTIUS, ESTATS_HISTORIC, ORDRE_PER_DEFECTE, filtreCercaHistoric, filtreModalitatHistoric,
+  kgDeLaFila, kgPerOferta, limitsDies, llegeixOrdre,
   llegeixPestanya, nombrePagines, nomOfertant, ordenaPerData, pasDeLaFila, patroIlike, rangPagina, resumPerOferta, textPagina,
+  tipusOperacioDe, vencudaSenseResoldre,
   type CanalLlistat, type OfertaLlistat,
 } from '../src/lib/llistatOfertes'
 import { DICTS } from '../src/lib/i18n'
@@ -242,9 +244,43 @@ describe('columnas del listado (20-11-2026)', () => {
   })
 })
 
+describe('fase 4: orden por disponibilidad, tipus d\'operació y modalidad prevista', () => {
+  it('el orden por defecto es la disponibilidad; lo desconocido, también', () => {
+    expect(ORDRE_PER_DEFECTE).toBe('disponibilitat')
+    expect(llegeixOrdre(null)).toBe('disponibilitat')
+    expect(llegeixOrdre('xx')).toBe('disponibilitat')
+    for (const o of ['disponibilitat', 'disponibilitat_desc', 'recent', 'antiga']) expect(llegeixOrdre(o)).toBe(o)
+  })
+
+  it('vencida sin resolver: pasada la fecha y con kilos sin salida', () => {
+    expect(vencudaSenseResoldre({ disponible_hasta: '2026-11-01', kg_total: 100 }, 40, ara)).toBe(true)
+    expect(vencudaSenseResoldre({ disponible_hasta: '2026-11-01', kg_total: 100 }, 100, ara)).toBe(false)
+    expect(vencudaSenseResoldre({ disponible_hasta: '2026-12-01', kg_total: 100 }, 0, ara)).toBe(false)
+    expect(vencudaSenseResoldre({ disponible_hasta: null, kg_total: 100 }, 0, ara)).toBe(false)
+  })
+
+  it('tipus d\'operació: la columna manda; sin ella, se deduce como la base', () => {
+    expect(tipusOperacioDe({ tipus_operacio: 'espigolada' })).toBe('espigolada')
+    expect(tipusOperacioDe({ tipus_operacio: 'excedent', espigolada_demanada: true })).toBe('excedent')
+    expect(tipusOperacioDe({ espigolada_demanada: true })).toBe('espigolada')
+    expect(tipusOperacioDe({ espigolada_id: 'j1' })).toBe('espigolada')
+    expect(tipusOperacioDe({})).toBe('excedent')
+  })
+
+  it('la modalidad prevista del Històric: lista o la de siempre, y nada que no sea una modalidad', () => {
+    expect(filtreModalitatHistoric('maquila')).toBe('modalitats.cs.{maquila},modalitat.eq.maquila')
+    expect(filtreModalitatHistoric('espigolada')).toBeNull()
+    expect(filtreModalitatHistoric('venda),estado.eq.(cerrada')).toBeNull()
+    expect(filtreModalitatHistoric('')).toBeNull()
+    expect(filtreModalitatHistoric(undefined)).toBeNull()
+  })
+})
+
 describe('claves i18n de las columnas nuevas', () => {
-  const claus = ['off.c_data', 'off.c_ofertant', 'off.kg_oferts', 'off.kg_sortida', 'off.ordre_data_recent',
-    'off.ordre_data_antiga', 'fl.o_antiga', 'fl.o_tancament_recent', 'fl.o_tancament_antic']
+  const claus = ['off.c_disponibilitat', 'off.c_ofertant', 'off.kg_oferts', 'off.kg_sortida', 'off.ordre_disp_asc',
+    'off.ordre_disp_desc', 'off.disponible_fins', 'off.sense_disponibilitat', 'fl.o_antiga', 'fl.o_disponibilitat',
+    'fl.o_disponibilitat_desc', 'fl.o_tancament_recent', 'fl.o_tancament_antic', 'fl.d_tipus_operacio',
+    'fl.d_modalitat_prevista', 'fl.r_disponibilitat', 'tipop.excedent', 'tipop.espigolada']
   it.each(claus)('%s existe en ca y es', (c) => {
     expect(DICTS.ca[c]).toBeTruthy()
     expect(DICTS.es[c]).toBeTruthy()

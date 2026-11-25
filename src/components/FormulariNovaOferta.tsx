@@ -62,12 +62,16 @@ import { esborraFoto } from '../lib/fotos'
 import { useConfirma } from './DialegConfirma'
 import type { Excedente } from '../types'
 import { modalitatsDe } from '../lib/modalitats'
+import {
+  ambReglaEspigolada, espigoladaMarcada, ofereixEspigolada, triaEspigolada, triaModalitat,
+} from '../lib/modalitatsOferta'
 import { esFranjaValida } from '../lib/franja'
-import { useAppContext } from '../hooks/useAppContext'
 import type { Franja } from '../lib/franja'
 import type { Municipi } from '../lib/municipis'
 import SelectorMunicipi from './SelectorMunicipi'
 import SelectorFranja from './SelectorFranja'
+import EditorDiesFranges from './EditorDiesFranges'
+import { franjaDinsDelLloc, frangesDelLloc, normalitzaDies } from '../lib/diesRecollida'
 import Desplegable from './Desplegable'
 import CercadorOpcions from './CercadorOpcions'
 import TriaSiNo from './TriaSiNo'
@@ -204,9 +208,6 @@ export interface ResultatNovaOferta {
   id: string
   /** `enviat` cuando la confirmación por correo salió de verdad. */
   confirmacio_email?: string | null
-  /** «Espigolada» del equipo: la jornada que se creó en el acto (o por qué no). */
-  espigolada_id?: string | null
-  espigolada_error?: string | null
 }
 
 /** `crear` (alta), `esborrany` (reabrir uno guardado) o `editar` (una oferta publicada). */
@@ -256,9 +257,6 @@ export default function FormulariNovaOferta({
   const { t, lang } = useT()
   const { confirma, dialeg: dialegConfirma } = useConfirma()
   const editar = mode === 'editar'
-  // «Espigolada» en el alta (20-11-2026): el equipo la convierte en el acto en una jornada; la
-  // productora la pide y la decide el equipo. El texto de la opción lo dice según quién la ve.
-  const esIntern = useAppContext().ctx?.esIntern ?? false
   /** Lo que la oferta decía al abrirla (editar): para no exigir lo que ya faltaba antes. */
   const original = useMemo<Datos>(() => (oferta ? datosDeFila(oferta) : {}), [oferta])
   // El descriptor tal como llega (catalán + castellano), y debajo, en el idioma de la pantalla.
@@ -284,8 +282,13 @@ export default function FormulariNovaOferta({
    * vacíe algo anterior. Viaja en el borrador como `pasMaxim` (el nombre de cuando era por pasos).
    */
   const [obertsFins, setObertsFins] = useState(0)
-  /** El mini-formulario de «un lloc nou», dentro de la sección de recogida. */
-  const [llocNou, setLlocNou] = useState<{ alias: string; maps: string; municipi: Municipi | null } | null>(null)
+  /**
+   * El mini-formulario de «un lloc nou», dentro de la sección de recogida. Fase 4 (25-11-2026):
+   * también sus días y franjas (`EditorDiesFranges`), que se guardan en la ficha del lugar.
+   */
+  const [llocNou, setLlocNou] = useState<{
+    alias: string; maps: string; municipi: Municipi | null; dies: number[]; franges: (Partial<Franja> | null)[]
+  } | null>(null)
   const [desantLloc, setDesantLloc] = useState(false)
   /**
    * Lo que la Operativa ha propuesto y nadie ha tocado todavía (A4): se marca «proposat des
@@ -298,6 +301,8 @@ export default function FormulariNovaOferta({
    */
   const [canviaLloc, setCanviaLloc] = useState(false)
   const estatLloc = estatLlocHabitual(datos.ubicacio, proposats.has('ubicacio'), catalogos?.ubicaciones ?? [], canviaLloc)
+  /** Fase 4: el lugar elegido (sus días y franjas limitan los de la oferta). */
+  const llocTriat = (catalogos?.ubicaciones ?? []).find((u) => u.id === String(datos.ubicacio ?? ''))
   /**
    * El coste por kilo lo decide el productor (27-09-2026), partiendo de la REFERENCIA del
    * producto: al elegir producto se prellena con ella, y en cuanto el productor lo toca ya no
@@ -421,7 +426,8 @@ export default function FormulariNovaOferta({
           else delete nou.cost_kg
         }
       }
-      return nou
+      // Sin producto en el campo no hay espigolada (`lib/modalitatsOferta.ts`).
+      return ambReglaEspigolada(nou)
     })
     // En cuanto se toca un campo marcado, deja de estarlo: el rojo es «esto faltaba», no
     // «esto está mal», así que no tiene sentido que sobreviva a la primera letra escrita.
@@ -439,11 +445,13 @@ export default function FormulariNovaOferta({
    * el lugar nuevo (marcados como propuestos) y el enlace de Maps escrito para el anterior se
    * quita. Confirmar el mismo lugar no toca nada; vaciarlo («Canvia el lloc») tampoco.
    */
-  function triaLloc(id: string) {
+  function triaLloc(id: string, llocNouCreat?: CatalogosOferta['ubicaciones'][number]) {
     const abans = String(datos.ubicacio ?? '')
     set('ubicacio', id)
     if (!id || id === abans) return
-    const lloc = (catalogos?.ubicaciones ?? []).find((u) => u.id === id)
+    // El lugar recién creado todavía no está en `catalogos` (el `setCatalogos` no ha pintado):
+    // se pasa entero para que sus días y franjas lleguen a la oferta.
+    const lloc = llocNouCreat ?? (catalogos?.ubicaciones ?? []).find((u) => u.id === id)
     const r = recalculaDelLloc(datos, lloc)
     setDatos((d) => {
       const nou: Datos = { ...d, ubicacio: id }
@@ -532,17 +540,25 @@ export default function FormulariNovaOferta({
     if (!llocNou.alias.trim()) { toast.error(t('po.place_need_name')); return }
     setDesantLloc(true)
     const gmaps = llocNou.maps.trim() || null
+    // Fase 4: los días y las franjas del lugar nuevo van a su ficha (una franja a medias no).
+    const franges = llocNou.franges.filter((x): x is Franja => esFranjaValida(x))
+    const dies_setmana = llocNou.dies.length ? [...llocNou.dies].sort((a, b) => a - b) : null
     const r = await creaUbicacio({
       productorId,
       alias: llocNou.alias.trim(),
       gmapsUrl: gmaps,
       municipi: llocNou.municipi ? { codi_ine: llocNou.municipi.codi_ine, nom: llocNou.municipi.nom } : null,
+      // El resto de la ficha del lugar no se pregunta aquí: nace vacío (se completa en la ficha).
+      extra: {
+        direccion: null, contacto_nombre: null, contacto_telefono: null, horario: null, observaciones: null,
+        dies_setmana, franges: franges.length ? franges : null,
+      },
     })
     setDesantLloc(false)
     if (!r.ok || !r.data) { toast.error(textError(t, r.error)); return }
-    const nou = { ...r.data, gmaps_url: gmaps }
+    const nou = { ...r.data, gmaps_url: gmaps, dies_setmana, franges: franges.length ? franges : null }
     setCatalogos((c) => (c ? { ...c, ubicaciones: [...c.ubicaciones, nou] } : c))
-    triaLloc(nou.id)
+    triaLloc(nou.id, nou)
     setLlocNou(null)
     toast.success(t('po.place_saved'))
   }
@@ -834,16 +850,27 @@ export default function FormulariNovaOferta({
           </div>
         )
       }
-      case 'dies':
-        // Los días de recogida (17-11-2026, solo panel): los del lugar, editables.
+      case 'dies': {
+        // Los días de recogida (17-11-2026, solo panel): los del lugar, editables. Fase 4: si el
+        // lugar elegido tiene días, solo esos se pueden marcar (un día ya marcado que no es del
+        // lugar se puede quitar, no añadir).
+        const diesLloc = normalitzaDies(llocTriat?.dies_setmana)
         return (
           <div id={id} tabIndex={-1} className={cn('rounded-md', invalid && 'ring-2 ring-destructive/40')}>
             <XipsTria etiquetaId={`${id}-l`}
-              opcions={DIES.map((d) => ({ valor: String(d), text: t(`org.dia_${d}`) }))}
+              opcions={DIES.map((d) => ({
+                valor: String(d), text: t(`org.dia_${d}`), desactivat: diesLloc.length > 0 && !diesLloc.includes(d),
+              }))}
               triats={Array.isArray(valor) ? (valor as unknown[]).map(String) : []}
               onChange={(v) => set(campo.clave, v.map(Number).sort((a, b) => a - b))} />
+            {diesLloc.length > 0 && (
+              <p className="mt-1 text-xs text-muted-foreground" data-testid="of-dies-del-lloc">
+                {t('po.dies_del_lloc', { dies: diesLloc.map((d) => t(`org.dia_${d}`)).join(', ') })}
+              </p>
+            )}
           </div>
         )
+      }
       case 'ubicacio': {
         const ubis = catalogos?.ubicaciones ?? []
         if (estatLloc.tipus !== 'llista') {
@@ -899,7 +926,7 @@ export default function FormulariNovaOferta({
                 camps i magatzems, i obligar-lo a anar a la fitxa a mig alta és perdre'l. */}
             {!llocNou ? (
               <Button type="button" variant="outline" className="h-11 whitespace-normal md:h-8"
-                onClick={() => setLlocNou({ alias: '', maps: '', municipi: null })}>
+                onClick={() => setLlocNou({ alias: '', maps: '', municipi: null, dies: [], franges: [] })}>
                 <Plus className="size-4" aria-hidden /> {t('po.place_add')}
               </Button>
             ) : (
@@ -923,6 +950,10 @@ export default function FormulariNovaOferta({
                     placeholder="https://maps.app.goo.gl/…"
                     onChange={(e) => setLlocNou((l) => (l ? { ...l, maps: e.target.value } : l))} />
                 </div>
+                {/* Fase 4: los días y las franjas del lugar, que quedan en su ficha y la oferta hereda. */}
+                <EditorDiesFranges idPrefix="of-lloc" dies={llocNou.dies} franges={llocNou.franges}
+                  onDies={(dies) => setLlocNou((l) => (l ? { ...l, dies } : l))}
+                  onFranges={(franges) => setLlocNou((l) => (l ? { ...l, franges } : l))} />
                 <div className="flex flex-wrap gap-2 sm:col-span-2">
                   <Button type="button" className="h-11 whitespace-normal md:h-8" disabled={desantLloc}
                     onClick={() => void desaLlocNou()}>
@@ -942,21 +973,21 @@ export default function FormulariNovaOferta({
           // VARIAS a la vez (05-10-2026): una casilla por opción, con su explicación al lado,
           // que aquí sí cabe. El valor es la lista de ids, en el orden de las opciones.
           const triades = modalitatsDe(valor) as string[]
-          // «Espigolada» va con las modalidades pero NO es una (20270614100000): excluye las otras
-          // tres. Por debajo viaja como donación con el producto en el campo y `espigolada: true`.
-          const ambEspigolada = campo.clave === 'modalitat' && !editar
-          const espigolada = ambEspigolada && datos.espigolada === true
+          // «Espigolada» va con las modalidades pero NO es una: es una donación con el producto
+          // en el campo. Sale solo con el producto en el campo, en el alta Y al editar (proceso
+          // 3.4); la regla, una sola y pura, en `lib/modalitatsOferta.ts`.
+          const ambEspigolada = campo.clave === 'modalitat' && ofereixEspigolada(datos)
+          const espigolada = ambEspigolada && espigoladaMarcada(datos)
           const canvia = (idOpcio: string, on: boolean) => {
-            const nou = (campo.opciones ?? [])
-              .map((o) => o.id)
-              .filter((x) => (x === idOpcio ? on : !espigolada && triades.includes(x)))
-            if (espigolada) set('espigolada', false)
-            set(campo.clave, nou)
+            const r = triaModalitat(datos, (campo.opciones ?? []).map((o) => o.id), idOpcio, on)
+            if (r.espigolada === false) set('espigolada', false)
+            set(campo.clave, r.modalitat)
           }
-          const triaEspigolada = (on: boolean) => {
-            set('espigolada', on)
-            set(campo.clave, on ? ['donacio'] : [])
-            if (on) set('producte_al_camp', 'si')
+          const triaEsp = (on: boolean) => {
+            const r = triaEspigolada(on)
+            set('espigolada', r.espigolada)
+            set(campo.clave, r.modalitat)
+            if (r.producte_al_camp) set('producte_al_camp', r.producte_al_camp)
           }
           return (
             <div id={id} role="group" aria-invalid={invalid}
@@ -969,11 +1000,9 @@ export default function FormulariNovaOferta({
               ))}
               {ambEspigolada && (
                 <div data-testid="of-espigolada">
-                  <FilaCasella checked={espigolada} onChange={triaEspigolada}>
+                  <FilaCasella checked={espigolada} onChange={triaEsp}>
                     <span className="font-medium">{t('po.mod_espigolada')}</span>
-                    <span className="block text-xs text-muted-foreground">
-                      {t(esIntern ? 'po.mod_espigolada_d_equip' : 'po.mod_espigolada_d')}
-                    </span>
+                    <span className="block text-xs text-muted-foreground">{t('po.mod_espigolada_d')}</span>
                   </FilaCasella>
                 </div>
               )}
@@ -1060,9 +1089,22 @@ export default function FormulariNovaOferta({
           )
         }
         if (campo.format === 'franja') {
-          // De qué hora a qué hora (05-10-2026): `SelectorFranja`, hora y cuarto.
-          return <SelectorFranja id={id} valor={valor as Partial<Franja> | null} invalid={invalid}
-            onChange={(f) => set(campo.clave, f)} />
+          // De qué hora a qué hora (05-10-2026): `SelectorFranja`, hora y cuarto. Fase 4: si el
+          // lugar tiene franjas, se dicen debajo y se avisa si la de la oferta queda fuera.
+          const frangesLloc = frangesDelLloc(llocTriat?.franges)
+          const fora = !franjaDinsDelLloc(valor as Partial<Franja> | null, frangesLloc)
+          const textFranges = frangesLloc.map((x) => `${x.inici}–${x.fi}`).join(', ')
+          return (
+            <div className="min-w-0">
+              <SelectorFranja id={id} valor={valor as Partial<Franja> | null} invalid={invalid}
+                onChange={(f) => set(campo.clave, f)} />
+              {frangesLloc.length > 0 && (
+                <p className={cn('mt-1 text-xs', fora ? 'text-aviso' : 'text-muted-foreground')} data-testid="of-franges-del-lloc">
+                  {t(fora ? 'po.franja_fora_lloc' : 'po.franges_del_lloc', { franges: textFranges })}
+                </p>
+              )}
+            </div>
+          )
         }
         if (campo.clave === 'varietat') {
           return (
@@ -1095,6 +1137,8 @@ export default function FormulariNovaOferta({
   const revalidara = editar && oferta !== null && !esEquip && oferta.estado !== 'pendent_validacio' && (
     Number(datos.kg) !== Number(oferta.kg_total ?? 0)
     || modalitatsTriades.join() !== modalitatsDe(oferta.modalitats?.length ? oferta.modalitats : oferta.modalitat).join()
+    // Marcar la espigolada también la devuelve a validación (`editar_oferta`, 20270617100300).
+    || (espigoladaMarcada(datos) && !oferta.espigolada_demanada)
   )
   const avisModalitats = !motiuConveni && bloquejades.length > 0
     ? t('po.mod_sense_conveni', { mods: bloquejades.map((m) => t(`od.mod_${m}`)).join(', ') })

@@ -946,3 +946,35 @@ actualitzada_at}`, equipo) y la interna `signant_equip_actual()`. `emitir_albara
 | `interaccions_llistat(…)` / `interaccions_opcions()` | `es_intern()` (externo `42501`) | solo lectura; la fila, en la interna `interaccions_base` (solo `service_role`) |
 
 Arnés: externos denegados, equipo permitido (clon 2.508/2.508 y 41 sin datos).
+
+### Fases 3 y 4 del plan DIC 26 (25-11-2026)
+
+| RPC | Cambio |
+| --- | --- |
+| `crear_espigolada`, `repartir_espigolada` | `revoke execute` de todos (`20270617100100`): la espigolada ya no crea jornada |
+| `editar_oferta` | admite `espigolada_demanada` (`20270617100300`) |
+| `entrades_sortides(…, p_tipus_operacio, p_limit, p_offset)` / `entrades_sortides_resum(…, p_tipus_operacio, p_per)` | `es_intern()`; externo `42501` antes que `22023 tipus_operacio_invalid`/`modalitat_invalida` (`20270618100000`) |
+| `comprova_hora_recollida` | `dia_fora_dies` solo si `auth.uid()` no es nulo y no es `es_intern()`; `respondre_proposta` no envía hora (`20270618100200`) |
+| `trg_excedentes_lloc_des_de_oferta()` | `security definer`, sin EXECUTE para nadie |
+
+Arnés: clon 2.530/2.530 y 41 sin datos tras la fase 4.
+
+### Operació realitzada (proceso 3.7, `20270619100200`, 25-11-2026)
+
+`registrar_operacio_realitzada(p_productor uuid, p_producto text, p_kg numeric, p_data date, p_modalitat text,
+p_destinataris jsonb, p_destins jsonb default '[]', p_variedad text, p_ubicacion uuid, p_espigolada boolean default false,
+p_subcausa text, p_hora time, p_coste_kg numeric, p_observacions text, p_id_excedente text, p_texto_oferta text) returns jsonb`
+
+- Quién: `pot_aprovar()` **con sesión**; `service_role` también recibe `42501` (`validar_recollida` exige saber quién valida).
+- `p_destinataris` `[{entidad_id, kg>0, preu_kg (venta, ≥0), caixes?}]` (≥1); `p_destins` `[{desti, kg>0, receptor?, notes?}]`.
+  Sin `p_ubicacion`, el lugar principal; sin `p_hora`, las 12:00 de Madrid (o ahora si es hoy).
+- Devuelve `{excedente_id, id_excedente, estado, data, data_hora, kg_total, kg_destinataris, kg_destins, canalitzacions:[…]}`.
+- Errores: `42501` (sin permiso; `sense_conveni`); `22023` `modalitat_invalida`, `espigolada_nomes_donacio`, `kg_invalids`,
+  `cal_data`, `data_futura`, `fora_exercici`, `observacions_llargues`, `preu_invalid`, `productor_inexistent`,
+  `producte_desconegut`, `ubicacio_aliena`, `cal_destinatari`, `destinatari_invalid`, `entitat_repetida`,
+  `entitat_inexistent`, `cal_preu_acordat`, `destins_invalids`, `desti_desconegut`, `kg_no_quadren`, `periode_certificat`,
+  `id_excedent_invalid`, `id_excedent_ocupat`; más los de las funciones reutilizadas (`entitat_inactiva`, P8, subcausa);
+  `23505` si el identificador ya existe.
+- `periode_certificat`: CDP de periodo con número del donante, CD anual del ejercicio o CR de una entidad destinataria
+  (cuentan también los de prueba, deuda 209).
+- `siglas_oferta(text)`: interna, sin EXECUTE. Arnés: `OPERACIO_REALITZADA_*` (clon 2.546/2.546 y 41 sin datos).

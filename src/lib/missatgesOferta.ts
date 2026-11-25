@@ -204,7 +204,9 @@ export function missatgesDeLOferta(f: FetsMissatges, o: OpcionsMissatges): Missa
     tipus === 'entidad' ? (f.entitats?.[id] ?? null) : (f.productor?.id === id ? f.productor.nom : null)
 
   // 1. Lo que el productor recibe al registrar la oferta (intake por WhatsApp, panel o
-  //    asistida; no las espigoladas, que no tienen productor que avise).
+  //    asistida). Una espigolada de hoy (`tipus_operacio = 'espigolada'`, fase 3 del
+  //    25-11-2026) es una oferta más y lo tiene; solo el lote HEREDADO de una jornada
+  //    (`origen = 'espigolament'`, ya no nace ninguno) no tuvo alta que avisar.
   if (oferta.origen !== 'espigolament' && oferta.id_excedente) {
     // Esperó validación si ahora la espera o si ya la pasó.
     const estatInicial = oferta.estado === 'pendent_validacio' || oferta.validada_at

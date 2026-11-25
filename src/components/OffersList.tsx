@@ -28,11 +28,17 @@
 //   · Los kilos canalizados ya no suman las canalizaciones anuladas.
 //   · El orden por defecto es «Més recents».
 
-// COLUMNAS (20-11-2026): referencia · fecha · ofertante · producto (con los kg ofrecidos) ·
-// progreso (kg con salida y pendientes) · estado. Los RECEPTORES no son columna: una oferta se
-// reparte entre varios y se ven en el detalle. La cabecera «Data» ordena (recent ↔ antiga). Los
-// breakpoints (fecha `md`, ofertante `xl`, referencia `2xl`) salen de medir: con el menú lateral
-// la tabla solo tiene ~700 px a 1024. Detalle en `context/06ter` y `lib/llistatOfertes.ts`.
+// COLUMNAS (fase 4, 25-11-2026): disponibilidad · ofertante · producto (con los kg ofrecidos) ·
+// progreso (kg con salida y pendientes) · estado (badge de color y el paso debajo). La REFERENCIA
+// ya no se enseña (ni columna ni línea): vive en el detalle y el buscador la sigue encontrando. Los
+// RECEPTORES no son columna: una oferta se reparte entre varios y se ven en el detalle.
+// ORDEN por defecto: por disponibilidad —las vencidas sin resolver arriba, después la que se acaba
+// antes y las que no tienen fecha al final—; la cabecera «Disponibilitat» invierte el sentido. El
+// Històric sigue con su orden de cierre. Los breakpoints (disponibilidad `md`, ofertante `xl`) salen
+// de medir: con el menú lateral la tabla solo tiene ~700 px a 1024; hasta `xl` el ofertante va bajo
+// el producto, en el color del texto (no en gris). Filtros nuevos: tipus d'operació (excedent ja
+// collit · espigolada) y modalitat de sortida prevista, también en el Històric (en el servidor);
+// una espigolada lleva su badge en la fila. Detalle en `context/06ter` y `lib/llistatOfertes.ts`.
 
 import { useSearchParams } from 'react-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -46,6 +52,7 @@ import { modalitatsOferta } from '../lib/modalitats'
 import { provinciesDe } from '../lib/territori'
 import { useTerritori } from '../hooks/useTerritori'
 import { filtraLlistat, opcionsDisponibles, ordenaPerDisponibilitat, type Dimensio } from '../lib/filtres'
+import { clauTipusOperacio, esTipusOperacio, textDia } from '../lib/sortides'
 import { useFiltresLlistat } from '../hooks/useFiltresLlistat'
 import BarraFiltres from './BarraFiltres'
 import Desplegable from './Desplegable'
@@ -53,12 +60,15 @@ import { dataCurta, kg as fmtKg } from '../lib/format'
 import { useCerca } from '../hooks/useCerca'
 import { etiquetaEstatOferta, llegendaOferta } from '../lib/procesOferta'
 import {
-  ESTATS_ACTIUS, ESTATS_HISTORIC, ESTATS_REC_VIU, MIDA_PAGINA_HISTORIC,
-  filtreCercaHistoric, kgDeLaFila, kgPerOferta, limitsDies, llegeixPestanya, nombrePagines, nomOfertant,
-  ordenaPerData, pasDeLaFila, rangPagina, resumPerOferta, textPagina,
-  type CanalLlistat, type OfertantLlistat, type OrdreData, type RecLlistat, type RespostaLlistat, type ResumOferta,
+  ESTATS_ACTIUS, ESTATS_HISTORIC, ESTATS_REC_VIU, MIDA_PAGINA_HISTORIC, ORDRE_PER_DEFECTE,
+  filtreCercaHistoric, filtreModalitatHistoric, kgDeLaFila, kgPerOferta, limitsDies, llegeixOrdre, llegeixPestanya,
+  nombrePagines, nomOfertant, ordenaPerData, pasDeLaFila, rangPagina, resumPerOferta, textPagina, tipusOperacioDe,
+  vencudaSenseResoldre,
+  type CanalLlistat, type OfertantLlistat, type OrdreData, type OrdreLlistat, type RecLlistat, type RespostaLlistat,
+  type ResumOferta,
 } from '../lib/llistatOfertes'
 import LlegendaEstats from './proces/LlegendaEstats'
+import BadgeEspigolada from './BadgeEspigolada'
 import type { Excedente } from '../types'
 import CarregantSeccio from './CarregantSeccio'
 import BotoIcona from './BotoIcona'
@@ -88,6 +98,9 @@ interface FilaOpcioHistoric {
   producto: string | null
   productor_id: string | null
   tancada_at: string | null
+  tipus_operacio: string | null
+  modalitat: Excedente['modalitat']
+  modalitats: Excedente['modalitats']
   productores: { name: string | null; empresa: string | null } | null
 }
 
@@ -213,34 +226,43 @@ export default function OffersList({ onOpen, accio }: Props) {
   }
 
   // --- Filtros de Actives, Per validar y Esborranys (en el cliente, como antes) -------------
-  // Provincia, zona, municipio, tipo de producto, producto y modalidad, más la fecha de alta y
-  // el orden. Provincia y municipio (16-11-2026) salen del `municipi_ine` de la oferta y del
-  // catálogo; la modalidad mira TODAS las de la oferta (`modalitats`), no solo la primera.
+  // Provincia, zona, municipio, tipo de producto, producto, modalidad de salida prevista y
+  // tipus d'operació, más la fecha de DISPONIBILIDAD (fase 4; antes, la de alta) y el orden.
+  // Provincia y municipio (16-11-2026) salen del `municipi_ine` de la oferta y del catálogo; la
+  // modalidad mira TODAS las de la oferta (`modalitats`), no solo la primera.
   const f = useFiltresLlistat('equip-ofertes')
   const territori = useTerritori()
-  // `recent`/`antiga` = por fecha de alta, en el sentido que se pida; `disponibilitat` = lo que
-  // caduca antes (solo Actives, Per validar y Esborranys). La columna «Data» alterna los dos primeros.
-  const [ordre, setOrdre] = useState<OrdreData | 'disponibilitat'>('recent')
-  const alternaOrdreData = () => setOrdre((o) => (o === 'recent' ? 'antiga' : 'recent'))
+  // `disponibilitat` (por defecto) = las vencidas sin resolver y después lo que caduca antes;
+  // `disponibilitat_desc` = al revés; `recent`/`antiga` = por fecha de alta. La cabecera
+  // «Disponibilitat» alterna los dos primeros.
+  const [ordre, setOrdre] = useState<OrdreLlistat>(ORDRE_PER_DEFECTE)
+  const alternaOrdreDisponibilitat = () => setOrdre((o) => (o === 'disponibilitat' ? 'disponibilitat_desc' : 'disponibilitat'))
   const dims = useMemo<Dimensio<FilaOferta>[]>(() => [
     { clau: 'provincia', etiquetaKey: 'fl.d_provincia', valor: (o) => provinciesDe(o.municipi_ine, o.comarca, territori.perComarca) },
     { clau: 'comarca', etiquetaKey: 'fl.d_comarca', valor: (o) => o.comarca },
     { clau: 'municipi', etiquetaKey: 'fl.d_municipi', valor: (o) => territori.nomMunicipi(o.municipi_ine) },
     { clau: 'categoria', etiquetaKey: 'fl.d_categoria', valor: (o) => categoriaDeFamilia(o.familia) },
     { clau: 'producte', etiquetaKey: 'fl.d_producte', valor: (o) => o.producto },
-    { clau: 'modalitat', etiquetaKey: 'fl.d_modalitat', valor: (o) => modalitatsOferta(o) },
+    { clau: 'modalitat', etiquetaKey: 'fl.d_modalitat_prevista', valor: (o) => modalitatsOferta(o) },
+    { clau: 'tipus_operacio', etiquetaKey: 'fl.d_tipus_operacio', valor: (o) => tipusOperacioDe(o) },
   ], [territori])
-  const rang = useMemo(() => ({ data: (o: FilaOferta) => o.created_at, desDe: f.desDe, finsA: f.finsA }), [f.desDe, f.finsA])
+  const rang = useMemo(() => ({ data: (o: FilaOferta) => o.disponible_hasta, desDe: f.desDe, finsA: f.finsA }), [f.desDe, f.finsA])
 
   const filtra = useCallback((files: FilaOferta[]) => {
     // El buscador también encuentra por ofertante (20-11-2026): es la columna con la que se
     // reconoce una oferta cuando no se sabe su referencia.
     const r = filtraLlistat(filtraCerca(files, q,
       (o) => [o.id_excedente, o.producto, o.variedad, nomOfertant(o.productores), t(etiquetaEstatOferta(o.estado).key)]), dims, f.valors, rang)
-    return ordre === 'disponibilitat'
-      ? ordenaPerDisponibilitat(r, (o) => (ESTATS_ACTIUS as readonly string[]).includes(o.estado))
-      : ordenaPerData(r, (o) => o.created_at, ordre, (o) => o.id)
-  }, [q, t, dims, f.valors, rang, ordre])
+    if (ordre === 'recent' || ordre === 'antiga') return ordenaPerData(r, (o) => o.created_at, ordre, (o) => o.id)
+    // Por disponibilidad, todas «en curso» (Esborranys incluidas: no hay cerradas aquí); las
+    // vencidas sin resolver, solo entre las activas.
+    const ara = new Date()
+    return ordenaPerDisponibilitat(r, () => true, {
+      sentit: ordre === 'disponibilitat_desc' ? 'desc' : 'asc',
+      vencuda: (o) => (ESTATS_ACTIUS as readonly string[]).includes(o.estado)
+        && vencudaSenseResoldre(o, resum[o.id]?.kgCanalitzats ?? 0, ara),
+    })
+  }, [q, t, dims, f.valors, rang, ordre, resum])
 
   const vives = useMemo(() => [...actives, ...esborranys], [actives, esborranys])
 
@@ -262,9 +284,9 @@ export default function OffersList({ onOpen, accio }: Props) {
   }, [cerca])
   // La página va atada a los filtros con los que se pidió: cambiar un filtro vuelve a la 1
   // sin un efecto que la resetee (que pediría primero la página vieja con el filtro nuevo).
-  // El Històric solo conoce dos sentidos (por cierre, y por alta si no se cerró): `disponibilitat` es
-  // de las pestañas vivas y aquí cuenta como «més recent».
-  const ordreHist: OrdreData = ordre === 'antiga' ? 'antiga' : 'recent'
+  // El Històric solo conoce dos sentidos (por cierre, y por alta si no se cerró): tiene su propio
+  // desplegable; el orden por disponibilidad es de las pestañas vivas.
+  const [ordreHist, setOrdreHist] = useState<OrdreData>('recent')
   const clauFiltresHist = JSON.stringify([fh.valors, fh.desDe, fh.finsA, cercaHist.trim(), ordreHist])
   const [paginaHist, setPaginaHist] = useState({ clau: clauFiltresHist, n: 0 })
   const pagina = paginaHist.clau === clauFiltresHist ? paginaHist.n : 0
@@ -286,6 +308,11 @@ export default function OffersList({ onOpen, accio }: Props) {
       let consulta = supabase.from('excedentes').select('*, productores(name, empresa)', { count: 'exact' }).in('estado', estats)
       if (fh.valors.producte) consulta = consulta.eq('producto', fh.valors.producte)
       if (fh.valors.productor) consulta = consulta.eq('productor_id', fh.valors.productor)
+      // Fase 4: tipus d'operació (columna generada) y modalidad prevista (lista o la de siempre).
+      // Lo que no vale (un filtro viejo recordado) no llega a la base.
+      if (esTipusOperacio(fh.valors.tipus_operacio)) consulta = consulta.eq('tipus_operacio', fh.valors.tipus_operacio)
+      const modOr = filtreModalitatHistoric(fh.valors.modalitat)
+      if (modOr) consulta = consulta.or(modOr)
       const cercaOr = filtreCercaHistoric(cercaHist)
       if (cercaOr) consulta = consulta.or(cercaOr)
       // La fecha de cierre, en días locales inclusivos. Una cancelada no tiene `tancada_at`:
@@ -332,7 +359,7 @@ export default function OffersList({ onOpen, accio }: Props) {
     let viu = true
     void (async () => {
       const { data, count } = await supabase.from('excedentes')
-        .select('estado, producto, productor_id, tancada_at, productores(name, empresa)', { count: 'exact' })
+        .select('estado, producto, productor_id, tancada_at, tipus_operacio, modalitat, modalitats, productores(name, empresa)', { count: 'exact' })
         .in('estado', ESTATS_HISTORIC)
         .order('created_at', { ascending: false })
         .limit(TOPE_OPCIONS_HISTORIC)
@@ -354,6 +381,8 @@ export default function OffersList({ onOpen, accio }: Props) {
     { clau: 'estat', etiquetaKey: 'fl.d_estat', valor: (o) => o.estado },
     { clau: 'producte', etiquetaKey: 'fl.d_producte', valor: (o) => o.producto },
     { clau: 'productor', etiquetaKey: 'fl.d_ofertant', valor: (o) => o.productor_id },
+    { clau: 'modalitat', etiquetaKey: 'fl.d_modalitat_prevista', valor: (o) => modalitatsOferta(o) },
+    { clau: 'tipus_operacio', etiquetaKey: 'fl.d_tipus_operacio', valor: (o) => tipusOperacioDe(o) },
   ], [])
   const rangHist = useMemo(() => ({ data: (o: FilaOpcioHistoric) => o.tancada_at, desDe: fh.desDe, finsA: fh.finsA }), [fh.desDe, fh.finsA])
 
@@ -362,31 +391,34 @@ export default function OffersList({ onOpen, accio }: Props) {
   const ambHistoric = useMemo(() => [...vives, ...historic], [vives, historic])
   const foto = useFotosOfertes(ambHistoric)
 
-  function taula(files: FilaOferta[], buitKey: string, kgDe: (o: Excedente) => number, ambPas: boolean) {
+  function taula(files: FilaOferta[], buitKey: string, kgDe: (o: Excedente) => number, ambPas: boolean, ordenable: boolean) {
     if (files.length === 0) return <p className="text-sm text-muted-foreground">{t(buitKey)}</p>
     // El criterio de las tablas (03-11-2026, AGENTS.md §2): cabe sin scroll horizontal. Orden de
-    // aparición al ensanchar (20-11-2026): en móvil quedan producto (con kilos ofrecidos, fecha,
-    // ofertante y referencia debajo), estado y la acción; la fecha gana columna desde `md`, junto
-    // con el progreso; el ofertante desde `xl` y la referencia desde `2xl` (con el menú lateral
-    // abierto, a 1024 px la tabla solo tiene ~700 px: más columnas dejarían el producto en 90 px). La miniatura aparece
-    // desde `sm`. Los receptores NO tienen columna: una oferta se reparte entre varios y eso se
-    // consulta en el detalle (asignaciones y salidas).
+    // aparición al ensanchar (fase 4): en móvil quedan producto (con kilos ofrecidos, ofertante y
+    // disponibilidad debajo), estado y la acción; la disponibilidad gana columna desde `md`, junto
+    // con el progreso, y el ofertante desde `xl` (con el menú lateral abierto, a 1024 px la tabla
+    // solo tiene ~700 px: más columnas dejarían el producto en 90 px). La miniatura aparece desde
+    // `sm`. Los receptores NO tienen columna: una oferta se reparte entre varios y eso se consulta
+    // en el detalle (asignaciones y salidas).
     const ara = new Date()
-    // La cabecera de fecha ordena: un botón de verdad (teclado y lector), con la flecha del
-    // sentido actual. Con «disponibilitat» no hay sentido de fecha y el primer clic pone el más reciente.
-    const IconaOrdre = ordre === 'recent' ? ArrowDown : ordre === 'antiga' ? ArrowUp : ArrowUpDown
+    // La cabecera «Disponibilitat» ordena en las pestañas vivas: un botón de verdad (teclado y
+    // lector), con la flecha del sentido actual; con el orden por alta, el primer clic vuelve al
+    // de disponibilidad. En el Històric (orden de cierre, en el servidor) es solo un título.
+    const sortDisp = ordre === 'disponibilitat' ? 'ascending' : ordre === 'disponibilitat_desc' ? 'descending' : 'none'
+    const IconaOrdre = sortDisp === 'ascending' ? ArrowUp : sortDisp === 'descending' ? ArrowDown : ArrowUpDown
     return (
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="hidden 2xl:table-cell">{t('off.c_ref')}</TableHead>
-            <TableHead className="hidden w-28 md:table-cell" aria-sort={ordre === 'recent' ? 'descending' : ordre === 'antiga' ? 'ascending' : 'none'}>
-              <button type="button" onClick={alternaOrdreData} data-testid="ordre-data"
-                title={t(ordre === 'antiga' ? 'off.ordre_data_recent' : 'off.ordre_data_antiga')}
-                className="inline-flex items-center gap-1 whitespace-nowrap rounded-sm hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
-                {t('off.c_data')}
-                <IconaOrdre className="size-3.5" aria-hidden />
-              </button>
+            <TableHead className="hidden w-28 md:table-cell" aria-sort={ordenable ? sortDisp : undefined}>
+              {ordenable ? (
+                <button type="button" onClick={alternaOrdreDisponibilitat} data-testid="ordre-disponibilitat"
+                  title={t(ordre === 'disponibilitat' ? 'off.ordre_disp_desc' : 'off.ordre_disp_asc')}
+                  className="inline-flex items-center gap-1 whitespace-nowrap rounded-sm hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
+                  {t('off.c_disponibilitat')}
+                  <IconaOrdre className="size-3.5" aria-hidden />
+                </button>
+              ) : t('off.c_disponibilitat')}
             </TableHead>
             <TableHead className="hidden xl:table-cell">{t('off.c_ofertant')}</TableHead>
             <TableHead>{t('off.c_product')}</TableHead>
@@ -401,7 +433,12 @@ export default function OffersList({ onOpen, accio }: Props) {
             const kgs = kgDeLaFila(o.kg_total, kgDe(o))
             const est = etiquetaEstatOferta(o.estado)
             const ofertant = nomOfertant(o.productores)
-            const data = dataCurta(o.created_at)
+            // La disponibilidad (`disponible_hasta`, un día): «—» sin fecha. Vencida sin resolver
+            // en `aviso` (le toca al equipo), solo en las pestañas vivas.
+            const disp = textDia(o.disponible_hasta)
+            const vencuda = ambPas && (ESTATS_ACTIUS as readonly string[]).includes(o.estado)
+              && vencudaSenseResoldre(o, kgDe(o), ara)
+            const espigolada = tipusOperacioDe(o) === 'espigolada'
             // Los kilos con salida y los que faltan, en dos frases que sirven igual bajo el
             // producto (móvil) que bajo la barra (desde `md`). Un esborrany no tiene progreso.
             const textSortida = t('off.kg_sortida', { a: fmtKg(kgs.canalitzats), b: fmtKg(kgs.total) })
@@ -410,9 +447,9 @@ export default function OffersList({ onOpen, accio }: Props) {
             const pas = ambPas ? pasDeLaFila(o, resum[o.id], ara) : null
             return (
               <FilaClicable key={o.id} onObre={() => onOpen(o)}>
-                <TableCell className="hidden 2xl:table-cell"><code className="text-xs break-all">{o.id_excedente ?? '—'}</code></TableCell>
-                <TableCell className="hidden whitespace-nowrap tabular-nums md:table-cell" data-testid="oferta-data">{data}</TableCell>
-                <TableCell className="hidden break-words xl:table-cell" data-testid="oferta-ofertant">{ofertant}</TableCell>
+                <TableCell className={`hidden whitespace-nowrap tabular-nums md:table-cell ${vencuda ? 'font-medium text-aviso' : ''}`}
+                  data-testid="oferta-disponibilitat" data-vencuda={vencuda || undefined}>{disp}</TableCell>
+                <TableCell className="hidden font-medium break-words xl:table-cell" data-testid="oferta-ofertant">{ofertant}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <span className="hidden shrink-0 sm:block">
@@ -429,11 +466,13 @@ export default function OffersList({ onOpen, accio }: Props) {
                       {!esEsborrany && (
                         <span className="block text-xs text-muted-foreground md:hidden">{textSortida} · {textFalten}</span>
                       )}
-                      {/* Lo que no tiene columna todavía va bajo el nombre: fecha y ofertante en
-                          móvil; solo el ofertante entre `md` y `xl`; la referencia hasta `2xl`. */}
-                      <span className="block text-xs break-words text-muted-foreground md:hidden">{data} · {ofertant}</span>
-                      <span className="hidden text-xs break-words text-muted-foreground md:block xl:hidden">{ofertant}</span>
-                      <code className="block text-xs break-all text-muted-foreground 2xl:hidden">{o.id_excedente ?? '—'}</code>
+                      {/* Lo que no tiene columna todavía va bajo el nombre: el ofertante hasta
+                          `xl`, en el color del texto (es quien la hizo: se reconoce por él); la
+                          disponibilidad, en móvil. */}
+                      <span className="block text-sm font-medium break-words xl:hidden">{ofertant}</span>
+                      <span className={`block text-xs tabular-nums md:hidden ${vencuda ? 'font-medium text-aviso' : 'text-muted-foreground'}`}>
+                        {o.disponible_hasta ? t('off.disponible_fins', { data: disp }) : t('off.sense_disponibilitat')}
+                      </span>
                     </div>
                   </div>
                 </TableCell>
@@ -466,11 +505,12 @@ export default function OffersList({ onOpen, accio }: Props) {
                     {!ambPas && o.estado === 'cerrada' && o.tancada_at && (
                       <span className="text-xs text-muted-foreground">{t('off.tancada_el', { data: dataCurta(o.tancada_at) })}</span>
                     )}
-                    {/* F3. El listado es a donde manda la cola `espigolades_per_convertir`
-                        del tablero, así que tiene que poder decir CUÁLES son: una oferta
-                        con producto sin cosechar y sin jornada todavía. */}
-                    {o.producte_al_camp && !o.espigolada_id && ambPas && (
-                      <Badge className="max-w-full bg-aviso-fondo whitespace-normal text-aviso">{t('conv_esp.tag')}</Badge>
+                    {/* Fase 4: el tipus d'operació, solo cuando no es el normal (excedent ja collit),
+                        con la marca común de la espigolada (`BadgeEspigolada`, fase 3). */}
+                    {espigolada && (
+                      <span data-testid="oferta-espigolada" className="max-w-full">
+                        <BadgeEspigolada className="max-w-full whitespace-normal" />
+                      </span>
                     )}
                   </div>
                 </TableCell>
@@ -518,7 +558,11 @@ export default function OffersList({ onOpen, accio }: Props) {
               clau: d.clau, etiquetaKey: d.etiquetaKey,
               opcions: opcionsDisponibles(opcionsHist, dimsHist, d.clau, fh.valors, rangHist),
               text: d.clau === 'estat' ? (v: string) => t(etiquetaEstatOferta(v as Excedente['estado']).key)
-                : d.clau === 'productor' ? (v: string) => nomsProductors[v] ?? v : undefined,
+                : d.clau === 'productor' ? (v: string) => nomsProductors[v] ?? v
+                  : d.clau === 'modalitat' ? (v: string) => t(`od.mod_${v}`)
+                    : d.clau === 'tipus_operacio' ? (v: string) => t(clauTipusOperacio(v)) : undefined,
+              // Listas cortas y fijas: desplegable, nunca buscador.
+              ...(d.clau === 'modalitat' || d.clau === 'tipus_operacio' ? { cercador: false } : {}),
             }))}
             valors={fh.valors}
             onValors={fh.setValors}
@@ -529,7 +573,7 @@ export default function OffersList({ onOpen, accio }: Props) {
               <div className="min-w-0 space-y-1 md:w-56">
                 <label htmlFor="off-ordre-hist" className="text-xs text-muted-foreground">{t('fl.ordre')}</label>
                 <Desplegable id="off-ordre-hist" mida="sm" value={ordreHist}
-                  onChange={(v) => setOrdre(v === 'antiga' ? 'antiga' : 'recent')}
+                  onChange={(v) => setOrdreHist(v === 'antiga' ? 'antiga' : 'recent')}
                   opcions={[
                     { valor: 'recent', text: t('fl.o_tancament_recent') },
                     { valor: 'antiga', text: t('fl.o_tancament_antic') },
@@ -544,11 +588,13 @@ export default function OffersList({ onOpen, accio }: Props) {
               clau: d.clau, etiquetaKey: d.etiquetaKey,
               opcions: opcionsDisponibles(vives, dims, d.clau, f.valors, rang),
               text: d.clau === 'modalitat' ? (v: string) => t(`od.mod_${v}`)
-                : d.clau === 'categoria' ? (v: string) => t(v === 'altres' ? 'mk.f_other' : `pr.o_${v}`) : undefined,
+                : d.clau === 'tipus_operacio' ? (v: string) => t(clauTipusOperacio(v))
+                  : d.clau === 'categoria' ? (v: string) => t(v === 'altres' ? 'mk.f_other' : `pr.o_${v}`) : undefined,
+              ...(d.clau === 'modalitat' || d.clau === 'tipus_operacio' ? { cercador: false } : {}),
             }))}
             valors={f.valors}
             onValors={f.setValors}
-            rang={{ etiquetaKey: 'fl.r_alta', desDe: f.desDe, finsA: f.finsA, onCanvi: f.setRang }}
+            rang={{ etiquetaKey: 'fl.r_disponibilitat', desDe: f.desDe, finsA: f.finsA, onCanvi: f.setRang }}
             mostrant={pestanya === 'validar' ? grups.validar.length
               : pestanya === 'esborranys' ? grups.esborranys.length : grups.actives.length}
             total={pestanya === 'validar' ? actives.filter((o) => o.estado === 'pendent_validacio').length
@@ -557,11 +603,12 @@ export default function OffersList({ onOpen, accio }: Props) {
               <div className="min-w-0 space-y-1 md:w-44">
                 <label htmlFor="off-ordre" className="text-xs text-muted-foreground">{t('fl.ordre')}</label>
                 <Desplegable id="off-ordre" mida="sm" value={ordre}
-                  onChange={(v) => setOrdre(v === 'disponibilitat' ? 'disponibilitat' : v === 'antiga' ? 'antiga' : 'recent')}
+                  onChange={(v) => setOrdre(llegeixOrdre(v))}
                   opcions={[
+                    { valor: 'disponibilitat', text: t('fl.o_disponibilitat') },
+                    { valor: 'disponibilitat_desc', text: t('fl.o_disponibilitat_desc') },
                     { valor: 'recent', text: t('fl.o_recent') },
                     { valor: 'antiga', text: t('fl.o_antiga') },
-                    { valor: 'disponibilitat', text: t('fl.o_disponibilitat') },
                   ]} />
               </div>
             )}
@@ -585,14 +632,14 @@ export default function OffersList({ onOpen, accio }: Props) {
 
             <TabsContent value="validar" className="space-y-2">
               <p className="text-sm text-muted-foreground">{t('off.validar_hint')}</p>
-              {taula(grups.validar, senseCoincidencia ? 'off.no_match' : 'off.empty_validar', kgViu, true)}
+              {taula(grups.validar, senseCoincidencia ? 'off.no_match' : 'off.empty_validar', kgViu, true, true)}
             </TabsContent>
             <TabsContent value="actives" className="space-y-2">
-              {taula(grups.actives, senseCoincidencia ? 'off.no_match' : 'off.empty_active', kgViu, true)}
+              {taula(grups.actives, senseCoincidencia ? 'off.no_match' : 'off.empty_active', kgViu, true, true)}
             </TabsContent>
             <TabsContent value="esborranys" className="space-y-2">
               <p className="text-sm text-muted-foreground">{t('off.esborranys_hint')}</p>
-              {taula(grups.esborranys, senseCoincidencia ? 'off.no_match' : 'off.empty_esborranys', kgViu, false)}
+              {taula(grups.esborranys, senseCoincidencia ? 'off.no_match' : 'off.empty_esborranys', kgViu, false, true)}
             </TabsContent>
             <TabsContent value="historic" className="space-y-2">
               <p className="text-sm text-muted-foreground">{t('off.historic_hint')}</p>
@@ -600,7 +647,7 @@ export default function OffersList({ onOpen, accio }: Props) {
                 ? <p className="text-sm text-error">{t('c.load_error')}</p>
                 : carregantHist && historic.length === 0
                   ? <CarregantSeccio files={5} ambCapcalera={false} />
-                  : taula(historic, filtresHistActius ? 'off.no_match' : 'off.empty_historic', kgHist, false)}
+                  : taula(historic, filtresHistActius ? 'off.no_match' : 'off.empty_historic', kgHist, false, false)}
               {!errorHist && totalHist > MIDA_PAGINA_HISTORIC && (
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-2" data-testid="paginacio-historic">
                   <span className="text-sm text-muted-foreground tabular-nums" aria-live="polite">

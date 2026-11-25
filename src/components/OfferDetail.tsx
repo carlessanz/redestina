@@ -32,7 +32,7 @@ import { algunCanal, motiuCanal, motiuTallServidor } from '../lib/canals'
 import PasosProces from './proces/PasosProces'
 import QueTocaAra from './proces/QueTocaAra'
 import DialegMotiu from './DialegMotiu'
-import DialegEspigolada from './equip/DialegEspigolada'
+import BadgeEspigolada from './BadgeEspigolada'
 import BotoAmbMotiu from './proces/BotoAmbMotiu'
 import ValidacioOferta from './equip/ValidacioOferta'
 import DestiFinal from './DestiFinal'
@@ -47,6 +47,7 @@ import AccionsAssignacio, { PreuAcordat } from './equip/AccionsAssignacio'
 import CertificatOferta from './equip/CertificatOferta'
 import { registrarEnviamentManual } from '../lib/canalitzacio'
 import { ambPreu, modalitatsOferta, textModalitats } from '../lib/modalitats'
+import { esOfertaEspigolada } from '../lib/modalitatsOferta'
 import type { Canalizacion, EstadoAlbaran, Excedente, OfertaRespuesta } from '../types'
 import { Casella, FilaCasella } from './Casella'
 import { SelectorFotos } from './FotosOferta'
@@ -175,7 +176,6 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // La entidad que se preselecciona en «Registra l'interès» (desde una fila «pendent»).
   const [entitatInteres, setEntitatInteres] = useState('')
   // F3: el diálogo que convierte esta oferta en jornada de espigueo.
-  const [convertint, setConvertint] = useState(false)
   // Productor y municipi para las variables de la plantilla oferta_excedent.
   const [datosOferta, setDatosOferta] = useState<{ productor: string | null; municipi: string | null }>(
     { productor: null, municipi: null },
@@ -733,21 +733,10 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   const foraDelCami = punt.index < 0
   const estat = etiquetaEstatOferta(exc.estado)
   const mods = modalitatsOferta(exc)
-
-  /**
-   * Por qué NO se puede convertir en espigolada, si no se puede (F3).
-   *
-   * Las dos razones las impone `crear_espigolada()` con `22023` —`ja_te_canalitzacions` y
-   * `ja_te_albarans`— y el motivo es el mismo en las dos: la oferta ya tiene una entrada,
-   * y la jornada crearía un segundo REC con los mismos kilos, que la conciliación contaría
-   * dos veces. Se anticipa aquí para no mandar a nadie a chocar contra la base, pero **la
-   * autoridad sigue siendo la RPC**: esto es un aviso, no la regla.
-   */
-  const motiuNoConvertible = canalizaciones.length > 0
-    ? t('conv_esp.no_canalitzacions')
-    : albarans.some((a) => a.estado !== 'anulado')
-      ? t('conv_esp.no_albarans')
-      : null
+  // «Espigolada» (fase 3, 25-11-2026): una oferta de donación con el producto en el campo. No
+  // es una excepción del circuito —se asigna, se comparte y se registra la recogida igual—;
+  // solo se marca con su badge.
+  const espigolada = esOfertaEspigolada(exc)
 
   return (
     <div className="space-y-4">
@@ -777,6 +766,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${estat.clase}`}>
               {t(estat.key)}
             </span>
+            {espigolada && <BadgeEspigolada />}
           </div>
           {/* De quién es y de dónde: la ficha del equipo no lo decía en ningún sitio más que
               dentro del texto de la oferta. Enlaza a la ficha de la productora. */}
@@ -859,32 +849,6 @@ export default function OfferDetail({ excedente, onBack }: Props) {
           {editable && (
             <DialegEdicioOferta obert={editant} onObert={setEditant} oferta={exc}
               kgCanalitzats={canalizados} esEquip onFet={recargar} />
-          )}
-
-          {/* ── F3: convertir en espigolada ──
-              Solo cuando la oferta declara producto SIN COSECHAR y todavía no es una
-              jornada. Si ya lo es, lo dice la nota de `QueTocaAra` con su enlace, que sale
-              del mismo `punt`: dos sitios contando lo mismo acabarían discrepando. */}
-          {exc.producte_al_camp && !exc.espigolada_id && (
-            <div className="rounded-lg border border-aviso/30 bg-aviso-fondo p-3">
-              <p className="text-sm font-medium text-aviso">{t('conv_esp.banner')}</p>
-              {exc.espigolada_demanada && (
-                <p className="mt-1 text-sm text-aviso" data-testid="od-espigolada-demanada">{t('conv_esp.demanada')}</p>
-              )}
-              {/* El motivo del gris va TAMBIÉN visible: en táctil no hay hover, así que el
-                  tooltip de `BotoAmbMotiu` no existe para media aplicación (§6ter). */}
-              {motiuNoConvertible && (
-                <p className="mt-1 text-sm text-aviso">{motiuNoConvertible}</p>
-              )}
-              <BotoAmbMotiu
-                className="mt-2 h-11 whitespace-normal md:h-8"
-                disabled={Boolean(motiuNoConvertible)}
-                motiu={motiuNoConvertible ?? undefined}
-                onClick={() => setConvertint(true)}
-              >
-                {t('conv_esp.cta')}
-              </BotoAmbMotiu>
-            </div>
           )}
         </CardContent>
       </Card>
@@ -1214,8 +1178,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
             const senseAlbara = esVendaOMaquila(c.valorizacion) && !sortida
             const validada = Boolean(fila.recollida_validada_at) || c.estado === 'conciliada'
             const perValidar = !validada && estatValidacio(fila) === 'pendent_validacio'
-            // «Registrar la recollida»: viva, sin validar y fuera de una espigolada (allí no hay
-            // receptora que registre; las salidas se emiten desde la ficha del albarán).
+            // «Registrar la recollida»: viva y sin validar. Una espigolada de hoy se registra como
+            // cualquier donación (fase 3); solo un lote HEREDADO de una jornada (`espigolada_id`)
+            // no, porque sus salidas se emitieron desde la ficha del albarán (deuda 192).
             const potRegistrar = !anulada && !validada && !exc.espigolada_id
             return (
               <div key={c.id} data-testid="od-canalitzacio"
@@ -1367,16 +1332,6 @@ export default function OfferDetail({ excedente, onBack }: Props) {
           </CardContent>
         </Card>
       )}
-
-      {/* Al crear la jornada se recarga: `exc.espigolada_id` pasa a tener valor, el bloque
-          de arriba desaparece y la nota de `QueTocaAra` enseña el enlace a la jornada. */}
-      <DialegEspigolada
-        obert={convertint}
-        oferta={exc}
-        productorNom={datosOferta.productor}
-        onTancar={() => setConvertint(false)}
-        onCreada={() => { setConvertint(false); void recargar(); void refrescaComptadors() }}
-      />
 
       {/* «Registrar la recollida» desde la fila (fase 3 de los puntos 4-6): el mismo diálogo que
           el ciclo guiado y la ficha del albarán. Al validar salen el ENT y su REC conciliados

@@ -37,7 +37,6 @@ import EntradesSortides from '../routes/equip/EntradesSortides'
 import Interaccions from '../routes/equip/Interaccions'
 import Canalitzacio from '../routes/equip/Canalitzacio'
 import CanalitzacioDetall from '../routes/equip/CanalitzacioDetall'
-import { EspigoladaDetall, Espigolades, NovaEspigolada } from '../routes/equip/Espigolades'
 import Confirmar from '../routes/public/Confirmar'
 import Verificar from '../routes/public/Verificar'
 import Signar from '../routes/public/Signar'
@@ -166,9 +165,9 @@ export const router = createBrowserRouter([
                   // «Entrades i sortides» (punto 6.7): una fila por salida, el resumen y el Excel.
                   // `?pestanya=sortides|resum`, `?per=` y `?canalitzacio=` (la ficha) en la URL.
                   { path: 'entrades-sortides', element: <EntradesSortides />, handle: { titleKey: 'nav.entrades_sortides' } },
-                  { path: 'espigolades', element: <Espigolades />, handle: { titleKey: 'nav.espigolades' } },
-                  { path: 'espigolades/nova', element: <NovaEspigolada />, handle: { titleKey: 'nav.espigolades' } },
-                  { path: 'espigolades/:id', element: <EspigoladaDetall />, handle: { titleKey: 'nav.espigolades' } },
+                  // «Espigolades» se retiró el 25-11-2026 (fase 3): una espigolada es una oferta de
+                  // donación más. Los enlaces guardados (la lista, `nova` y `:id`) van a Ofertes.
+                  { path: 'espigolades/*', element: <Navigate to="/equip/ofertes" replace /> },
                   { path: 'tancament', element: <Tancament />, handle: { titleKey: 'nav.tancament' } },
                   { path: 'tancament/:id', element: <TancamentDetall />, handle: { titleKey: 'nav.tancament' } },
                   { path: 'productes', element: <Productes />, handle: { titleKey: 'nav.productes' } },

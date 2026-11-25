@@ -24,6 +24,9 @@ const CODIS: Record<string, string> = {
   'Preus de referencia provisionals': 'cdon.err_preus_provisionals',
   preus_canviats: 'cdon.err_preus_canviats',
   preu_canalitzacio_protegit: 'alb.err_preu_protegit',
+  // `editar_oferta()` al marcar «Espigolada» (proceso 3.4, 20270617100300).
+  espigolada_no_donacio: 'edit.err_espigolada_no_donacio',
+  espigolada_sense_camp: 'edit.err_espigolada_sense_camp',
   canalitzacio_certificada: 'alb.err_canalitzacio_certificada',
   // `emitir_albaran()` sobre un albarán de una recogida sin validar (17-10-2026). Contiene a
   // `recollida`, no a ningún otro código de la lista, pero va arriba igual por si acaso.
@@ -86,6 +89,11 @@ const CODIS: Record<string, string> = {
   ja_validada: 'asg.err_ja_validada',
   no_es_venda: 'asg.err_no_es_venda',
   hora_passada: 'rrec.err_hora_passada',
+  // `comprova_hora_recollida()` (20270618100200): el receptor pide un día que no está en los
+  // `dies_recollida` de la oferta (el equipo no se bloquea).
+  dia_fora_dies: 'rrec.err_dia_fora_dies',
+  // `entrades_sortides*()` (20270618100000): un tipus d'operació que no existe.
+  tipus_operacio_invalid: 'sort.err_tipus_operacio',
   // Fase 3 (20270608100100): el REC propio de una recogida se anula anulando la asignación.
   anula_la_canalitzacio: 'asg.err_anula_la_canalitzacio',
   kg_maxim: 'asg.err_kg_maxim',

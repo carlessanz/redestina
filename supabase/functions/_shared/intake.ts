@@ -230,8 +230,8 @@ async function preguntar(
     case "producte_al_camp":
       // Lista y no botones, por lo mismo que `modalitat` (deuda §12.105): un botón solo
       // lleva título, y aquí el título solo dice «sí» o «no» a una pregunta que decide un
-      // flujo entero —si el equipo puede convertir la oferta en una espigolada, y si la
-      // entidad se está comprometiendo a ir a collir—. La `description` es la que lo
+      // flujo entero —si la oferta puede ser una espigolada, y si la entidad se está
+      // comprometiendo a ir a collir—. La `description` es la que lo
       // explica, y es la misma que lee el panel bajo el desplegable.
       return (await sendLista(
         supabase, to, "El producte encara és al camp?", "Tria una opció",

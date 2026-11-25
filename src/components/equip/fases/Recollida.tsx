@@ -12,9 +12,9 @@
 // 4. CONCILIAR solo las excepciones —un REC heredado fuera de tolerancia, una salida
 //    confirmada por el circuito anterior—, en la misma pantalla (`DialegConciliarAlbara`).
 //
-// ⚠️ Una espigolada no tiene receptora que registre: sus albaranes de salida los emite el
-//    equipo desde la ficha de cada uno (el editor de líneas vive allí, y un segundo editor es
-//    un segundo sitio donde los kilos pueden acabar siendo otros).
+// ⚠️ Una espigolada de hoy (fase 3, 25-11-2026) se registra como cualquier donación. Solo un
+//    lote HEREDADO de una jornada (`origen = 'espigolament'`, deuda 192) no tiene receptora que
+//    registre: sus albaranes de salida se emiten desde la ficha de cada uno.
 
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'

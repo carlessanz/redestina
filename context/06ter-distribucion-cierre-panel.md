@@ -11,7 +11,7 @@
 
 | Panel | Rutas | Qué ve |
 | --- | --- | --- |
-| **Equip** (`intern`) | `/equip/tauler · ofertes[/:id] · aprovacions · productors[/:id] · entitats[/:id] · missatgeria[/:phone] · **documents** · **albarans[/:id]** · **espigolades/nova[/:id]** · configuracio` | Todo lo que ya existía, más la **cola global de aprobaciones** y la **bandeja de documentos** (§4) |
+| **Equip** (`intern`) | `/equip/tauler · ofertes[/:id] · aprovacions · productors[/:id] · entitats[/:id] · missatgeria[/:phone] · **documents** · **albarans[/:id]** · configuracio` | Todo lo que ya existía, más la **cola global de aprobaciones** y la **bandeja de documentos** (§4) |
 | **Productor** | `/productor/inici · ofertes · ofertes/nova · ofertes/:id · **documents**` | Sus ofertas, su progreso, el **alta con el mismo cuestionario del intake** y sus **documentos** |
 | **Receptor** | `/receptor/mercat · interessos · historic · **documents**` | Las ofertas **compatibles con su `tipo_receptor`** (el filtro NO es de cliente: lo aplica la RLS de `excedentes` con la matriz `modalitat_receptor_compat`, §4bis), su interés, su histórico y sus **documentos** |
 
@@ -939,7 +939,7 @@ Lo pintan cinco componentes de `src/components/proces/`, con una regla heredada 
 `aviso-fondo` cuando `emToca`). `BotoAmbMotiu` pone tooltip a un botón deshabilitado con su
 porqué, pero el porqué va **además** visible en `QueTocaAra`: en táctil no hay hover.
 
-**El menú del equipo sigue el camino de una oferta** (`nav.ts`): Operació (Ofertes, Espigolades,
+**El menú del equipo sigue el camino de una oferta** (`nav.ts`): Operació (Ofertes,
 Aprovacions, Missatgeria, Albarans) → Tancament anual (Costos **antes** que Tancament: es su
 prerrequisito) → Organitzacions (Productors, Entitats, Convenis) → Sistema (Documents,
 Configuració). Sin números en las etiquetas: son también el título de la barra y el tooltip
@@ -1128,8 +1128,9 @@ caro.
 guiado se puede recorrer **entero**, certificado incluido. Lo decide
 `bloquejaProvisionals(provisionals, mode)`, no `dadesFiscalsProvisionals()` a secas.
 
-⚠️ **Una espigolada no recorre las seis fases**: entra por la 5 con su REC ya creado
-(`crear_espigolada`). Sus fases 2-4 salen `fet` **con su motivo**, nunca `pendent`.
+⚠️ **Desde el 25-11-2026 una espigolada recorre las seis fases** como cualquier donación (`tipus_operacio =
+'espigolada'`): sin `canal.bl_espigolada` ni `albarans_espigolada`. Lo heredado (`origen='espigolament'`) solo cuenta
+como donación en `certificatsDelLot`; su recogida no se registra desde el panel (deudas 192 y 206).
 
 ⚠️ **La fase del ÍNDICE es una aproximación honesta.** `canalitzacions_actives()` devuelve un
 resumen —no las respuestas ni los albaranes uno a uno—, así que la fila afirma solo lo que ese
@@ -1217,6 +1218,9 @@ y solo cambia la vía impresa en la página de evidencias. El certificado final 
 **bloqueado y explicado**, y la guía dice que ese es el resultado correcto, no una avería.
 
 ### «Producte al camp»: convertir una oferta en espigolada (22-09-2026)
+
+> **Retirado el 25-11-2026 (plan DIC 26, fase 3)**: sin `DialegEspigolada`, sin la pantalla `Espigolades`
+> (`/equip/espigolades/*` redirige a Ofertes), sin la cola `espigolades_per_convertir` y sin `conversioEspigolada.ts`.
 
 **El caso real más común del espigueo es el intermedio**, y hasta hoy no tenía camino: un generador
 avisa de que tiene un campo **sin cosechar**, eso se publica como oferta para ver quién la quiere,
@@ -2876,3 +2880,43 @@ Organitzacions → «Interaccions i seguiment» (`/equip/interaccions`, `RoleGua
   quiere igualar.
 - Pruebas: `tests/interaccions.test.ts`, `tests/notesInternes.test.ts` (vocabulario contra `20270616100000`),
   `tests/e2e/interaccions.e2e.ts` y `crm.e2e.ts`.
+
+## La espigolada es una oferta de donación (plan DIC 26, fase 3: procesos 3.6, 3.5 C y 3.4, 25-11-2026)
+
+- **Sin jornada**: el alta con «Espigolada» ya no crea fila en `espigoladas` ni navega a ella; la oferta nace como
+  donación con `espigolada_demanada` y el producto en el campo, y sigue el circuito normal (Mercat, interés, asignación,
+  mensajes, recogida, ENT + REC por recogida). La de la productora pasa por validación.
+- **Una sola regla** para alta y edición (`lib/modalitatsOferta.ts`, con paridad contra `dadesAmbEspigolada()` del
+  servidor): «Espigolada» solo con el producto en el campo; marcarla deja la modalidad en donación; otra modalidad la
+  desmarca; si el producto deja de estar en el campo, se desmarca. Al editar se envía `canvis.espigolada`; errores
+  `espigolada_no_donacio` (hay asignaciones que no son donación) y `espigolada_sense_camp`.
+- `BadgeEspigolada` (variante `secondary`, hoja) en la ficha, la fase de entrada, el listado y Entrades i sortides.
+- Retirados: menú y rutas `Espigolades` (redirigen a Ofertes), lotes, `DialegEspigolada`, `conversioEspigolada.ts`,
+  `crearEspigolada`/`repartirEspigolada` de `lib/albarans.ts`, la cola `espigolades_per_convertir` (18 colas) y los
+  pasos `canal.bl_espigolada`. Se conservan, para lo heredado, `off.st_draft`, `proc.*_nota_espigolada*`, `eq.g_espigolades`.
+- E2E `espigolada-oferta.e2e.ts` (alta → asignación → recogida → ENT y REC; edición «ja collit → al camp → Espigolada»;
+  redirección; 360 px).
+
+## Listado por disponibilidad, tipus d'operació y días de recogida (plan DIC 26, fase 4: procesos 3.1, 3.5 A-B y 3.2, 25-11-2026)
+
+- **Listado del equipo** (`OffersList`, `lib/llistatOfertes.ts`): orden `OrdreLlistat` = disponibilitat (por defecto) ·
+  disponibilitat_desc · recent · antiga; `ordenaPerDisponibilitat(files, enCurs, { vencuda, sentit })` (`lib/filtres.ts`)
+  pone arriba las vencidas sin resolver (`vencudaSenseResoldre`, la regla de `fetsDeLlistat`). Fuera la columna y la
+  línea «Referència» (el buscador encuentra el `E-…`). Columna «Disponibilitat» (aviso si vencida; cabecera
+  `ordre-disponibilitat` con `aria-sort`). Ofertant `font-medium`, columna desde `xl`. `BadgeEspigolada`. Filtros tipus
+  d'operació y modalidad prevista; en el Històric, en servidor (`.eq('tipus_operacio')` y `filtreModalitatHistoric()`:
+  dos `or=` se combinan con AND en PostgREST). El rango de fechas de las pestañas vivas es de disponibilidad; el del
+  Històric sigue siendo de cierre.
+- **Entrades i sortides**: `MODALITATS_SORTIDA` = donacio·venda·maquila; `TIPUS_OPERACIO` y claves `tipop.*`;
+  `argsFiltres` añade `p_tipus_operacio` (`?tipus=`); `llegeixFila` deduce el tipo si la RPC no lo trae; `xifres` lee
+  `per_tipus_operacio` y nunca `per_modalitat.espigolada`; Excel con columna «Tipus d'operació» y Resum de 12 columnas;
+  `TaulaResum`: 3 modalidades + kg de espigolades.
+- **Días**: `lib/diesRecollida.ts` (día ISO, `opcionsDies` ≤ 60, `frangesDelLloc`, `franjaDinsDelLloc`).
+  `CampsRecollida` (`diesRecollida`; `nomesAvisa` para el equipo en `FormulariInteresAssistit`: calendario y aviso) y el
+  Mercat (selecciona `dies_recollida`); `clauErrorInteres` y `textError` traducen `dia_fora_dies`.
+- **Lugares**: `EditorDiesFranges` (idPrefix, dies, franges, onDies, onFranges, diesPermesos?, etiquetaDiesKey?,
+  etiquetaFrangesKey?, disabled?) en `LlocsRecollida` y en el lugar nuevo de `FormulariNovaOferta` (`creaUbicacio(extra)`
+  guarda días y franjas; `triaLloc(id, llocNouCreat)`). La oferta solo marca los días del lugar; la franja no se recorta,
+  se avisa si queda fuera de las del lugar.
+- Fuera de alcance: `DetallOfertaReceptor` no enseña los días (el receptor los ve en el diálogo de interés).
+- E2E: `ofertes-llistat`, `entrades-sortides`, `dies-recollida` (a/b/c), `filtres`, `filtres-territori`.

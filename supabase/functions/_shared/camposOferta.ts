@@ -122,11 +122,10 @@ export const OPCIONS_TRANSPORT = [
 
 // «Producte al camp»: lo ofrecido TODAVÍA NO ESTÁ RECOGIDO y hay que ir a cosecharlo.
 //
-// No es un matiz descriptivo, decide un flujo (20270328101000): esa oferta la puede
-// convertir el equipo en una jornada de espigueo con `crear_espigolada(p_excedente => …)`,
-// reutilizando el excedente en vez de crear una segunda entrada del mismo producto. Y la
-// entidad que la recibe tiene derecho a saberlo ANTES de mostrar interés: comprometerse a
-// recoger 300 kg de un palot no es lo mismo que ir a un campo a cogerlos.
+// No es un matiz descriptivo: con el producto en el campo, el panel ofrece «Espigolada» (una
+// oferta de DONACIÓN que sigue el circuito de cualquier donación desde la fase 3, 25-11-2026;
+// ya no crea jornada). Y la entidad que la recibe tiene derecho a saberlo ANTES de mostrar
+// interés: comprometerse a recoger 300 kg de un palot no es lo mismo que ir a un campo a cogerlos.
 //
 // ⚠️ Los `id` son `si`/`no` y no el título, al revés que `TIPOS_CAIXA` y `OPCIONES_RETORN`:
 //    lo que se guarda es un boolean, así que el valor que viaja tiene que ser estable

@@ -12,6 +12,7 @@
 import { ddmmaaaaAIso, isoADdmmaaaa } from './esborranyOferta'
 import { hhmm } from './franja'
 import { ambPreu, modalitatsDe } from './modalitats'
+import { espigoladaMarcada } from './modalitatsOferta'
 
 type Datos = Record<string, unknown>
 
@@ -21,6 +22,8 @@ export interface FilaEditable {
   familia?: string | null
   variedad?: string | null
   producte_al_camp?: boolean | null
+  /** «Espigolada» pedida (proceso 3.4): una donación con el producto en el campo. */
+  espigolada_demanada?: boolean | null
   hectarees?: number | string | null
   kg_total?: number | string | null
   num_caixes?: number | null
@@ -64,6 +67,8 @@ export function datosDeFila(f: FilaEditable): Datos {
   pon('familia', f.familia)
   pon('varietat', f.variedad)
   d.producte_al_camp = f.producte_al_camp ? 'si' : 'no'
+  // La espigolada es la casilla junto a las modalidades (`lib/modalitatsOferta.ts`).
+  if (f.espigolada_demanada) d.espigolada = true
   pon('hectarees', num(f.hectarees))
   pon('kg', num(f.kg_total))
   pon('format_entrega', f.format_entrega)
@@ -121,6 +126,13 @@ export function canvisDeDatos(
 
   const alCamp = d.producte_al_camp === 'si' || d.producte_al_camp === true
   if (alCamp !== Boolean(f.producte_al_camp)) c.producte_al_camp = alCamp
+  // «Espigolada» al editar (proceso 3.4, fase 3): `canvis.espigolada` (boolean) a
+  // `crear-oferta/editar`. Marcada, el servidor pone el producto en el campo y solo donación
+  // (`editar_oferta`, 20270617100300), así que las modalidades no viajan: con una asignación
+  // de venta la RPC responde `espigolada_no_donacio`, que es lo que hay que decir.
+  const esp = espigoladaMarcada(d)
+  if (esp !== Boolean(f.espigolada_demanada)) c.espigolada = esp
+  if (esp) delete c.modalitats
   // Hectáreas (19-11-2026): solo con el producto en el campo; si deja de estarlo, se vacían.
   const hect = alCamp ? num(val('hectarees')) : null
   if (hect !== num(f.hectarees)) c.hectarees = hect

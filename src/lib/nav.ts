@@ -84,9 +84,9 @@ export interface NavGrup {
 // oferta (organizaciones, archivo técnico, configuración) va debajo. Hasta el 14-09-2026 el
 // orden era el de las fases de desarrollo, y se leía al revés: «Costos per quilo» iba detrás
 // del Tancament al que precede (sin coste no hay certificado), «Convenis» —lo que habilita
-// operar— era la última entrada, y «Espigolades», que es un ORIGEN de oferta, iba después de
-// los albaranes. Sin números en las etiquetas: son también el título de la barra superior y
-// el tooltip del menú plegado. La secuencia numerada vive en el «Com funciona» del tablero
+// operar— era la última entrada. («Espigolades» salió del menú el 25-11-2026: una espigolada
+// es una oferta de donación más y se gestiona en Ofertes.) Sin números en las etiquetas: son
+// también el título de la barra superior y el tooltip del menú plegado. La secuencia numerada vive en el «Com funciona» del tablero
 // (`FASES_EQUIP` en procesOferta.ts), que enlaza a cada entrada en este mismo orden.
 const EQUIP: NavGrup[] = [
   { items: [{ to: '/equip/tauler', labelKey: 'nav.dashboard', icon: LayoutDashboard, end: true }] },
@@ -98,8 +98,6 @@ const EQUIP: NavGrup[] = [
       // `barra: false` — el equipo tiene siete secciones y la barra de móvil admite cuatro.
       { to: '/equip/canalitzacio', labelKey: 'nav.canalitzacio', icon: Workflow, barra: false },
       { to: '/equip/ofertes', labelKey: 'nav.offers', icon: Package, comptador: 'ofertes' },
-      // Junto a Ofertes porque es el otro origen: una jornada crea registros y un REC.
-      { to: '/equip/espigolades', labelKey: 'nav.espigolades', icon: Leaf },
       { to: '/equip/aprovacions', labelKey: 'nav.approvals', icon: ClipboardCheck, comptador: 'aprovacions' },
       { to: '/equip/missatgeria', labelKey: 'nav.messaging', icon: MessageSquare, comptador: 'missatges', requereix: 'whatsapp' },
       { to: '/equip/albarans', labelKey: 'nav.albarans', icon: Truck, comptador: 'albarans' },

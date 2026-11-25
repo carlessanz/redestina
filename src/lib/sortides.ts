@@ -1,6 +1,12 @@
 // «Entrades i sortides» (punto 6.7 del Excel de la Fundació, 20-11-2026): la lógica de la
 // pantalla del equipo `/equip/entrades-sortides`, sin React ni red.
 //
+// FASE 4 (25-11-2026): la espigolada deja de ser una pseudo-modalidad. La modalidad es la REAL de
+// la salida (donació · venda · maquila, `canalizaciones.valorizacion`) y el TIPUS D'OPERACIÓ es
+// otra dimensión, la de la oferta (`excedentes.tipus_operacio`: excedent ja collit · espigolada;
+// migraciones 20270617100000 y 20270618100000). La RPC aún manda `per_modalitat.espigolada` para
+// el frontend publicado: aquí NO se lee (los kilos de las espigolades salen de `per_tipus_operacio`).
+//
 // Es la hoja «Aprofitat» del Excel ARA con el que trabaja hoy el equipo: una fila por salida de
 // producto de un ofertante a un receptor (una canalización), sin agrupar, con los indicadores
 // por ofertante, receptor, producto, modalidad, mes y zona, y la exportación a Excel. Los datos
@@ -18,7 +24,7 @@
 import type { SheetData } from 'write-excel-file/browser'
 import type {
   AgrupacioSortides, AlbaraSortida, EntradesSortides, EstatSortida, FilaSortida, GrupSortides,
-  ModalitatSortida, ResumSortides, XifresModalitat, XifresSortides,
+  ModalitatSortida, ResumSortides, TipusOperacio, XifresModalitat, XifresSortides,
 } from '../types'
 
 type T = (clau: string, params?: Record<string, string | number>) => string
@@ -27,12 +33,14 @@ type T = (clau: string, params?: Record<string, string | number>) => string
 // Vocabulario
 // ---------------------------------------------------------------------------
 
-export const MODALITATS_SORTIDA: readonly ModalitatSortida[] = ['donacio', 'venda', 'maquila', 'espigolada']
+export const MODALITATS_SORTIDA: readonly ModalitatSortida[] = ['donacio', 'venda', 'maquila']
+/** El tipus d'operació de la oferta: ya cosechado o espigolada (una donación normal). */
+export const TIPUS_OPERACIO: readonly TipusOperacio[] = ['excedent', 'espigolada']
 export const ESTATS_SORTIDA: readonly EstatSortida[] = [
   'pendent', 'programada', 'registrada', 'entregada', 'confirmada', 'conciliada', 'anulada',
 ]
 export const AGRUPACIONS_SORTIDES: readonly AgrupacioSortides[] = [
-  'ofertant', 'receptor', 'producte', 'modalitat', 'mes', 'zona', 'estat',
+  'ofertant', 'receptor', 'producte', 'modalitat', 'tipus_operacio', 'mes', 'zona', 'estat',
 ]
 
 /** Las filas de una página de la tabla. */
@@ -41,22 +49,26 @@ export const MIDA_PAGINA_SORTIDES = 25
 export const PAGINA_EXPORTACIO_SORTIDES = 1000
 
 /**
- * La modalidad en la interfaz. Las tres de siempre, con sus claves (`od.mod_*`: la maquila es
- * «Transformació en obrador (maquila)»); la donación de una espigolada, la suya.
+ * La modalidad en la interfaz: las tres reales, con sus claves (`od.mod_*`: la maquila es
+ * «Transformació en obrador (maquila)»).
  */
 const CLAU_MODALITAT: Record<ModalitatSortida, string> = {
   donacio: 'od.mod_donacio',
   venda: 'od.mod_venda',
   maquila: 'od.mod_maquila',
-  espigolada: 'sort.mod_espigolada',
 }
 
-/** El nombre corto de la modalidad, para las columnas del Resum (cuatro, en una tabla). */
+/** El nombre corto de la modalidad, para las columnas del Resum. */
 const CLAU_MODALITAT_CURTA: Record<ModalitatSortida, string> = {
   donacio: 'sort.curt_donacio',
   venda: 'sort.curt_venda',
   maquila: 'sort.curt_maquila',
-  espigolada: 'sort.curt_espigolada',
+}
+
+/** El tipus d'operació en la interfaz (filtro, columna, grupo y Excel; también el listado de ofertas). */
+const CLAU_TIPUS_OPERACIO: Record<TipusOperacio, string> = {
+  excedent: 'tipop.excedent',
+  espigolada: 'tipop.espigolada',
 }
 
 /**
@@ -92,6 +104,7 @@ const CLAU_AGRUPACIO: Record<AgrupacioSortides, string> = {
   receptor: 'sort.per_receptor',
   producte: 'sort.per_producte',
   modalitat: 'sort.per_modalitat',
+  tipus_operacio: 'sort.per_tipus_operacio',
   mes: 'sort.per_mes',
   zona: 'sort.per_zona',
   estat: 'sort.per_estat',
@@ -115,6 +128,9 @@ const CLAU_MES = [
 export function esModalitatSortida(v: unknown): v is ModalitatSortida {
   return typeof v === 'string' && (MODALITATS_SORTIDA as readonly string[]).includes(v)
 }
+export function esTipusOperacio(v: unknown): v is TipusOperacio {
+  return typeof v === 'string' && (TIPUS_OPERACIO as readonly string[]).includes(v)
+}
 export function esEstatSortida(v: unknown): v is EstatSortida {
   return typeof v === 'string' && (ESTATS_SORTIDA as readonly string[]).includes(v)
 }
@@ -127,6 +143,9 @@ export function clauModalitat(m: string): string {
 }
 export function clauModalitatCurta(m: ModalitatSortida): string {
   return CLAU_MODALITAT_CURTA[m]
+}
+export function clauTipusOperacio(x: string): string {
+  return esTipusOperacio(x) ? CLAU_TIPUS_OPERACIO[x] : 'sort.desconegut'
 }
 export function clauEstat(e: string): string {
   return esEstatSortida(e) ? CLAU_ESTAT[e] : 'sort.desconegut'
@@ -159,7 +178,7 @@ export function llegeixAgrupacio(v: string | null | undefined): AgrupacioSortide
 // ---------------------------------------------------------------------------
 
 /** Las dimensiones de la barra de filtros, por su clave en `ValorsFiltre`. */
-export const DIMENSIONS_FILTRE = ['ofertant', 'receptor', 'producte', 'zona', 'modalitat', 'estat'] as const
+export const DIMENSIONS_FILTRE = ['ofertant', 'receptor', 'producte', 'zona', 'modalitat', 'tipus_operacio', 'estat'] as const
 
 export interface FiltresSortides {
   valors: Record<string, string>
@@ -169,7 +188,7 @@ export interface FiltresSortides {
   cerca: string
 }
 
-/** Los nueve filtros comunes de las dos RPC (null = sin filtro). */
+/** Los diez filtros comunes de las dos RPC (null = sin filtro). */
 export interface ArgsFiltresSortides {
   p_desde: string | null
   p_hasta: string | null
@@ -180,6 +199,7 @@ export interface ArgsFiltresSortides {
   p_modalitat: string | null
   p_estat: string | null
   p_cerca: string | null
+  p_tipus_operacio: string | null
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -224,9 +244,11 @@ export function argsFiltres(f: FiltresSortides): ArgsFiltresSortides {
     p_entidad: uuid(v.receptor),
     p_producto: textNet(v.producte),
     p_zona: textNet(v.zona),
+    // Un `modalitat=espigolada` recordado de antes de la fase 4 ya no es modalidad: sin filtro.
     p_modalitat: esModalitatSortida(v.modalitat) ? v.modalitat : null,
     p_estat: esEstatSortida(v.estat) ? v.estat : null,
     p_cerca: textNet(f.cerca),
+    p_tipus_operacio: esTipusOperacio(v.tipus_operacio) ? v.tipus_operacio : null,
   }
 }
 
@@ -244,6 +266,7 @@ export function ambFiltres(a: ArgsFiltresSortides): boolean {
 export function clauError(missatge: string | null | undefined): string {
   const m = missatge ?? ''
   if (m.includes('periode_invalid')) return 'sort.err_periode'
+  if (m.includes('tipus_operacio_invalid')) return 'sort.err_tipus_operacio'
   return 'c.load_error'
 }
 
@@ -289,7 +312,10 @@ export function llegeixFila(v: unknown): FilaSortida {
     variedad: textONull(f.variedad),
     kg_sortida: numONull(f.kg_sortida),
     kg_recollits: numONull(f.kg_recollits),
+    // La RPC de antes de la fase 4 podía mandar `espigolada` como modalidad: era una donación.
     modalitat: esModalitatSortida(f.modalitat) ? f.modalitat : 'donacio',
+    tipus_operacio: esTipusOperacio(f.tipus_operacio) ? f.tipus_operacio
+      : (f.modalitat === 'espigolada' || textONull(f.espigolada_id) ? 'espigolada' : 'excedent'),
     estat: esEstatSortida(f.estat) ? f.estat : 'pendent',
     causa_codigo: textONull(f.causa_codigo),
     municipi: textONull(f.municipi),
@@ -322,16 +348,21 @@ function xifresModalitat(v: unknown): XifresModalitat {
 function xifres(v: unknown): XifresSortides {
   const x = (v ?? {}) as Record<string, unknown>
   const pm = (x.per_modalitat ?? {}) as Record<string, unknown>
+  const pt = (x.per_tipus_operacio ?? {}) as Record<string, unknown>
   return {
     ...xifresModalitat(x),
     ofertants: num(x.ofertants),
     receptors: num(x.receptors),
     espigolades: num(x.espigolades),
+    // `pm.espigolada` (obsoleta) se ignora a propósito: esos kilos ya están en `donacio`.
     per_modalitat: {
       donacio: xifresModalitat(pm.donacio),
       venda: xifresModalitat(pm.venda),
       maquila: xifresModalitat(pm.maquila),
-      espigolada: xifresModalitat(pm.espigolada),
+    },
+    per_tipus_operacio: {
+      excedent: xifresModalitat(pt.excedent),
+      espigolada: xifresModalitat(pt.espigolada),
     },
   }
 }
@@ -367,9 +398,10 @@ export function textMes(clau: string | null | undefined, t: T): string | null {
   return `${t(CLAU_MES[mes - 1])} ${m[1]}`
 }
 
-/** Cómo se lee un grupo del Resum: el nombre, la modalidad o el estado traducidos, el mes, o «Sense …». */
+/** Cómo se lee un grupo del Resum: el nombre, la modalidad, el tipo o el estado traducidos, el mes, o «Sense …». */
 export function textGrup(per: AgrupacioSortides, g: Pick<GrupSortides, 'clau' | 'etiqueta'>, t: T): string {
   if (per === 'modalitat') return g.clau ? t(clauModalitat(g.clau)) : t('sort.desconegut')
+  if (per === 'tipus_operacio') return g.clau ? t(clauTipusOperacio(g.clau)) : t('sort.desconegut')
   if (per === 'estat') return g.clau ? t(clauEstat(g.clau)) : t('sort.desconegut')
   if (per === 'mes') return textMes(g.clau, t) ?? t(CLAU_SENSE.mes ?? 'sort.desconegut')
   const nom = (g.etiqueta ?? '').trim() || (g.clau ?? '').trim()
@@ -418,6 +450,7 @@ export const COLUMNES_SORTIDES = [
   { clau: 'kg_sortida', capcalera: 'sort.x_kg_sortida', ample: 12 },
   { clau: 'kg_recollits', capcalera: 'sort.x_kg_recollits', ample: 12 },
   { clau: 'modalitat', capcalera: 'sort.x_modalitat', ample: 22 },
+  { clau: 'tipus_operacio', capcalera: 'sort.x_tipus_operacio', ample: 20 },
   { clau: 'estat', capcalera: 'sort.x_estat', ample: 20 },
   { clau: 'causa', capcalera: 'sort.x_causa', ample: 10 },
   { clau: 'municipi', capcalera: 'sort.x_municipi', ample: 18 },
@@ -462,6 +495,7 @@ export function filaExcel(f: FilaSortida, t: T): CellaSortides[] {
     cNum(f.kg_sortida),
     cNum(f.kg_recollits),
     cText(t(clauModalitat(f.modalitat))),
+    cText(t(clauTipusOperacio(f.tipus_operacio))),
     cText(t(clauEstat(f.estat))),
     cText(f.causa_codigo),
     cText(f.municipi),
@@ -480,12 +514,16 @@ export function fullaSortides(files: readonly FilaSortida[], t: T): CellaSortide
   return [COLUMNES_SORTIDES.map((c) => negreta(t(c.capcalera))), ...files.map((f) => filaExcel(f, t))]
 }
 
-/** La hoja «Resum»: el grupo, las cifras y los kilos recogidos por modalidad; y la fila del total. */
+/**
+ * La hoja «Resum»: el grupo, las cifras, los kilos recogidos por modalidad y por tipus d'operació;
+ * y la fila del total.
+ */
 export function fullaResum(resum: ResumSortides, per: AgrupacioSortides, t: T): CellaSortides[][] {
   const capcalera = [
     t(clauAgrupacio(per)), t('sort.x_sortides'), t('sort.x_kg_sortida'), t('sort.x_kg_recollits'),
     t('sort.x_ofertants'), t('sort.x_receptors'), t('sort.x_espigolades'),
     ...MODALITATS_SORTIDA.map((m) => t('sort.x_kg_recollits_mod', { modalitat: t(clauModalitatCurta(m)) })),
+    ...TIPUS_OPERACIO.map((x) => t('sort.x_kg_recollits_mod', { modalitat: t(clauTipusOperacio(x)) })),
   ].map(negreta)
   const fila = (nom: string, x: XifresSortides, bold = false): CellaSortides[] => {
     const n = (v: number) => (bold ? { value: v, type: Number, fontWeight: 'bold' as const } : cNum(v))
@@ -494,6 +532,7 @@ export function fullaResum(resum: ResumSortides, per: AgrupacioSortides, t: T): 
       n(x.sortides), n(x.kg_sortida), n(x.kg_recollits),
       n(x.ofertants), n(x.receptors), n(x.espigolades),
       ...MODALITATS_SORTIDA.map((m) => n(x.per_modalitat[m].kg_recollits)),
+      ...TIPUS_OPERACIO.map((o) => n(x.per_tipus_operacio[o].kg_recollits)),
     ]
   }
   return [
@@ -504,7 +543,7 @@ export function fullaResum(resum: ResumSortides, per: AgrupacioSortides, t: T): 
 }
 
 /** Los anchos de columna de la hoja «Resum». */
-const AMPLES_RESUM = [30, 10, 14, 14, 10, 10, 12, 16, 16, 16, 16]
+const AMPLES_RESUM = [30, 10, 14, 14, 10, 10, 12, 16, 16, 16, 22, 16]
 
 /** Las dos hojas, con el formato de `writeXlsxFile` (nombres traducidos). */
 export function llibreSortides(files: readonly FilaSortida[], resum: ResumSortides, per: AgrupacioSortides, t: T) {

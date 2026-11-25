@@ -7,7 +7,7 @@
 // en el `details` del error, los campos de la ficha que faltan separados por comas
 // (`nif,domicili`): la pantalla los enseña y manda a la ficha a completarlos.
 //
-// ⚠️ PURO Y APARTE DE `convenis.ts`, como `conversioEspigolada.ts`: aquel importa el cliente
+// ⚠️ PURO Y APARTE DE `convenis.ts`, como los demás módulos con test: aquel importa el cliente
 //    de Supabase, y un fichero que lo importe no se puede cargar desde Vitest. Las claves
 //    `cdecl.err_*` y `cdecl.camp_*` se componen, así que sin esta separación no habría
 //    ninguna prueba que dijera que existen en los dos idiomas.

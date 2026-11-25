@@ -86,8 +86,8 @@ export default function CanalitzacioDetall() {
   const [extra, setExtra] = useState<ExtraCanal | null>(null)
   /**
    * La fila entera de la oferta (F3). `canalitzacio_assistida()` devuelve de ella cuatro
-   * campos, y la conversión en espigolada, la distribución y el destino final necesitan más
-   * —`producte_al_camp`, `espigolada_id`, el texto, `desti_reclamat_at`— así que se pide
+   * campos, y la marca de espigolada, la distribución y el destino final necesitan más
+   * —`tipus_operacio`, `espigolada_id`, el texto, `desti_reclamat_at`— así que se pide
    * aparte en vez de ensanchar una RPC del circuito para una pantalla.
    */
   const [oferta, setOferta] = useState<Excedente | null>(null)

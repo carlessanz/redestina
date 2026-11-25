@@ -41,8 +41,7 @@ interface SesionCompleta {
  * ⚠️ Ante cualquier otra cosa —ausente, vacío, un id que no reconoce— devuelve **false**,
  *    que es el default de la columna y lo que son todas las ofertas anteriores. Es el lado
  *    seguro por el mismo motivo: `false` deja el circuito como estaba; `true` inventado
- *    metería la oferta en la cola de espigolades del equipo y afirmaría al receptor algo
- *    que nadie ha dicho.
+ *    afirmaría al receptor algo que nadie ha dicho (que tiene que ir a collir).
  */
 /** Un coste por kilo positivo, o null si no se dijo o no es un número (acepta la coma). */
 export function costDeclarat(v: unknown): number | null {
@@ -88,6 +87,19 @@ export function retornDetall(d: Record<string, unknown>): { detall: string | nul
 /** ¿Se eligió «Espigolada» en el alta? Solo un `true` (o `"si"`) explícito del panel. */
 export function esEspigolada(valor: unknown): boolean {
   return valor === true || valor === "si";
+}
+
+/**
+ * Los datos del alta con la regla de la ESPIGOLADA aplicada (fase 3, 25-11-2026). Una espigolada
+ * es una oferta de DONACIÓN con el producto todavía en el campo, que sigue el circuito de
+ * cualquier donación (ya no crea jornada ni lotes): con `espigolada`, la modalidad es solo
+ * `donacio` y `producte_al_camp` es «sí», diga lo que diga el resto. Se aplica ANTES de validar,
+ * así que los obligatorios, el convenio que se exige y la fila que se guarda dicen lo mismo. Sin
+ * espigolada devuelve el mismo objeto. Pura.
+ */
+export function dadesAmbEspigolada(d: Record<string, unknown>): Record<string, unknown> {
+  if (!esEspigolada(d.espigolada)) return d;
+  return { ...d, espigolada: true, producte_al_camp: "si", modalitat: ["donacio"] };
 }
 
 export function esProducteAlCamp(valor: unknown): boolean {
@@ -199,9 +211,11 @@ export async function generarId(
  *   · `intake`        el productor la dicta por WhatsApp
  *   · `panel`         la da de alta él mismo desde su panel
  *   · `asistido`      la introduce el equipo en su nombre (modelo asistido, §1bis)
- *   · `espigolament`  nace de una espigolada, no de una oferta (la crea SQL)
+ *   · `espigolament`  HEREDADO: nacía de una jornada de espigolada (`crear_espigolada`, revocada
+ *                     en la fase 3). Una espigolada de hoy es una oferta con `espigolada_demanada`
+ *                     y el origen de quien la da de alta.
  */
-export type OrigenExcedente = "intake" | "panel" | "asistido" | "espigolament";
+export type OrigenExcedente = "intake" | "panel" | "asistido" | "espigolament" | "registre";
 
 /** Resultado de crear un excedente, para que quien llame decida qué contar. */
 export interface ResultadoCreacion {
@@ -283,8 +297,8 @@ export async function crearExcedente(
 
   // El nombre de la ORGANIZACIÓN (`empresa`, el «Nom comercial»), con `name` de respaldo:
   // en una ficha del registro `name` es la persona de contacto, y el código de la oferta
-  // salía con sus iniciales (28-09-2026). Es el mismo criterio que ya aplican en SQL
-  // `crear_espigolada()` y el alta de albaranes (`coalesce(p.empresa, p.name)`).
+  // salía con sus iniciales (28-09-2026). Es el mismo criterio que ya aplica en SQL el alta
+  // de albaranes (`coalesce(p.empresa, p.name)`).
   const nomOrganitzacio = fichaProductor?.empresa || productor.name;
   const fila = filaDeDades(d, prod?.familia ?? null, causa);
   const kg = Number(fila.kg_total ?? 0);
@@ -361,8 +375,8 @@ export function filaDeDades(
 ): Record<string, unknown> {
   const kgN = Number(String(d.kg ?? "").replace(",", "."));
   const kg = Number.isFinite(kgN) && kgN > 0 ? kgN : null;
-  // «Espigolada» (20-11-2026, `20270614100000`): no es una modalidad, es un destino. Implica el
-  // producto en el campo y una donación (lo que reparte la jornada); la marca la lleva aparte.
+  // «Espigolada» (fase 3, 25-11-2026): una oferta de DONACIÓN con el producto en el campo
+  // (`dadesAmbEspigolada`); la marca va aparte y de ella sale `tipus_operacio` (columna generada).
   const espigolada = esEspigolada(d.espigolada);
   // Las modalidades, en plural desde el 05-10-2026 (`modalitats.ts`). `modalitat` sigue
   // guardando la PRINCIPAL para todo lo que todavía lee una sola.
@@ -571,6 +585,25 @@ export async function textoOfertaDeFila(
 }
 
 /**
+ * La fila tal como quedará tras `editar_oferta()`, para componer su `texto_oferta` ANTES de
+ * llamarla (fase 3, 25-11-2026). Aplica lo que la RPC deriva de la espigolada y no llega en
+ * `canvis`: marcarla pone el producto en el campo y solo donación; `producte_al_camp: false` sin
+ * decir nada de ella la desmarca. `modalitat` va a null para que el texto lea `modalitats`. Pura.
+ */
+export function filaEditada(
+  fila: Record<string, unknown>,
+  canvis: Record<string, unknown>,
+): Record<string, unknown> {
+  const nova: Record<string, unknown> = { ...fila, ...canvis, modalitat: null };
+  if (canvis.producte_al_camp === false && !("espigolada_demanada" in canvis)) nova.espigolada_demanada = false;
+  if (nova.espigolada_demanada === true) {
+    nova.producte_al_camp = true;
+    nova.modalitats = ["donacio"];
+  }
+  return nova;
+}
+
+/**
  * Los cambios que acepta `editar_oferta()`, a partir de lo que manda el panel. Puro: lo
  * prueba `tests/oferta.test.ts`. La franja llega como `{inici, fi}` y se guarda en sus dos
  * columnas MÁS el texto, como en el alta. Lo que no se reconoce se descarta en silencio;
@@ -628,6 +661,22 @@ export function canvisOferta(entrada: Record<string, unknown>): Record<string, u
     if (n !== undefined) fora.retorn_envasos_quantitat = n;
   }
   if ("producte_al_camp" in entrada) fora.producte_al_camp = esProducteAlCamp(entrada.producte_al_camp);
+  // «Espigolada» (fase 3, 25-11-2026): `espigolada` (lo que manda el panel, como en el alta) o
+  // `espigolada_demanada` (el nombre de la columna) → `espigolada_demanada`. La regla la impone
+  // `editar_oferta()` (20270617100300): con `true` pone el producto en el campo y fuerza la
+  // donación, y rechaza `espigolada_no_donacio` si hay asignaciones vivas de otra modalidad;
+  // `producte_al_camp: false` sin decir nada de la espigolada la desmarca. Aquí solo se evita
+  // mandarle una contradicción: como en el alta, la espigolada manda, así que con `true` el
+  // producto va al campo y las modalidades que lleguen se descartan (las fuerza la RPC, y así
+  // una asignación de venta da `espigolada_no_donacio` y no `modalitat_amb_canalitzacions`).
+  const esp = "espigolada" in entrada
+    ? entrada.espigolada
+    : "espigolada_demanada" in entrada ? entrada.espigolada_demanada : undefined;
+  if (esp !== undefined) fora.espigolada_demanada = esEspigolada(esp);
+  if (fora.espigolada_demanada === true) {
+    fora.producte_al_camp = true;
+    delete fora.modalitats;
+  }
   // Hectáreas (19-11-2026): vacío = sin dato; mal formado viaja tal cual y la RPC lo rechaza.
   if ("hectarees" in entrada) {
     const n = num(entrada.hectarees);

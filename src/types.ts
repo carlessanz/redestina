@@ -320,7 +320,8 @@ export interface Excedente {
   estado: EstadoExcedente
   motivo_no_colocada: string | null
   created_at: string  // --- fase 3 ---
-  origen: 'intake' | 'panel' | 'asistido' | 'espigolament'
+  /** `registre` = operación registrada a posteriori (3.7, 20270619100000). */
+  origen: 'intake' | 'panel' | 'asistido' | 'espigolament' | 'registre'
   espigolada_id: string | null
   /** Previsión para el futuro módulo de espigolament: evita duplicar kilos */
   ref_externa: string | null
@@ -332,6 +333,12 @@ export interface Excedente {
   producte_al_camp: boolean
   /** Se eligió «Espigolada» en el alta (20270614100000): lo pide quien la dio de alta. */
   espigolada_demanada?: boolean
+  /**
+   * Tipus d'operació (columna generada, 20270617100000): `espigolada` si se pidió espigolada o
+   * viene de una jornada heredada (`espigolada_id`); si no, `excedent` (ya cosechado). La
+   * espigolada es una oferta de DONACIÓN normal: no crea jornada.
+   */
+  tipus_operacio?: TipusOperacio
   /** Derivados por el trigger `excedentes_ubica` (20270331100000). El receptor ve la comarca. */
   municipi_ine: string | null
   comarca: string | null
@@ -1702,9 +1709,12 @@ export interface ResultatImportacio {
 // `entrades_sortides_resum()`, solo equipo. Una fila por salida (canalización) de un ofertante
 // a un receptor. Los numéricos pueden llegar como texto: se leen con `Number()` (`lib/sortides.ts`).
 // ---------------------------------------------------------------------------
-export type ModalitatSortida = 'donacio' | 'venda' | 'maquila' | 'espigolada'
+/** Modalidad REAL de la salida (`canalizaciones.valorizacion`); la espigolada ya no es modalidad (fase 4). */
+export type ModalitatSortida = 'donacio' | 'venda' | 'maquila'
+/** Tipus d'operació de la oferta (`excedentes.tipus_operacio`, 20270617100000). */
+export type TipusOperacio = 'excedent' | 'espigolada'
 export type EstatSortida = 'pendent' | 'programada' | 'registrada' | 'entregada' | 'confirmada' | 'conciliada' | 'anulada'
-export type AgrupacioSortides = 'ofertant' | 'receptor' | 'producte' | 'modalitat' | 'mes' | 'zona' | 'estat'
+export type AgrupacioSortides = 'ofertant' | 'receptor' | 'producte' | 'modalitat' | 'tipus_operacio' | 'mes' | 'zona' | 'estat'
 export interface AlbaraSortida {
   id: string
   tipo: 'ENT' | 'OPE' | 'REC'
@@ -1730,6 +1740,7 @@ export interface FilaSortida {
   kg_sortida: number | null
   kg_recollits: number | null
   modalitat: ModalitatSortida
+  tipus_operacio: TipusOperacio
   estat: EstatSortida
   causa_codigo: string | null
   municipi: string | null
@@ -1741,6 +1752,8 @@ export interface FilaSortida {
   valor: number | null
   albara_ent: AlbaraSortida | null
   albara_rec: AlbaraSortida | null
+  /** Oferta registrada a posteriori (`origen = 'registre'`, 20270619100300). */
+  registre_posteriori?: boolean
 }
 export interface EntradesSortides {
   total: number
@@ -1756,8 +1769,11 @@ export interface XifresModalitat {
 export interface XifresSortides extends XifresModalitat {
   ofertants: number
   receptors: number
+  /** Ofertas distintas de tipo espigolada (20270618100000). */
   espigolades: number
+  /** Llega aún `per_modalitat.espigolada` (OBSOLETA, para el frontend viejo): no se lee. */
   per_modalitat: Record<ModalitatSortida, XifresModalitat>
+  per_tipus_operacio: Record<TipusOperacio, XifresModalitat>
 }
 export type GrupSortides = XifresSortides & { clau: string | null; etiqueta: string | null }
 export interface ResumSortides {
@@ -1821,4 +1837,43 @@ export interface OpcionsInteraccions {
   productes: string[]
   zones: string[]
   municipis: { ine: string; nom: string }[]
+}
+
+// ---------------------------------------------------------------------------
+// «Registrar operació realitzada» (proceso 3.7, 20270619100200):
+// `registrar_operacio_realitzada(...)`, solo `pot_aprovar()`, con la sesión del usuario.
+// ---------------------------------------------------------------------------
+export interface DestinatariOperacio {
+  entidad_id: string
+  kg: number
+  /** Obligatorio (≥ 0) solo en venta. */
+  preu_kg?: number | null
+  caixes?: number | null
+}
+export interface DestiOperacio {
+  /** `destins_finals.codi` */
+  desti: string
+  kg: number
+  receptor?: string | null
+  notes?: string | null
+}
+export interface ResultatOperacioRealitzada {
+  excedente_id: string
+  id_excedente: string
+  estado: string
+  data: string
+  data_hora: string
+  kg_total: number
+  kg_destinataris: number
+  kg_destins: number
+  canalitzacions: {
+    canalizacion_id: string
+    entidad_id: string
+    kg: number
+    estado: string
+    conciliat: boolean
+    sense_albara: boolean
+    albara: { id: string; numero: string | null; estat: string } | null
+    rec: { id: string; numero: string | null; estat: string } | null
+  }[]
 }

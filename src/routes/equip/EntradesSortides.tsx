@@ -5,13 +5,17 @@
 //     agrupar, paginada en el servidor de 25 en 25 y por fecha de salida, la más reciente arriba.
 //     Clicar la fila abre la ficha de la operación (`?canalitzacio=<id>`, para poder compartirla).
 //   · «Resum»: los indicadores agrupados (`?per=`): por entidad productora, receptora, producto,
-//     modalidad, mes, zona o estado, con los kilos recogidos de cada modalidad.
+//     modalidad, tipus d'operació, mes, zona o estado, con los kilos recogidos de cada modalidad.
 //   · «Exporta a Excel»: TODO lo filtrado, en páginas de 1.000, y la agrupación del Resum.
 //
 // Espigoladors no aparece como intermediaria: la fila va del ofertante al receptor. Las ofertas
 // sin ninguna salida no salen (se consultan en «Ofertes»). Los datos los dan dos RPC del equipo
 // (`entrades_sortides`, `entrades_sortides_resum`; migración 20270612100000) con los MISMOS
-// nueve filtros; la lógica pura (filtros → argumentos, etiquetas, Excel) vive en `lib/sortides.ts`.
+// diez filtros; la lógica pura (filtros → argumentos, etiquetas, Excel) vive en `lib/sortides.ts`.
+//
+// FASE 4 (25-11-2026): la modalidad es la REAL (donació · venda · maquila) y el TIPUS D'OPERACIÓ
+// (excedent ja collit · espigolada) es un filtro propio (`p_tipus_operacio`), también desde la URL
+// (`?tipus=espigolada`, al llegar), una agrupación del Resum y una columna del Excel.
 //
 // Patrones copiados del Històric de `OffersList`: la página va atada a la clave de los filtros
 // (cambiar un filtro vuelve a la 1 sin un efecto que la resetee), el buscador va al servidor con
@@ -28,7 +32,8 @@ import { descarregarBlob } from '../../lib/tancament'
 import { nombrePagines, textPagina } from '../../lib/llistatOfertes'
 import {
   AGRUPACIONS_SORTIDES, ESTATS_SORTIDA, MIDA_PAGINA_SORTIDES, MODALITATS_SORTIDA, PAGINA_EXPORTACIO_SORTIDES,
-  ambFiltres, argsFiltres, blobSortides, clauAgrupacio, clauError, clauEstat, clauModalitat,
+  TIPUS_OPERACIO, ambFiltres, argsFiltres, blobSortides, clauAgrupacio, clauError, clauEstat, clauModalitat,
+  clauTipusOperacio, esTipusOperacio,
   llegeixAgrupacio, llegeixEntrades, llegeixPestanyaSortides, llegeixResum, nomFitxerSortides,
   opcionsDeGrups, rangInvertit,
   type ArgsFiltresSortides, type OpcionsFiltre, type PestanyaSortides,
@@ -116,6 +121,16 @@ export default function EntradesSortides() {
 
   // --- Filtros y buscador --------------------------------------------------------------------
   const f = useFiltresLlistat('equip-entrades-sortides')
+  // `?tipus=` fija el tipus d'operació al llegar (como `?rol=` en Entitats): un enlace a «solo las
+  // espigolades» abre filtrado. Después manda la barra, y el parámetro se quita de la URL para que
+  // «Neteja els filtres» no se contradiga con ella.
+  const tipusUrl = params.get('tipus')
+  useEffect(() => {
+    if (tipusUrl === null) return
+    if (esTipusOperacio(tipusUrl)) f.setValors({ ...f.valors, tipus_operacio: tipusUrl })
+    posaParam('tipus', null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al llegar con `?tipus=`
+  }, [tipusUrl])
   const { cerca, setCerca } = useCerca()
   const [cercaServ, setCercaServ] = useState(cerca)
   useEffect(() => {
@@ -261,6 +276,7 @@ export default function EntradesSortides() {
             { clau: 'producte', etiquetaKey: 'fl.d_producte', opcions: opcions.producte.valors, text: textOpcio('producte'), cercador: true },
             { clau: 'zona', etiquetaKey: 'fl.d_comarca', opcions: opcions.zona.valors, text: textOpcio('zona'), cercador: true },
             { clau: 'modalitat', etiquetaKey: 'fl.d_modalitat', opcions: [...MODALITATS_SORTIDA], text: (v: string) => t(clauModalitat(v)), cercador: false },
+            { clau: 'tipus_operacio', etiquetaKey: 'fl.d_tipus_operacio', opcions: [...TIPUS_OPERACIO], text: (v: string) => t(clauTipusOperacio(v)), cercador: false },
             { clau: 'estat', etiquetaKey: 'fl.d_estat', opcions: [...ESTATS_SORTIDA], text: (v: string) => t(clauEstat(v)), cercador: false },
           ]}
           valors={f.valors}

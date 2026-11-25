@@ -18,6 +18,9 @@
 // 16-11-2026: sin ningún lugar, se PROPONE la dirección de la ficha (`llocDeLaFitxa`) con el
 // formulario ya rellenado; quien lo edita añade días y franjas, la cambia si no es ahí, y guarda.
 // Y un principal sin días ni franjas lo dice: es justo lo que el diagnóstico echa en falta.
+//
+// Fase 4 (25-11-2026): el editor de días y franjas es `EditorDiesFranges`, el mismo que usará el
+// lugar nuevo del alta de oferta; aquí se monta igual que antes.
 
 import { useEffect, useState } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
@@ -33,8 +36,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { carregaMunicipis, type Municipi } from '../lib/municipis'
 import { esFranjaValida, type Franja } from '../lib/franja'
 import SelectorMunicipi from './SelectorMunicipi'
-import SelectorFranja from './SelectorFranja'
-import XipsTria from './XipsTria'
+import EditorDiesFranges from './EditorDiesFranges'
 import { Badge } from '@/components/ui/badge'
 import { useConfirma } from './DialegConfirma'
 import { Button } from '@/components/ui/button'
@@ -63,10 +65,6 @@ const BUIT: Omit<FormLloc, 'id'> = {
   direccion: '', contacto_nombre: '', contacto_telefono: '', horario: '', observaciones: '',
   dies: [], franges: [],
 }
-
-/** Como mucho cuatro franjas por lugar (CHECK `franges_valides`). */
-const MAX_FRANGES = 4
-const DIES = [1, 2, 3, 4, 5, 6, 7] as const
 
 /** Vacío → `null`: una columna en blanco no es lo mismo que un texto vacío. */
 const net = (v: string) => (v.trim() === '' ? null : v.trim())
@@ -347,33 +345,9 @@ export default function LlocsRecollida({
             </div>
           ))}
           {/* A4 (fila 2.5): días de la semana y franjas horarias del lugar. */}
-          <div className="sm:col-span-2">
-            <p id={`${idPrefix}-dies-l`} className="mb-1.5 text-xs text-muted-foreground">{t('org.place_days')}</p>
-            <XipsTria etiquetaId={`${idPrefix}-dies-l`}
-              opcions={DIES.map((d) => ({ valor: String(d), text: t(`org.dia_${d}`) }))}
-              triats={llocNou.dies.map(String)}
-              onChange={(v) => setLlocNou((l) => (l ? { ...l, dies: v.map(Number) } : l))} />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <p className="text-xs text-muted-foreground">{t('org.place_slots')}</p>
-            {llocNou.franges.map((f, i) => (
-              <div key={i} className="flex flex-wrap items-center gap-2">
-                <SelectorFranja id={`${idPrefix}-franja-${i}`} valor={f}
-                  invalid={f !== null && !esFranjaValida(f) && Boolean(f.inici && f.fi)}
-                  onChange={(nf) => setLlocNou((l) => (l ? { ...l, franges: l.franges.map((x, j) => (j === i ? nf : x)) } : l))} />
-                <Button variant="ghost" size="sm" className="h-11 md:h-8" aria-label={t('org.place_slot_delete')}
-                  onClick={() => setLlocNou((l) => (l ? { ...l, franges: l.franges.filter((_, j) => j !== i) } : l))}>
-                  <Trash2 className="size-4" aria-hidden />
-                </Button>
-              </div>
-            ))}
-            {llocNou.franges.length < MAX_FRANGES && (
-              <Button variant="outline" size="sm" className="h-11 whitespace-nowrap md:h-8"
-                onClick={() => setLlocNou((l) => (l ? { ...l, franges: [...l.franges, null] } : l))}>
-                <Plus className="size-4" aria-hidden /> {t('org.place_slot_add')}
-              </Button>
-            )}
-          </div>
+          <EditorDiesFranges idPrefix={idPrefix} dies={llocNou.dies} franges={llocNou.franges}
+            onDies={(dies) => setLlocNou((l) => (l ? { ...l, dies } : l))}
+            onFranges={(franges) => setLlocNou((l) => (l ? { ...l, franges } : l))} />
           <div className="sm:col-span-2">
             <Label htmlFor={`${idPrefix}-observaciones`} className="mb-1.5 block text-xs text-muted-foreground">
               {t('org.place_notes')} <span className="ml-1">{t('po.optional')}</span>

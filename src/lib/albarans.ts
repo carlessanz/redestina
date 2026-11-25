@@ -1,4 +1,5 @@
-// Cliente de albaranes y espigoladas.
+// Cliente de albaranes. (Las jornadas de espigolada y sus lotes se retiraron en la fase 3 del
+// plan de noviembre de 2026: una espigolada es hoy una oferta de donación más.)
 //
 // Todo lo que cambia un albarán es una RPC, nunca un `update`: `authenticated` solo tiene
 // SELECT sobre `albaranes` y `albaran_lineas` (20261012100300), así que aquí no hay —ni
@@ -68,12 +69,6 @@ export interface LiniaEntrada {
   kg_neto?: number | null
   kg_previstos?: number | null
   lote_origen?: string | null
-  /**
-   * Solo lo lee `crear_espigolada()`: es el peso de la jornada, que va a la vez al registro
-   * (`excedentes.kg_total`) y a la línea del albarán de recepción. `emitir_albaran()` lo
-   * ignora, que ahí el peso es `kg_neto`.
-   */
-  kg?: number | null
 }
 
 /** `marcar_entregado()` devuelve el token EN CLARO: es la única vez que existe. */
@@ -107,32 +102,6 @@ export interface PropostaConciliacio {
   /** ¿Se puede conciliar sin confirmación? Solo si venció el plazo del parámetro. */
   termini_vencut: boolean
 }
-
-export interface LotEspigolada {
-  excedente_id: string
-  entidad_id: string
-  kg: number
-  nota?: string | null
-  codigo_lote?: string | null
-}
-
-export interface ResultatRepartiment {
-  lots: { canalitzacio_id: string; excedente_id: string; kg: number }[]
-  /** Avisos de convenio. Hoy el `exigir_convenio()` de la base es un stub que solo avisa. */
-  avisos: string[]
-}
-
-export interface ResultatEspigolada {
-  espigolada_id: string
-  albara_rec: string
-  /** La oferta que se ha convertido, si la jornada ha nacido de una (F3). */
-  oferta_origen_id?: string | null
-  registres: { excedente_id: string; producte: string | null; kg: number }[]
-}
-
-// Los rechazos de la CONVERSIÓN de una oferta en jornada (F3) se traducen por su código
-// en `conversioEspigolada.ts`, que es puro y por tanto se puede probar desde Vitest —este
-// módulo importa el cliente de Supabase y no se puede importar desde una prueba—.
 
 /**
  * Envoltorio único de `supabase.rpc`.
@@ -261,43 +230,6 @@ export function rectificarAlbara(
     p_lineas: linies,
     p_motivo: motiu,
   }, 'alb.err_generic')
-}
-
-/** La jornada: cabecera, un registro por producto y el albarán de recepción. */
-export function crearEspigolada(camps: {
-  productor: string
-  ubicacio: string | null
-  data: string | null
-  voluntaris: number | null
-  notes: string | null
-  linies: LiniaEntrada[]
-  refExterna: string | null
-  /**
-   * CONVERTIR una oferta «producte al camp» en jornada (F3), en vez de crear registros
-   * nuevos: la RPC reutiliza ese excedente y la jornada guarda `oferta_origen_id`. Con
-   * `p_excedente` solo se admite UNA línea, la del pesaje real; omitirla toma lo que la
-   * oferta declaraba. Sin él, el comportamiento es exactamente el de siempre.
-   */
-  excedent?: string | null
-}): Promise<ResultatRpc<ResultatEspigolada>> {
-  return crida('crear_espigolada', {
-    p_productor: camps.productor,
-    p_ubicacion: camps.ubicacio,
-    p_fecha: camps.data,
-    p_num_voluntarios: camps.voluntaris,
-    p_notas: camps.notes,
-    p_lineas: camps.linies,
-    p_ref_externa: camps.refExterna,
-    p_excedente: camps.excedent ?? null,
-  }, 'esp.err_generic')
-}
-
-/** Cada lote es una canalización y, por el trigger, un albarán de entrega en borrador. */
-export function repartirEspigolada(
-  id: string,
-  lots: LotEspigolada[],
-): Promise<ResultatRpc<ResultatRepartiment>> {
-  return crida('repartir_espigolada', { p_id: id, p_lotes: lots }, 'esp.err_generic')
 }
 
 /** Estado → clase de token. El error es rojo; el coral no significa fallo (§2bis). */

@@ -8,9 +8,9 @@
 import { describe, expect, it } from 'vitest'
 import { DICTS } from '../src/lib/i18n'
 import {
-  AGRUPACIONS_SORTIDES, COLUMNES_SORTIDES, ESTATS_SORTIDA, MODALITATS_SORTIDA,
+  AGRUPACIONS_SORTIDES, COLUMNES_SORTIDES, ESTATS_SORTIDA, MODALITATS_SORTIDA, TIPUS_OPERACIO,
   ambFiltres, argsFiltres, cellaDia, classeEstat, clauAgrupacio, clauError, clauEstat, clauModalitat,
-  clauModalitatCurta, diaValid, filaExcel, fullaResum, fullaSortides, llegeixAgrupacio, llegeixEntrades,
+  clauModalitatCurta, clauTipusOperacio, diaValid, filaExcel, fullaResum, fullaSortides, llegeixAgrupacio, llegeixEntrades,
   llegeixFila, llegeixPestanyaSortides, llegeixResum, llibreSortides, nomFitxerSortides, opcionsDeGrups,
   rangInvertit, resumBuit, textDia, textGrup, textMes,
 } from '../src/lib/sortides'
@@ -35,7 +35,7 @@ const FILA: FilaSortida = {
   productor_id: UUID, productor_nom: 'Ofertant de prova', productor_org: 'o1',
   entidad_id: UUID2, entidad_nom: 'Banc de prova', entidad_org: 'o2',
   producto: 'Pastanaga', variedad: 'Nantesa', kg_sortida: 40, kg_recollits: 38,
-  modalitat: 'donacio', estat: 'conciliada', causa_codigo: 'C1',
+  modalitat: 'donacio', tipus_operacio: 'excedent', estat: 'conciliada', causa_codigo: 'C1',
   municipi: 'Gavà', municipi_ine: '08089', zona: 'Baix Llobregat',
   caixes_entregades: 3, caixes_retornades: 2, preu_kg: 0.5, valor: 19,
   albara_ent: { id: 'a1', tipo: 'ENT', numero: 'ENT-2026-00014', estado: 'conciliado' },
@@ -43,43 +43,49 @@ const FILA: FilaSortida = {
 }
 
 describe('filtros → argumentos de las RPC', () => {
-  it('sin nada puesto, los nueve a null', () => {
+  it('sin nada puesto, los diez a null', () => {
     const a = argsFiltres({ valors: {}, desDe: '', finsA: '', cerca: '   ' })
     expect(a).toEqual({
       p_desde: null, p_hasta: null, p_productor: null, p_entidad: null, p_producto: null,
-      p_zona: null, p_modalitat: null, p_estat: null, p_cerca: null,
+      p_zona: null, p_modalitat: null, p_estat: null, p_cerca: null, p_tipus_operacio: null,
     })
     expect(ambFiltres(a)).toBe(false)
   })
 
   it('cada dimensión va a su argumento', () => {
     const a = argsFiltres({
-      valors: { ofertant: UUID, receptor: UUID2, producte: 'Pera', zona: 'Baix Llobregat', modalitat: 'venda', estat: 'anulada' },
+      valors: {
+        ofertant: UUID, receptor: UUID2, producte: 'Pera', zona: 'Baix Llobregat', modalitat: 'venda', estat: 'anulada',
+        tipus_operacio: 'espigolada',
+      },
       desDe: '2026-01-01', finsA: '2026-12-31', cerca: ' pera ',
     })
     expect(a).toEqual({
       p_desde: '2026-01-01', p_hasta: '2026-12-31', p_productor: UUID, p_entidad: UUID2, p_producto: 'Pera',
-      p_zona: 'Baix Llobregat', p_modalitat: 'venda', p_estat: 'anulada', p_cerca: 'pera',
+      p_zona: 'Baix Llobregat', p_modalitat: 'venda', p_estat: 'anulada', p_cerca: 'pera', p_tipus_operacio: 'espigolada',
     })
     expect(ambFiltres(a)).toBe(true)
   })
 
   it('lo que no vale no llega a la base (un filtro viejo del localStorage)', () => {
     const a = argsFiltres({
-      valors: { ofertant: 'no-es-uuid', receptor: '', modalitat: 'regal', estat: 'perduda', producte: '  ' },
+      valors: { ofertant: 'no-es-uuid', receptor: '', modalitat: 'regal', estat: 'perduda', producte: '  ', tipus_operacio: 'collita' },
       desDe: '2026-02-31', finsA: '31/12/2026', cerca: '',
     })
     expect(a.p_productor).toBeNull()
     expect(a.p_entidad).toBeNull()
     expect(a.p_modalitat).toBeNull()
+    expect(a.p_tipus_operacio).toBeNull()
     expect(a.p_estat).toBeNull()
     expect(a.p_producto).toBeNull()
     expect(a.p_desde).toBeNull()
     expect(a.p_hasta).toBeNull()
   })
 
-  it('las cuatro modalidades y los siete estados pasan', () => {
+  it('las tres modalidades, los dos tipos y los siete estados pasan', () => {
+    expect(MODALITATS_SORTIDA).toEqual(['donacio', 'venda', 'maquila'])
     for (const m of MODALITATS_SORTIDA) expect(argsFiltres({ valors: { modalitat: m }, desDe: '', finsA: '', cerca: '' }).p_modalitat).toBe(m)
+    for (const x of TIPUS_OPERACIO) expect(argsFiltres({ valors: { tipus_operacio: x }, desDe: '', finsA: '', cerca: '' }).p_tipus_operacio).toBe(x)
     for (const e of ESTATS_SORTIDA) expect(argsFiltres({ valors: { estat: e }, desDe: '', finsA: '', cerca: '' }).p_estat).toBe(e)
   })
 
@@ -92,6 +98,7 @@ describe('filtros → argumentos de las RPC', () => {
   it('el error de periodo tiene su mensaje; el resto, el genérico', () => {
     expect(clauError('periode_invalid: la data inicial es posterior a la final')).toBe('sort.err_periode')
     expect(clauError('limit_invalid: entre 1 i 1000')).toBe('c.load_error')
+    expect(clauError('tipus_operacio_invalid: collita')).toBe('sort.err_tipus_operacio')
     expect(clauError(null)).toBe('c.load_error')
   })
 
@@ -110,7 +117,8 @@ describe('la URL', () => {
     expect(llegeixPestanyaSortides('resum')).toBe('resum')
     expect(llegeixPestanyaSortides('altra')).toBe('sortides')
   })
-  it('agrupación: modalidad por defecto, y las siete', () => {
+  it('agrupación: modalidad por defecto, y las ocho (con el tipus d\'operació)', () => {
+    expect(AGRUPACIONS_SORTIDES).toContain('tipus_operacio')
     expect(llegeixAgrupacio(null)).toBe('modalitat')
     expect(llegeixAgrupacio('xx')).toBe('modalitat')
     for (const a of AGRUPACIONS_SORTIDES) expect(llegeixAgrupacio(a)).toBe(a)
@@ -122,11 +130,13 @@ describe('etiquetas', () => {
     const claus = [
       ...MODALITATS_SORTIDA.map(clauModalitat),
       ...MODALITATS_SORTIDA.map(clauModalitatCurta),
+      ...TIPUS_OPERACIO.map(clauTipusOperacio),
       ...ESTATS_SORTIDA.map(clauEstat),
       ...AGRUPACIONS_SORTIDES.map(clauAgrupacio),
       ...COLUMNES_SORTIDES.map((c) => c.capcalera),
       'sort.sense_ofertant', 'sort.sense_receptor', 'sort.sense_producte', 'sort.sense_zona', 'sort.sense_data',
       'sort.full_sortides', 'sort.full_resum', 'sort.total', 'sort.desconegut', 'sort.err_periode',
+      'sort.err_tipus_operacio',
     ]
     const falten = claus.filter((c) => DICTS[lang][c] === undefined)
     expect(falten).toEqual([])
@@ -134,9 +144,13 @@ describe('etiquetas', () => {
 
   it('las modalidades se leen como en la interfaz', () => {
     expect(t(clauModalitat('maquila'))).toBe('Transformació en obrador (maquila)')
-    expect(t(clauModalitat('espigolada'))).toBe('Espigolada – Donació')
-    expect(tDe('es')(clauModalitat('espigolada'))).toBe('Espigueo – Donación')
+    // La espigolada ya no es modalidad (fase 4): es un tipus d'operació.
+    expect(clauModalitat('espigolada')).toBe('sort.desconegut')
     expect(clauModalitat('x')).toBe('sort.desconegut')
+    expect(t(clauTipusOperacio('excedent'))).toBe('Excedent ja collit')
+    expect(tDe('es')(clauTipusOperacio('excedent'))).toBe('Excedente ya cosechado')
+    expect(t(clauTipusOperacio('espigolada'))).toBe('Espigolada')
+    expect(clauTipusOperacio('x')).toBe('sort.desconegut')
   })
 
   it('pendent y programada se distinguen (son dos opciones del filtro)', () => {
@@ -163,6 +177,8 @@ describe('etiquetas', () => {
     expect(textGrup('modalitat', { clau: 'venda', etiqueta: 'venda' }, t)).toBe('Venda')
     expect(textGrup('estat', { clau: 'conciliada', etiqueta: 'conciliada' }, t)).toBe(t('op.estat_conciliada'))
     expect(textGrup('mes', { clau: '2026-01', etiqueta: '2026-01' }, t)).toBe('gener 2026')
+    expect(textGrup('tipus_operacio', { clau: 'espigolada', etiqueta: 'espigolada' }, t)).toBe('Espigolada')
+    expect(textGrup('tipus_operacio', { clau: null, etiqueta: null }, t)).toBe('Desconegut')
   })
 })
 
@@ -187,6 +203,16 @@ describe('lectura de las RPC', () => {
     expect(f.valor).toBe(19)
     expect(f.albara_rec).toBeNull()
     expect(f.modalitat).toBe('donacio')
+    expect(f.tipus_operacio).toBe('excedent')
+  })
+
+  it('el tipus d\'operació: el de la RPC; si falta, de la jornada o de la modalidad vieja', () => {
+    expect(llegeixFila({ ...FILA, tipus_operacio: 'espigolada' }).tipus_operacio).toBe('espigolada')
+    expect(llegeixFila({ ...FILA, tipus_operacio: undefined, espigolada_id: 'j1' }).tipus_operacio).toBe('espigolada')
+    // La RPC de antes de la fase 4: `modalitat = espigolada` era una donación de espigolada.
+    const vella = llegeixFila({ ...FILA, tipus_operacio: undefined, modalitat: 'espigolada' })
+    expect(vella.modalitat).toBe('donacio')
+    expect(vella.tipus_operacio).toBe('espigolada')
   })
 
   it('la página y sus totales', () => {
@@ -196,15 +222,22 @@ describe('lectura de las RPC', () => {
     expect(llegeixEntrades(null)).toEqual({ total: 0, kg_sortida: 0, kg_recollits: 0, files: [] })
   })
 
-  it('el resumen, con las cuatro modalidades siempre', () => {
+  it('el resumen, con las tres modalidades y los dos tipos siempre; `per_modalitat.espigolada` no se lee', () => {
     const r = llegeixResum({
-      total: { sortides: 3, kg_sortida: '100', kg_recollits: 90, ofertants: 1, receptors: 2, espigolades: 0,
-        per_modalitat: { donacio: { sortides: 3, kg_sortida: 100, kg_recollits: '90' } } },
+      total: { sortides: 3, kg_sortida: '100', kg_recollits: 90, ofertants: 1, receptors: 2, espigolades: 1,
+        per_modalitat: {
+          donacio: { sortides: 3, kg_sortida: 100, kg_recollits: '90' },
+          espigolada: { sortides: 1, kg_sortida: 20, kg_recollits: 18 },
+        },
+        per_tipus_operacio: { espigolada: { sortides: 1, kg_sortida: '20', kg_recollits: 18 } } },
       grups: [{ clau: 'donacio', etiqueta: 'donacio', sortides: 3, kg_sortida: 100, kg_recollits: 90 }],
     })
     expect(r.total.kg_sortida).toBe(100)
     expect(r.total.per_modalitat.donacio.kg_recollits).toBe(90)
     expect(r.total.per_modalitat.maquila).toEqual({ sortides: 0, kg_sortida: 0, kg_recollits: 0 })
+    expect(Object.keys(r.total.per_modalitat)).toEqual(['donacio', 'venda', 'maquila'])
+    expect(r.total.per_tipus_operacio.espigolada).toEqual({ sortides: 1, kg_sortida: 20, kg_recollits: 18 })
+    expect(r.total.per_tipus_operacio.excedent).toEqual({ sortides: 0, kg_sortida: 0, kg_recollits: 0 })
     expect(r.grups[0].clau).toBe('donacio')
     expect(resumBuit().grups).toEqual([])
   })
@@ -215,12 +248,12 @@ describe('Excel', () => {
     expect(nomFitxerSortides('2026-11-20')).toBe('entrades-sortides-2026-11-20.xlsx')
   })
 
-  it('la hoja «Sortides»: diecinueve columnas en el orden pedido', () => {
+  it('la hoja «Sortides»: veinte columnas en el orden pedido (con el tipus d\'operació)', () => {
     const fulla = fullaSortides([FILA], t)
     const cap = fulla[0].map((c) => (c as { value: string }).value)
     expect(cap).toEqual([
       'Data de sortida', 'Núm. oferta', 'Entitat productora', 'Producte', 'Varietat', 'Entitat receptora',
-      'Kg de sortida', 'Kg recollits', 'Modalitat', 'Estat', 'Causa', 'Municipi', 'Zona',
+      'Kg de sortida', 'Kg recollits', 'Modalitat', 'Tipus d’operació', 'Estat', 'Causa', 'Municipi', 'Zona',
       'Caixes entregades', 'Caixes retornades', '€/kg', 'Valor (€)', 'Albarà d’entrega', 'Albarà de recepció',
     ])
     expect(fulla).toHaveLength(2)
@@ -236,15 +269,18 @@ describe('Excel', () => {
     expect(fila[7]).toBeNull()
     expect(fila[4]).toBeNull()
     expect(fila[8]).toEqual({ value: 'Donació' })
-    expect(fila[17]).toEqual({ value: 'ENT-2026-00014' })
-    expect(fila[18]).toEqual({ value: 'REC-2026-00012' })
+    expect(fila[9]).toEqual({ value: 'Excedent ja collit' })
+    expect(filaExcel({ ...FILA, tipus_operacio: 'espigolada' }, t)[9]).toEqual({ value: 'Espigolada' })
+    expect(fila[18]).toEqual({ value: 'ENT-2026-00014' })
+    expect(fila[19]).toEqual({ value: 'REC-2026-00012' })
     expect(cellaDia('no')).toEqual({ value: 'no' })
   })
 
   it('la hoja «Resum»: grupo, cifras, kilos por modalidad y la fila del total', () => {
     const resum = llegeixResum({
       total: { sortides: 2, kg_sortida: 60, kg_recollits: 50, ofertants: 1, receptors: 1, espigolades: 0,
-        per_modalitat: { donacio: { sortides: 2, kg_sortida: 60, kg_recollits: 50 } } },
+        per_modalitat: { donacio: { sortides: 2, kg_sortida: 60, kg_recollits: 50 } },
+        per_tipus_operacio: { espigolada: { sortides: 1, kg_sortida: 10, kg_recollits: 8 } } },
       grups: [{ clau: '2026-11', etiqueta: '2026-11', sortides: 2, kg_sortida: 60, kg_recollits: 50,
         per_modalitat: { donacio: { sortides: 2, kg_sortida: 60, kg_recollits: 50 } } }],
     })
@@ -255,7 +291,11 @@ describe('Excel', () => {
     expect((fulla[1][0] as { value: string }).value).toBe('novembre 2026')
     expect(fulla[1][7]).toMatchObject({ value: 50, type: Number })
     expect((fulla[2][0] as { value: string }).value).toBe('Total')
-    expect(fulla[0]).toHaveLength(11)
+    // 7 cifras + 3 modalidades + 2 tipus d'operació.
+    expect(fulla[0]).toHaveLength(12)
+    expect((fulla[0][11] as { value: string }).value).toBe('Kg recollits · Espigolada')
+    expect(fulla[2][11]).toMatchObject({ value: 8, type: Number })
+    expect(llibreSortides([], resum, 'mes', t)[1].columns).toHaveLength(12)
   })
 
   it('el libro: dos hojas con nombre traducido', () => {

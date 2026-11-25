@@ -86,18 +86,38 @@ interface Ordenable {
   created_at?: string | null
 }
 
+/** Opciones de `ordenaPerDisponibilitat` (fase 4, 25-11-2026: el listado del equipo). */
+export interface OpcionsOrdreDisponibilitat<T> {
+  /**
+   * Las VENCIDAS SIN RESOLVER (pasada la fecha con kilos sin salida: la regla de
+   * `fetsDeLlistat`) van arriba de todo, antes que las que se acaban hoy: son lo que le toca al
+   * equipo. Solo en el sentido ascendente.
+   */
+  vencuda?: (f: T) => boolean
+  /** `asc` (por defecto) = la que se acaba antes, arriba; `desc` = la más lejana arriba. */
+  sentit?: 'asc' | 'desc'
+}
+
 /**
  * El orden de las ofertas que pide la Fundació: primero las que siguen en marcha, por
  * disponibilidad —la que se acaba antes, arriba; las que no tienen fecha, al final de ese
- * grupo—; después las cerradas, la más reciente arriba (por cierre, o por alta).
+ * grupo (en los dos sentidos)—; después las cerradas, la más reciente arriba (por cierre, o
+ * por alta). Con `vencuda`, las vencidas sin resolver encabezan las que siguen en marcha.
  */
-export function ordenaPerDisponibilitat<T extends Ordenable>(files: readonly T[], enCurs: (f: T) => boolean): T[] {
+export function ordenaPerDisponibilitat<T extends Ordenable>(
+  files: readonly T[], enCurs: (f: T) => boolean, opcions: OpcionsOrdreDisponibilitat<T> = {},
+): T[] {
   const actives = files.filter(enCurs)
   const tancades = files.filter((f) => !enCurs(f))
+  const sentit = opcions.sentit === 'desc' ? -1 : 1
+  const prioritat = (f: T) => (sentit === 1 && opcions.vencuda?.(f) ? 0 : 1)
   actives.sort((a, b) => {
+    const pa = prioritat(a)
+    const pb = prioritat(b)
+    if (pa !== pb) return pa - pb
     const da = a.disponible_hasta ?? ''
     const db = b.disponible_hasta ?? ''
-    if (da && db) return da.localeCompare(db) || (b.created_at ?? '').localeCompare(a.created_at ?? '')
+    if (da && db) return sentit * da.localeCompare(db) || (b.created_at ?? '').localeCompare(a.created_at ?? '')
     if (da) return -1
     if (db) return 1
     return (b.created_at ?? '').localeCompare(a.created_at ?? '')

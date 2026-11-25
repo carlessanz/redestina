@@ -199,3 +199,43 @@ describe('hectáreas (19-11-2026)', () => {
     expect(c).toEqual({ kg_total: 120 })
   })
 })
+
+// ---------------------------------------------------------------------------
+// Fase 3 del plan de noviembre (25-11-2026, proceso 3.4): «Espigolada» también al editar
+// ---------------------------------------------------------------------------
+describe('la espigolada al editar', () => {
+  const jaCollit: FilaEditable = {
+    producto: 'Poma', producte_al_camp: false, kg_total: 100, modalitats: ['donacio', 'venda'], preu_minim: 0.3,
+  }
+
+  it('datosDeFila marca la casilla si la oferta la pidió', () => {
+    expect(datosDeFila({ producto: 'Poma', producte_al_camp: true, espigolada_demanada: true }).espigolada).toBe(true)
+    expect('espigolada' in datosDeFila(jaCollit)).toBe(false)
+  })
+
+  it('ja collit → al camp → Espigolada: viajan `producte_al_camp` y `espigolada`, sin modalidades', () => {
+    const d = { ...datosDeFila(jaCollit), producte_al_camp: 'si', espigolada: true, modalitat: ['donacio'] }
+    const c = canvisDeDatos(jaCollit, d)
+    expect(c.producte_al_camp).toBe(true)
+    expect(c.espigolada).toBe(true)
+    expect('modalitats' in c).toBe(false)
+    // Lo que llega al servidor: la RPC fuerza la donación.
+    expect(canvisOferta(c)).toMatchObject({ producte_al_camp: true, espigolada_demanada: true })
+    expect('modalitats' in canvisOferta(c)).toBe(false)
+  })
+
+  it('sin producto en el campo la casilla no cuenta (no se manda una espigolada imposible)', () => {
+    const d = { ...datosDeFila(jaCollit), espigolada: true }
+    expect('espigolada' in canvisDeDatos(jaCollit, d)).toBe(false)
+  })
+
+  it('desmarcarla viaja como `espigolada: false`; sin tocarla, no viaja', () => {
+    const f: FilaEditable = { producto: 'Poma', producte_al_camp: true, espigolada_demanada: true, modalitats: ['donacio'] }
+    expect('espigolada' in canvisDeDatos(f, datosDeFila(f))).toBe(false)
+    expect(canvisDeDatos(f, { ...datosDeFila(f), espigolada: false }).espigolada).toBe(false)
+    // Producto fuera del campo: la espigolada se desmarca con él.
+    expect(canvisDeDatos(f, { ...datosDeFila(f), producte_al_camp: 'no' })).toMatchObject({
+      producte_al_camp: false, espigolada: false,
+    })
+  })
+})

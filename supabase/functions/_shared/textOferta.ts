@@ -48,6 +48,7 @@ export function textoOfertaDeDades(fila: Record<string, unknown>, ctx: ContextTe
     producte: String(fila.producto ?? ""),
     varietat: fila.variedad ? String(fila.variedad) : undefined,
     producteAlCamp: fila.producte_al_camp === true,
+    espigolada: fila.espigolada_demanada === true,
     productor: ctx.productor,
     municipi: ctx.municipi,
     ubicacio: mapsPropi || ctx.mapsLloc || undefined,
@@ -88,6 +89,11 @@ export function componerTextoOferta(campos: {
   varietat?: string;
   /** Solo cuando es cierto se imprime la línea: el silencio significa «ja està collit». */
   producteAlCamp?: boolean;
+  /**
+   * Es una ESPIGOLADA (`espigolada_demanada`, fase 3): una donación más, pero la línea del campo
+   * lo dice, porque quien la recoge también la cosecha (la entidad o su voluntariado).
+   */
+  espigolada?: boolean;
   productor?: string;
   municipi?: string;
   /** El enlace de Maps (el propio de la oferta o, si no, el del lugar). */
@@ -117,7 +123,9 @@ export function componerTextoOferta(campos: {
   ];
   // Va pegada al producto porque califica QUÉ se ofrece: la entidad tiene que saber que
   // todavía no está collit antes de decir que le interesa.
-  if (campos.producteAlCamp) {
+  if (campos.espigolada) {
+    lineas.push("🌱 ESPIGOLADA: el producte és al camp i el cull qui el reculli (entitat o voluntariat)");
+  } else if (campos.producteAlCamp) {
     lineas.push("🌱 PRODUCTE AL CAMP: sí (encara no s'ha collit)");
   }
   if (ple(campos.productor)) lineas.push(`👩‍🌾 PRODUCTOR: ${campos.productor}`);

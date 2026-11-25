@@ -123,7 +123,12 @@ describe('los mensajes de una oferta', () => {
     expect(sense[0].whatsapp).not.toContain('la revisarà')
   })
 
-  it('una espigolada no tiene mensaje de alta, y un rechazo da el texto del bot', () => {
+  it('una espigolada de hoy es una oferta más: tiene su mensaje de alta (fase 3)', () => {
+    const ms = missatgesDeLOferta({ ...BASE, oferta: { ...BASE.oferta, origen: 'asistido' } }, OPC)
+    expect(ms.map((m) => m.clau)).toContain('oferta_registrada')
+  })
+
+  it('un lote HEREDADO de una jornada no tiene mensaje de alta, y un rechazo da el texto del bot', () => {
     const ms = missatgesDeLOferta({
       ...BASE,
       oferta: { ...BASE.oferta, origen: 'espigolament' },

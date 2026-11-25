@@ -36,7 +36,7 @@ import { useTerritori } from '../../hooks/useTerritori'
 import BarraFiltres from '../../components/BarraFiltres'
 import BadgeEstat from '../../components/proces/BadgeEstat'
 import { FotoOfertaResolta, useFotosOfertes } from '../../components/FotosOferta'
-import type { ConvenioTipo, Modalitat, OfertaRespuesta } from '../../types'
+import type { ConvenioTipo, Excedente, Modalitat, OfertaRespuesta } from '../../types'
 import DialegFirmaConveni from '../../components/DialegFirmaConveni'
 import { convenisQueFalten, type Equivalencia } from '../../lib/convenisEquivalents'
 import { ambPreu, modalitatsDe, modalitatsPossibles, textModalitats } from '../../lib/modalitats'
@@ -63,6 +63,13 @@ import {
 type RespostaMeva = Pick<OfertaRespuesta, 'id' | 'excedente_id' | 'estado' | 'aprovacio' | 'kg_solicitados'>
 
 /** `disponible_hasta` ya pasada: la oferta sigue publicada, pero no se puede pedir. */
+/**
+ * La oferta del Mercat: las columnas de `OfertaReceptor` y, para el diálogo de interés, los días
+ * de recogida (fase 4: `CampsRecollida` deshabilita los que no son; la base los rechaza con
+ * `dia_fora_dies`).
+ */
+type OfertaMercat = OfertaReceptor & Pick<Excedente, 'dies_recollida'>
+
 function vencuda(o: Pick<OfertaReceptor, 'disponible_hasta'>, avui: string): boolean {
   return o.disponible_hasta != null && o.disponible_hasta.slice(0, 10) < avui
 }
@@ -73,7 +80,8 @@ export default function Mercat() {
   const [dlgConveni, setDlgConveni] = useState(false)
   const organitzacio = useOrganitzacio('entidad')
   const ctxUserId = useAppContext().ctx?.userId ?? null
-  const [ofertes, setOfertes] = useState<OfertaReceptor[]>([])
+  // `dies_recollida` (fase 4) solo lo usa el diálogo de interés: no es columna de `OfertaReceptor`.
+  const [ofertes, setOfertes] = useState<OfertaMercat[]>([])
   const [meves, setMeves] = useState<Record<string, RespostaMeva>>({})
   // La matriz `convenios_exigidos`, fila `parte = 'recibe'`: qué convenio exige cada
   // modalidad a quien recibe (hoy donació → don_rec; venda y maquila → com). Se lee de la
@@ -82,7 +90,7 @@ export default function Mercat() {
   const [equivalents, setEquivalents] = useState<Equivalencia[]>([])
   const [carregant, setCarregant] = useState(true)
   const [errorCarrega, setErrorCarrega] = useState(false)
-  const [obert, setObert] = useState<OfertaReceptor | null>(null)
+  const [obert, setObert] = useState<OfertaMercat | null>(null)
   /** El diálogo abre en detalle (tocar la tarjeta) o directamente en el interés (el botón). */
   const [mode, setMode] = useState<'detall' | 'interes'>('detall')
   const [kg, setKg] = useState('')
@@ -132,7 +140,7 @@ export default function Mercat() {
     // porqué, en `OfertaReceptor`.
     const [exc, resp, exi] = await Promise.all([
       supabase.from('excedentes')
-        .select('id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, hora_recollida_inici, hora_recollida_fi, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte, created_at, validada_at')
+        .select('id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, hora_recollida_inici, hora_recollida_fi, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte, created_at, validada_at, dies_recollida')
         .in('estado', ['publicada', 'parcial'])
         .order('created_at', { ascending: false }),
       entidadId
@@ -149,7 +157,7 @@ export default function Mercat() {
     setCompat(cm.error ? null : modalitatsDe(cm.data))
     if (exc.error) { setErrorCarrega(true); setCarregant(false); return }
     setErrorCarrega(false)
-    setOfertes((exc.data ?? []) as OfertaReceptor[])
+    setOfertes((exc.data ?? []) as OfertaMercat[])
     const per: Record<string, RespostaMeva> = {}
     for (const r of (resp.data ?? []) as RespostaMeva[]) per[r.excedente_id] = r
     setMeves(per)
@@ -199,7 +207,7 @@ export default function Mercat() {
   }
 
   /** Prepara el diálogo para una oferta (lo llama el efecto que lee la URL). */
-  function prepara(o: OfertaReceptor, m: 'detall' | 'interes') {
+  function prepara(o: OfertaMercat, m: 'detall' | 'interes') {
     setObert(o)
     setMode(m)
     setKg(String(o.kg_total ?? ''))
@@ -211,7 +219,7 @@ export default function Mercat() {
   }
 
   /** Abrir desde la pantalla es escribir la URL: el efecto de abajo hace el resto. */
-  function obre(o: OfertaReceptor, m: 'detall' | 'interes') {
+  function obre(o: OfertaMercat, m: 'detall' | 'interes') {
     dialeg.obre({ oferta: o.id, accio: m === 'interes' ? 'interes' : null })
   }
 
@@ -510,7 +518,7 @@ export default function Mercat() {
                     franja que dio la productora (por cuartos). */}
                 <CampsRecollida idPrefix="mk" dia={diaRec} hora={horaRec} onDia={setDiaRec} onHora={setHoraRec}
                   disponibleFins={obert.disponible_hasta} inici={obert.hora_recollida_inici} fi={obert.hora_recollida_fi}
-                  ajuda={t('mk.rec_help')} />
+                  diesRecollida={obert.dies_recollida} ajuda={t('mk.rec_help')} />
                 {obertMods.length > 1 && (
                   <div>
                     <Label htmlFor="mk-mode" className="mb-1.5 block text-xs text-muted-foreground">{t('mk.mode_q')}</Label>

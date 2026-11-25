@@ -39,6 +39,26 @@ describe('filtros comunes', () => {
     ], (f) => !!f.actiu)
     expect(o.map((f) => f.id)).toEqual(['aviat', 'tard', 'sense', 'tancada-nova', 'tancada-vella'])
   })
+  it('fase 4: las vencidas sin resolver arriba; al revés, la más lejana arriba y sin fecha al final', () => {
+    const files = [
+      { id: 'sense', disponible_hasta: null, created_at: '2026-10-09' },
+      { id: 'tard', disponible_hasta: '2026-11-30', created_at: '2026-10-01' },
+      { id: 'aviat', disponible_hasta: '2026-11-26', created_at: '2026-10-02' },
+      { id: 'vencuda-resolta', disponible_hasta: '2026-11-10', created_at: '2026-10-03' },
+      { id: 'vencuda', disponible_hasta: '2026-11-20', created_at: '2026-10-04' },
+      { id: 'vencuda-vella', disponible_hasta: '2026-11-01', created_at: '2026-10-05' },
+    ]
+    const vencuda = (f: { id: string }) => f.id === 'vencuda' || f.id === 'vencuda-vella'
+    const asc = ordenaPerDisponibilitat(files, () => true, { vencuda })
+    // Las vencidas sin resolver primero (entre ellas, la que venció antes); después, por fecha
+    // (la vencida ya resuelta, por su fecha); las que no tienen, al final.
+    expect(asc.map((f) => f.id)).toEqual(['vencuda-vella', 'vencuda', 'vencuda-resolta', 'aviat', 'tard', 'sense'])
+    const desc = ordenaPerDisponibilitat(files, () => true, { vencuda, sentit: 'desc' })
+    expect(desc.map((f) => f.id)).toEqual(['tard', 'aviat', 'vencuda', 'vencuda-resolta', 'vencuda-vella', 'sense'])
+    // Sin opciones, el de siempre (el panel del productor).
+    expect(ordenaPerDisponibilitat(files, () => true).map((f) => f.id))
+      .toEqual(['vencuda-vella', 'vencuda-resolta', 'vencuda', 'aviat', 'tard', 'sense'])
+  })
 })
 
 describe('dimensiones con varios valores (fase 1 del feedback del 08-10)', () => {

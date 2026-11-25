@@ -130,3 +130,4 @@ se va solo **cómo se llegó hasta aquí**.
 | 85 | El CT no tenía prueba end-to-end | 05-11-2026: el CT se retiró (`20270509100400`) |
 | 194 | Dos recogidas registradas sin `recollida_registrada_per` se quedaban con `recollida_origen` a null | 20-11-2026 (vaciado de producción, fase 6) |
 | 132 | Un `tecnic` se saltaba las puertas `pot_aprovar()` escribiendo directo en las tablas | 25-11-2026: rol `tecnic` retirado (`20270615100000`, plan DIC 26 fase 0) |
+| 190 | Anular una canalización de espigolada no reabría la jornada | 25-11-2026: jornadas retiradas, la espigolada es una donación (`20270617100000`…`100300`, plan DIC 26 fase 3) |

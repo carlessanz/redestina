@@ -19,7 +19,8 @@
 //
 // Puro y sin red: se prueba desde Vitest (`tests/llistatOfertes.test.ts`).
 
-import type { EstadoAlbaran, EstadoExcedente } from '../types'
+import type { EstadoAlbaran, EstadoExcedente, Modalitat, TipusOperacio } from '../types'
+import { esModalitat } from './modalitats'
 import { puntOferta, type FetsOferta, type PuntProces } from './procesOferta'
 import { estatValidacio } from './registreRecollida'
 
@@ -176,11 +177,22 @@ export interface OfertaLlistat {
   desti_reclamat_at?: string | null
 }
 
+/**
+ * ¿Vencida sin resolver? Pasada la fecha de disponibilidad con kilos sin salida: la misma regla
+ * que la ficha (`OfferDetail`). La usan el paso del proceso y el ORDEN del listado (fase 4:
+ * las vencidas sin resolver, arriba de todo).
+ */
+export function vencudaSenseResoldre(
+  o: Pick<OfertaLlistat, 'disponible_hasta' | 'kg_total'>, kgCanalitzats: number, ara: Date = new Date(),
+): boolean {
+  const falten = Math.max(0, Number(o.kg_total ?? 0) - kgCanalitzats)
+  return o.disponible_hasta != null && new Date(o.disponible_hasta) < ara && falten > 0
+}
+
 /** Los hechos que `puntOferta` sabe leer, a partir de la fila y su resumen. */
 export function fetsDeLlistat(o: OfertaLlistat, r: ResumOferta | undefined, ara: Date = new Date()): FetsOferta {
   const res = r ?? RESUM_BUIT
   const total = Number(o.kg_total ?? 0)
-  const falten = Math.max(0, total - res.kgCanalitzats)
   const diesEsperant = res.rec?.entregado_at
     ? Math.floor((ara.getTime() - new Date(res.rec.entregado_at).getTime()) / 86_400_000)
     : null
@@ -196,7 +208,7 @@ export function fetsDeLlistat(o: OfertaLlistat, r: ResumOferta | undefined, ara:
       : null,
     motiu: o.motivo_no_colocada,
     // La misma regla que la ficha (`OfferDetail`): pasada la fecha con kilos sin cubrir.
-    vencuda: o.disponible_hasta != null && new Date(o.disponible_hasta) < ara && falten > 0,
+    vencuda: vencudaSenseResoldre(o, res.kgCanalitzats, ara),
     producteAlCamp: o.producte_al_camp,
     espigoladaId: o.espigolada_id,
     id: o.id,
@@ -205,12 +217,13 @@ export function fetsDeLlistat(o: OfertaLlistat, r: ResumOferta | undefined, ara:
   }
 }
 
-// --- Qué enseña cada columna (20-11-2026) ------------------------------------------------
+// --- Qué enseña cada columna (20-11-2026; fase 4, 25-11-2026) -----------------------------
 //
-// El listado se lee de izquierda a derecha como una pregunta: ¿cuál es la oferta (referencia),
-// cuándo entró (fecha), quién la hizo (ofertante), qué es y cuánto había (producto y kilos
-// ofrecidos), cuánto se ha colocado (barra), en qué estado está. Los receptores NO van en el
-// listado: una oferta se reparte entre varios y eso se ve en su detalle, no aquí.
+// El listado se lee de izquierda a derecha como una pregunta: ¿hasta cuándo está disponible
+// (disponibilidad), quién la hizo (ofertante), qué es y cuánto había (producto y kilos
+// ofrecidos), cuánto se ha colocado (barra), en qué estado está. La REFERENCIA (`E-…`) ya no
+// se enseña (fase 4): vive en el detalle, y el buscador la sigue encontrando. Los receptores NO
+// van en el listado: una oferta se reparte entre varios y eso se ve en su detalle, no aquí.
 
 /** La productora tal y como la devuelve el embebido `productores(name, empresa)`. */
 export interface OfertantLlistat {
@@ -248,6 +261,46 @@ export function kgDeLaFila(total: number | string | null | undefined, canalitzat
 
 /** El sentido de la fecha: `recent` = lo último arriba, `antiga` = lo primero arriba. */
 export type OrdreData = 'recent' | 'antiga'
+
+/**
+ * El orden de las pestañas vivas (fase 4): por disponibilidad (por defecto: las vencidas sin
+ * resolver arriba y después la que se acaba antes), por disponibilidad al revés, o por alta.
+ */
+export type OrdreLlistat = 'disponibilitat' | 'disponibilitat_desc' | OrdreData
+export const ORDRE_PER_DEFECTE: OrdreLlistat = 'disponibilitat'
+export const ORDRES_LLISTAT: readonly OrdreLlistat[] = ['disponibilitat', 'disponibilitat_desc', 'recent', 'antiga']
+
+export function llegeixOrdre(v: string | null | undefined): OrdreLlistat {
+  return (ORDRES_LLISTAT as readonly string[]).includes(v ?? '') ? v as OrdreLlistat : ORDRE_PER_DEFECTE
+}
+
+// --- Tipus d'operació y modalidad prevista (fase 4, 25-11-2026) --------------------------
+
+/**
+ * El tipus d'operació de una fila. La columna generada `excedentes.tipus_operacio` lo da
+ * (20270617100000); si falta (una lectura sin ella), se deduce igual que la base: espigolada si
+ * se pidió o viene de una jornada heredada.
+ */
+export function tipusOperacioDe(o: {
+  tipus_operacio?: string | null
+  espigolada_demanada?: boolean | null
+  espigolada_id?: string | null
+}): TipusOperacio {
+  if (o.tipus_operacio === 'espigolada' || o.tipus_operacio === 'excedent') return o.tipus_operacio
+  return o.espigolada_demanada || o.espigolada_id ? 'espigolada' : 'excedent'
+}
+
+/**
+ * El filtro de MODALITAT DE SORTIDA PREVISTA del Històric, para un `.or()` de PostgREST: la
+ * oferta la tiene entre sus `modalitats` o, si es de antes de la lista, en `modalitat`. `null`
+ * con un valor que no es una modalidad (un filtro viejo recordado): sin filtro, nunca un texto
+ * libre dentro del `.or()`.
+ */
+export function filtreModalitatHistoric(v: string | null | undefined): string | null {
+  if (!esModalitat(v)) return null
+  const m: Modalitat = v
+  return `modalitats.cs.{${m}},modalitat.eq.${m}`
+}
 
 /**
  * Ordena por una fecha ISO. Las filas sin fecha van SIEMPRE al final (no se mezclan con las

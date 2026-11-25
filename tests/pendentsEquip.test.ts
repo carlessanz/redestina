@@ -18,7 +18,7 @@ const CUES = [...bloque.matchAll(/'([a-z_]+)'/g)].map((m) => m[1])
 
 // Las colas cuya fila del tablero lleva segunda línea (`pe.<cua>_sub`).
 const AMB_SUB = ['registres', 'convenis_contrasignar', 'ofertes_per_validar', 'respostes', 'ofertes_modificades',
-  'ofertes_vencudes', 'costos', 'preus', 'albarans_conciliar', 'espigolades_per_convertir',
+  'ofertes_vencudes', 'costos', 'preus', 'albarans_conciliar',
   'missatges', 'ofertes_sense_enviar', 'albarans_esborrany', 'documents_error', 'recollides_per_validar',
   'recollides_equip', 'signatures_per_tancar']
 // `albarans_esperant` es informativa: no tiene fila propia (espera a la otra parte, no al
@@ -26,14 +26,16 @@ const AMB_SUB = ['registres', 'convenis_contrasignar', 'ofertes_per_validar', 'r
 const SENSE_FILA = ['albarans_esperant']
 
 describe('pendents_equip · claves compuestas de «Pendent de l’equip»', () => {
-  it('lee las diecinueve colas del union CuaEquip', () => {
+  it('lee las dieciocho colas del union CuaEquip', () => {
     // 14 desde el 05-10-2026 (`ofertes_per_validar`), 15 desde el 11-10-2026
     // (`ofertes_modificades`, fase 2 de la revisión del 08-10-2026) y 16 desde el 17-10-2026
     // (`recollides_per_validar`: el admin valida la recogida antes de generar los albaranes).
     // 17 desde el 05-11-2026 (`signatures_per_tancar`: firmas subidas que revisa el super_admin).
     // 18 desde el 17-11-2026 (`preus`: precios de referencia por revisar, punto 3 D1).
     // 19 desde el 19-11-2026 (`recollides_equip`: ventas y maquilas sin albarán por registrar).
-    expect(CUES).toHaveLength(19)
+    // 18 desde el 25-11-2026: fuera `espigolades_per_convertir` (20270617100100; una espigolada
+    // ya no se convierte en jornada, es una oferta de donación más).
+    expect(CUES).toHaveLength(18)
     expect(CUES).toContain('recollides_equip')
     expect(CUES).toContain('preus')
     expect(CUES).toContain('signatures_per_tancar')
@@ -41,9 +43,8 @@ describe('pendents_equip · claves compuestas de «Pendent de l’equip»', () =
     expect(CUES).toContain('ofertes_modificades')
     expect(CUES).toContain('ofertes_per_validar')
     expect(CUES).toContain('tancament')
-    // F3. Es la que más fácil se queda fuera: la base la devuelve igual, y una cola que no
-    // esté en el union no da ningún error — simplemente no la enseña nadie.
-    expect(CUES).toContain('espigolades_per_convertir')
+    // Retirada con la función SQL (20270617100100): si volviera al union, la base ya no la da.
+    expect(CUES).not.toContain('espigolades_per_convertir')
   })
 
   for (const idioma of ['ca', 'es'] as const) {

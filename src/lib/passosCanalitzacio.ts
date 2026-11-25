@@ -16,11 +16,12 @@
 //    aprobación; el albarán manda sobre `excedentes.estado`; el coste por kilo bloquea el
 //    cierre; y sin conciliar no hay certificado. Cambiar el orden cambia el producto.
 //
-// ⚠️ **UNA ESPIGOLADA NO RECORRE LAS SEIS FASES.** `crear_espigolada` crea de golpe la
-//    jornada, un `excedente` por producto y su REC, así que entra al ciclo por la fase 5
-//    con la entrada ya hecha. Sus fases 2-4 se marcan `fet` CON SU MOTIVO, nunca
-//    `pendent`: una pantalla que le pide «publica la oferta» a un lote de espigueo es una
-//    pantalla que no entiende de dónde viene su propio producto.
+// ⚠️ **UNA ESPIGOLADA RECORRE LAS SEIS FASES** (fase 3 del plan de noviembre, 25-11-2026).
+//    Hasta entonces `crear_espigolada` creaba de golpe la jornada y su REC, y el lote entraba
+//    por la fase 5 con las 2-4 dadas por hechas. Hoy una espigolada es una oferta
+//    de DONACIÓN con el producto en el campo (`tipus_operacio`): se publica, se asigna, se
+//    registra la recogida y se validan su ENT y su REC como cualquier donación. Lo heredado
+//    (`origen = 'espigolament'`) solo cuenta ya como donación en `certificatsDelLot`.
 //
 // ⚠️ **VENTA Y MAQUILA NO TIENEN REC** (07-10-2026). El trigger que crea los albaranes
 //    (`trg_canalizaciones_crea_albaranes`) solo crea la entrada del generador en donación:
@@ -118,8 +119,8 @@ export interface PasEscala {
    * Por qué está así, cuando no es evidente. Clave i18n (`canal.bl_*`).
    *
    * Lo llevan los bloqueados —para poder decirlo en el botón Y en `QueTocaAra`, porque en
-   * táctil no hay hover— y también algunos `fet`: una espigolada tiene la entrada hecha
-   * sin haber pasado por el alta, y eso hay que explicarlo.
+   * táctil no hay hover— y también algunos `fet`: los pasos automáticos (`canal.bl_automatic`)
+   * o el coste que no hace falta en una venta.
    */
   motiuKey?: string
   /**
@@ -351,8 +352,8 @@ const VENDA = ['venda', 'maquila']
 /**
  * Qué certificados pide este lote: el de donación (CD), el de transacción (CT) o los dos.
  *
- * El orden de las preguntas es el de la fiabilidad del hecho: una espigolada o un REC vivo
- * dicen donación sin duda; los albaranes de salida dicen la modalidad REAL de cada entrega
+ * El orden de las preguntas es el de la fiabilidad del hecho: un lote heredado de una jornada
+ * (`origen = 'espigolament'`) o un REC vivo dicen donación sin duda; los albaranes de salida dicen la modalidad REAL de cada entrega
  * (el trigger elige ENT u OPE con la `valorizacion` de la canalización); y solo si todavía
  * no hay ninguno se mira la modalidad principal de la oferta.
  */
@@ -391,7 +392,6 @@ export function certificatsDelLot(f: FetsCanal): { donacio: boolean; transaccio:
  * lo que permite que un paso bloqueado no se lleve por delante a los que vienen detrás.
  */
 export function escalaCanal(f: FetsCanal): PasEscala[] {
-  const espigolada = f.oferta.origen === 'espigolament'
   const cg = f.conveni_gen
   const cgFet = cg != null && CONVENI_FET.includes(cg.estado)
   const cgVigent = cg?.estado === 'vigent'
@@ -456,10 +456,9 @@ export function escalaCanal(f: FetsCanal): PasEscala[] {
       // ── 2 · entrada ──
       case 'oferta_alta':
         // El lote existe: si no, no habría pantalla. Lo que cambia es POR DÓNDE entró.
-        return { fet: true, motiu: espigolada ? 'canal.bl_espigolada' : undefined }
+        return { fet: true }
       case 'oferta_publicar':
         if (cancellada) return { fet: false, bloqueig: `canal.bl_${f.oferta.estado}` }
-        if (espigolada) return { fet: true, motiu: 'canal.bl_espigolada' }
         return {
           fet: f.oferta.estado !== 'borrador',
           bloqueig: !cgVigent ? 'canal.bl_sense_conveni_gen' : undefined,
@@ -468,49 +467,39 @@ export function escalaCanal(f: FetsCanal): PasEscala[] {
         // Lo hace el equipo (`validar_oferta`), así que es un paso con su «ara», no un
         // bloqueo: el bloqueo con motivo lo lleva la distribución, que es lo que frena.
         if (cancellada) return { fet: false, bloqueig: `canal.bl_${f.oferta.estado}` }
-        if (espigolada) return { fet: true, motiu: 'canal.bl_espigolada' }
         return { fet: f.oferta.estado !== 'borrador' && !perValidar }
 
       // ── 3 · distribucio ──
       case 'distribuir':
-        if (espigolada) return { fet: true, motiu: 'canal.bl_espigolada' }
         if (cancellada) return { fet: false, bloqueig: `canal.bl_${f.oferta.estado}` }
         if (perValidar) return { fet: false, bloqueig: 'canal.bl_pendent_validacio' }
         return { fet: f.respostes.length > 0 }
 
       // ── 4 · aprovacio ──
       case 'interes':
-        if (espigolada) return { fet: true, motiu: 'canal.bl_espigolada' }
         return { fet: acceptades.length > 0 }
       case 'conv_rec':
-        if (espigolada) return { fet: true, motiu: 'canal.bl_espigolada' }
         return { fet: acceptades.length > 0 && senseConveniRec.length === 0 }
       case 'aprovar':
-        if (espigolada) return { fet: true, motiu: 'canal.bl_espigolada' }
         return {
           fet: aprovades.length > 0,
           bloqueig: senseConveniRec.length > 0 ? 'canal.bl_sense_conveni_rec' : undefined,
         }
 
       // ── 5 · lliurament ──
-      // Una espigolada no tiene receptora que registre nada: la jornada ya pesó el producto
-      // y sus albaranes los emite el equipo desde la ficha. Hora y registro no le tocan.
       case 'recollida_hora':
-        if (espigolada) return { fet: true, motiu: 'canal.bl_espigolada' }
         if (vives.length === 0) return { fet: false, bloqueig: 'canal.bl_sense_canalitzacions' }
         return { fet: ambHora }
       case 'recollida_registrar':
-        if (espigolada) return { fet: true, motiu: 'canal.bl_espigolada' }
         if (vives.length === 0) return { fet: false, bloqueig: 'canal.bl_sense_canalitzacions' }
         // La hora NO bloquea: es informativa, y una recogida que ya se hizo se registra
         // tenga o no hora acordada.
         return { fet: registrades }
       case 'albarans': {
         // Qué dicen los textos depende de por qué faltan: en venta no hay REC; si alguien ya
-        // registró, lo que falta es validar; en una espigolada los emite el equipo a mano.
-        const clau = espigolada ? 'albarans_espigolada'
-          : recollidesPerValidar ? 'albarans_validar'
-            : senseRec ? 'albarans_venda' : undefined
+        // registró, lo que falta es validar.
+        const clau = recollidesPerValidar ? 'albarans_validar'
+          : senseRec ? 'albarans_venda' : undefined
         const fet = vives.length > 0 && aSort >= 3 && (senseRec || aRec >= 3)
         return {
           fet,

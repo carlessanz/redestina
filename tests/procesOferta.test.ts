@@ -401,13 +401,13 @@ describe('la nota del «producte al camp» (F3)', () => {
     expect(puntOferta({ ...base, producteAlCamp: true }, 'equip').notaClau).toBe('proc.e_nota_camp')
   })
 
-  // El enlace va a `/equip/espigolades/:id`, que está bajo `RoleGuard rol="intern"`:
-  // dárselo al generador sería mandarlo a «sense accés».
-  it('ya convertida, solo el equipo recibe el enlace a la jornada', () => {
+  // La pantalla de jornadas se retiró (fase 3, 25-11-2026): el lote heredado conserva su nota,
+  // pero ya no hay enlace a ninguna jornada, ni para el equipo.
+  it('un lote heredado de una jornada lo dice, sin enlace', () => {
     const fets: FetsOferta = { ...base, producteAlCamp: true, espigoladaId: 'jornada-1' }
     const e = puntOferta(fets, 'equip')
     expect(e.notaClau).toBe('proc.e_nota_espigolada')
-    expect(e.notaEnllac).toBe('/equip/espigolades/jornada-1')
+    expect(e.notaEnllac).toBeUndefined()
     const pr = puntOferta(fets, 'productor')
     expect(pr.notaClau).toBe('proc.p_nota_espigolada')
     expect(pr.notaEnllac).toBeUndefined()

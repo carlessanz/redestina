@@ -58,8 +58,8 @@ export type CuaEquip =
   | 'signatures_per_tancar'
   | 'albarans_esborrany' | 'albarans_conciliar' | 'albarans_esperant'
   | 'costos' | 'tancament' | 'documents_error'
-  // F3: ofertas que declaran producto sin cosechar y todavía no son una jornada.
-  | 'espigolades_per_convertir'
+  // (`espigolades_per_convertir` se retiró el 25-11-2026, 20270617100100: una espigolada ya no
+  // se convierte en jornada, es una oferta de donación más.)
   // 17-11-2026 (punto 3, D1; la 18.ª): cargas de Gencat por revisar y fuentes de precios
   // cuya última comprobación dio error. Suma al badge de Productes.
   | 'preus'

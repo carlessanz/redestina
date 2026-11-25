@@ -111,14 +111,10 @@ src/
   hooks/ (useSessio, useAppContext, useConveni, useMissatgesOferta, useOperativaPendent…)
   routes/ public/ · equip/ · productor/ · receptor/ · PerfilOrganitzacio · PerfilRecepcio · PlaOrganitzacio
   components/ (ui/ shadcn · documents/ · proces/ · equip/ (fases/, diálogos asistidos) · expedient/ · diagnostic/ …)
-  lib/ (módulos PUROS con test: importEntitats, normalitzaImport, procesOferta, passosCanalitzacio, seguentPas, validacio, format,
-        cerca, filtres, missatgesOferta, destiFinal, registreRecollida, diagnostic, i18n…)
+  lib/ (módulos PUROS con test: procesOferta, seguentPas, filtres, missatgesOferta, i18n…; lista en `context/03`)
   types.ts · index.css
-scripts/  comprobar-rls.ts (arnés) · aplicar-migracion.ts · local/ (clon) · import-ara-2026.ts + ara2026/ · crear-*.ts ·
-          escenari-demo.ts · historial-migraciones.ts · huellas-funciones.ts · data/ (ignorado)
-supabase/ config.toml · migrations/ · functions/ (_shared/ con pdf/, hojas de texto, gate, canal,
-          autorizacion, resend, pujada, operativaLlegible, preusFonts; 27 funciones: whatsapp-*, crear-oferta, registro, donar-acces, firma-equip,
-          enviar-*, *-documento, diagnostic-pdf, enlace-publico, priorizar-entidades, recordatorios-*… ; lista en `context/03`)
+scripts/  comprobar-rls.ts (arnés) · aplicar-migracion.ts · local/ (clon) · sql/prova-*.sql · data/ (ignorado)
+supabase/ config.toml · migrations/ · functions/ (_shared/ con pdf/ y los módulos comunes; 27 funciones, lista en `context/03`)
 docs/ (ignorado por git)
 ```
 
@@ -139,7 +135,8 @@ tipo por organización; solo guarda identidad y `canal_preferido`, escrito por
 `actualizar_meu_canal()`). Vista `v_organizaciones` (`security_invoker`). **Naturalesa (A5)**:
 `organizaciones.naturalesa` (entitat_social·empresa) + `naturalesa_origen` (suggerida·confirmada); la sugiere un trigger
 por el NIF (`naturalesa_suggerida()`, `context/04`) y **solo la confirmada surte efecto** (P8, §8; `naturalesaEfectiva()`). Regla en tabla `modalitat_naturalesa_compat`. `productor_ubicaciones`
-(lugares; A4: `dies_setmana`, `franges` ≤4 y **un solo `es_principal`**, índice + trigger). **Operativa (A4, T4)**: producción y comercialización; `productores_operativa` **poda** lo que no cuelga. Fiscal: `regim_iva`, `*_fiscal` (si hay domicilio fiscal,
+(lugares; A4: `dies_setmana`, `franges` ≤4 y **un solo `es_principal`**, índice + trigger; **heredan días y franja de la
+oferta al publicarla si no los tienen**, fase 4; los días de la oferta limitan al receptor: `22023 dia_fora_dies`). **Operativa (A4, T4)**: producción y comercialización; `productores_operativa` **poda** lo que no cuelga. Fiscal: `regim_iva`, `*_fiscal` (si hay domicilio fiscal,
 convenio y certificados lo usan: `dada_fiscal()`), `contacte_facturacio_*`; `data_alta` («Data d'alta a
 l'organització», editable, trigger si falta) y `created_at` («Alta a la plataforma», solo lectura), equipo.
 
@@ -160,7 +157,7 @@ hasta publicar; `dades_esborrany`; solo → publicada; borrar: `esborrar_esborra
 pendent_validacio · parcial · bloqueada · cerrada · no_colocada · cancelada; `modalitat` +
 `modalitats[]`; `preu_minim`, `coste_kg`, `fotos[]`, `producte_al_camp`, `format_entrega`,
 `transport_propi`, `municipi_ine`/`comarca` por trigger, franja `hora_recollida_*`,
-`disponible_hasta`; `dies_recollida[]`, `gmaps_url` propio (envases: deuda 188); `hectarees`; `espigolada_demanada` (pide jornada: va a validación); `subcausa_codigo` → la causa, por trigger); `oferta_respuestas` (`estado` de la entidad × `aprovacio` del equipo, `proposada` = cambios del equipo que espera a la entidad, `proposta_*`;
+`disponible_hasta`; `dies_recollida[]`, `gmaps_url` propio (envases: deuda 188); `hectarees`; `espigolada_demanada` + `tipus_operacio` generada (excedent·espigolada; la espigolada es donación sin jornada, fase 3); `subcausa_codigo` → la causa, por trigger); `oferta_respuestas` (`estado` de la entidad × `aprovacio` del equipo, `proposada` = cambios del equipo que espera a la entidad, `proposta_*`;
 `canal` whatsapp·email·panel·asistido·manual; `kg_solicitados/kg_aprovats`, `modalitat`,
 `recollida_at`); `canalizaciones` (kg confirmados/reales/conciliados, `valorizacion`, `coste_kg` = **precio del mes
 del albarán** (D2: `preu_*`, rastro `canalizaciones_preu_hist`; `context/04`), `data_hora_recollida`, `recollida_origen` (entitat_receptora·equip), columnas de la recogida protegidas por trigger);
@@ -272,8 +269,11 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
 - **Diagnóstico**: escribe solo `es_intern()` (`42501` también sobre lo suyo, D5): `desar_excedents_diagnostic`
   (reemplaza el conjunto, conserva acciones) y `fixar_estat_accio` (A3).
   Lectura: `diagnostic_estat`, `diagnostic_datos` (la usa `diagnostic-pdf`). `fixar_lloc_principal` (A4).
-- **Entrades i sortides (6.7)**: `entrades_sortides(<9 filtros>, p_limit, p_offset)` y `…_resum(…, p_per)`, del equipo,
-  solo lectura; la fila, solo en la interna `sortides_base()`; el estado, `estat_recollida_canalitzacio()` (con `operacio_detall`).
+- **Entrades i sortides (6.7)**: `entrades_sortides(<9 filtros>, p_tipus_operacio, p_limit, p_offset)` y `…_resum(…, p_per)`,
+  del equipo, solo lectura; `p_modalitat` = la REAL (donacio·venda·maquila; `espigolada` aún = tipo, deuda 192); la fila, solo en la interna `sortides_base()`; el estado, `estat_recollida_canalitzacio()` (con `operacio_detall`).
+- **Operació realitzada (3.7)**: `registrar_operacio_realitzada(p_productor, p_producto, p_kg, p_data, p_modalitat,
+  p_destinataris, p_destins, …)` (`pot_aprovar`, con sesión) registra en un acto: oferta `origen='registre'` → asignación →
+  recogida validada con la fecha real → destinos; solo ejercicio en curso y fuera de periodo certificado; sin avisos.
 - **Interacciones (1.2)**: `afegir_nota_interna(…, previsión)`, `tancar_seguiment(p_id, p_resultat)`; lectura del equipo
   `interaccions_llistat(p_vista, <12 filtros>, p_limit, p_offset)` → `{total, files}` e `interaccions_opcions()`.
 - **Precios (D1)**: `preus_proposta_mes`, `noms_fonts_preus` (equipo); validar mes/periodo, `fixar_preu_referencia`
@@ -333,7 +333,7 @@ La oferta del panel se **precarga** de la Operativa (`predeterminats`).
 
 | Panel | Rutas | Qué ve |
 | --- | --- | --- |
-| Equip | `/equip/tauler · canalitzacio[/:id] · ofertes[/:id] · espigolades · aprovacions · missatgeria · albarans · entrades-sortides · productes · tancament · entitats[/nova · /importa · /:orgId] · interaccions · convenis · documents · diagnostics · plans · configuracio` | Todo; badges de `pendents_equip()` |
+| Equip | `/equip/tauler · canalitzacio[/:id] · ofertes[/:id] · aprovacions · missatgeria · albarans · entrades-sortides · productes · tancament · entitats[/nova · /importa · /:orgId] · interaccions · convenis · documents · diagnostics · plans · configuracio` | Todo; badges de `pendents_equip()` |
 | Productor | `/productor/inici · ofertes · ofertes/nova · ofertes/:id · documents` | Sus ofertas, embudo, alta (descriptor del intake) |
 | Receptor | `/receptor/mercat · interessos · historic · impacte · documents` | Ofertas compatibles (RLS con `modalitat_receptor_compat`), interés, histórico |
 | Organització | `/organitzacio · perfil-recepcio · diagnostic · pla` | Ficha propia por secciones (el equipo no la ve) |
@@ -355,14 +355,17 @@ Lo que manda hoy, en una línea cada uno:
 - **Importa des d'Excel** (`ImportaEntitats`, §6). **Convenio único de col·laboració** por papel. Filtros comunes
   (`lib/filtres.ts`, `lib/territori.ts`). **Diagnòstic**: lo contesta el equipo; la ficha y «El meu diagnòstic» lo leen (PDF);
   Pla = **expediente**.
-- **Alta de oferta por bloques** (`FormulariNovaOferta`): opción **Espigolada** (el equipo: jornada `oberta` al acto); el lugar trae municipio, Maps, días y franja;
+- **Alta de oferta por bloques** (`FormulariNovaOferta`): **Espigolada** solo con el producto en el campo = donación sin jornada, también al editar (`lib/modalitatsOferta.ts`, `BadgeEspigolada`); el lugar trae municipio, Maps, días y franja;
   disponible = hoy + 2; **causa por su subcausa** (`lib/causes.ts`).
 - **Productes** (D1-D2, `context/06ter`): Catàleg (precio vigente: último mes validado, si no el manual) · Preus de referència · Càrregues.
-- **Entrades i sortides** (6.7, `context/06ter`): una fila por salida (canalización), filtros, «Resum» agrupado
-  (`?per=`) y Excel (`lib/sortides.ts`); la fila abre `FitxaOperacio` (`?canalitzacio=`).
-- **Ofertes del equipo** (`context/06ter`): columnas Data (ordena) · Ofertant · Producte (+kg oferts) · Progrés · Estat,
-  **sin receptores** (al detalle); Missatges: solo oferta y RECOLLIDA CONFIRMADA; pestañas Per validar · Actives · Esborranys ·
-  **Històric** (servidor; `?tab=`); paso del proceso bajo el badge (`lib/llistatOfertes.ts`). Canalització, sin cerradas.
+- **Entrades i sortides** (6.7, `context/06ter`): una fila por salida; modalidad REAL y **tipus d'operació** aparte
+  (filtro, `?per=` del «Resum», Excel; `lib/sortides.ts`); la fila abre `FitxaOperacio` (`?canalitzacio=`).
+- **Ofertes del equipo** (`context/06ter`): Disponibilitat (orden por defecto: vencidas sin resolver arriba) · Ofertant ·
+  Producte · Progrés · Estat, **sin referencia** (la encuentra el buscador) ni receptores; filtros tipus d'operació y
+  modalidad prevista (también Històric, servidor); Missatges: solo oferta y RECOLLIDA CONFIRMADA; pestañas Per validar ·
+  Actives · Esborranys · **Històric** (`?tab=`); paso bajo el badge (`lib/llistatOfertes.ts`). Canalització, sin cerradas.
+- **Días de recogida** (fase 4): con `dies_recollida`, `CampsRecollida` solo ofrece esos días (`lib/diesRecollida.ts`;
+  el equipo, `nomesAvisa`); `EditorDiesFranges` en la ficha y en el lugar nuevo del alta; la oferta solo marca los días del lugar.
   **Selectores predictivos** (`SelectorEntitat`) y buscador en Aprovacions, Tancament y Plans; «Transformació en obrador» = `maquila`.
 - **Equipo autónomo**: **asignación en un acto**, Modifica/Anul·la, recogida asistida, `MissatgesDelPunt`; convenio
   **declarado** (Superadmin); **Ciclo guiado** `/equip/canalitzacio/:id`. **Roles (0.1)**: aviso `AvisSignaturaInstitucional`
@@ -412,7 +415,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270616100100`. Tabla operativa nueva → `v_ordre` del vaciado (§6).
+  Compatibles hacia atrás con el frontend publicado. Última: `20270619100300`. Tabla operativa nueva → `v_ordre` del vaciado (§6).
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -534,27 +537,22 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones; 13 a qué causa nueva van FC y GD.
 
-**Deuda abierta (98 vivas; siguiente: 206; los números no se reutilizan)**. Casi todas, decisiones con precio o a la espera (§12bis). Defectos o trabajo pendiente: **5** (filtros en cliente) · **126**
-(`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el resumen aún ofrece la factura) · **135** (D3 residual en snapshots y `v_albaranes_bandeja`) · **136** (sin code
-splitting) · **138** (CR sin rectificar ni «enviat») · **143**
-(entrantes con WhatsApp apagado: nadie los ve) · **146** (`organizacion_contactos` sin uso) · **149**
-(dos vistas sin uso) · **151** (rama muerta en `registro/alta.ts`)
-· **152** (privacidad en «Dona-li accés»)
-· **153** (el ARA no crea ubicaciones) · **154** (código muerto del CT) · **155**
-(rectificar reimprime la fecha) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **181** (el texto no sigue al lugar) · **182** (fotos huérfanas al cancelar) · **183** (Mercabarna sin job) · **184-187** (flecos de D2) · **188** (envases: columnas sin uso) · **189** (E2E de precios provisionales) · **190** (anular en espigolada no reabre) · **191** (fixture de externos) · **192** (modelo heredado) · **193·195-202** (flecos de las fases 5 y 6) · **203** (validadas con fecha prevista) · **204** (`prova-importacio.sql` caso e) · **205** (PNG de firma huérfano al borrar una cuenta).
+**Deuda abierta (104 vivas; siguiente: 213; los números no se reutilizan)**. Casi todas, decisiones con precio o a la espera (§12bis). Defectos o trabajo pendiente (qué es cada una, en `context/12`): **5** · **126** · **127** · **135** · **136** ·
+**138** · **143** · **146** · **149** · **151-156** · **157-164** (flecos de la firma) · **165-167** y **171** (importador) ·
+**169** (alta del equipo) · **170** · **172**/**179** (`drop` pendientes) · **173** · **181-189** · **191** · **192** (modelo
+heredado y espigoladas) · **193·195-203** · **204** · **205** · **206** · **207-212** (operación a posteriori).
 Decisiones de negocio pendientes (en `context/12`): **69**, **131**,
 **133·134** (frenos), **137**, **141**, **148**. El resto (entradas 4–116), en §12bis.
 
-**§12bis** y **§12ter** (100 cerradas, indexadas) viven en `context/`.
+**§12bis** y **§12ter** (101 cerradas, indexadas) viven en `context/`.
 
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.365 de Vitest (109 ficheros, 1 saltada) + 65 de Deno.**
+   **Referencia: 2.398 de Vitest (110 ficheros, 1 saltada) + 65 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.508/2.508 y 41 sin datos (25-11); producción 2.301/2.301 y 142 (20-11-2026).** `prueba-numeracion.ts` si toca la numeración; `scripts/sql/prova-signatura-institucional.sql` si toca roles o firmas.
+   **Referencia: clon 2.546/2.546 y 41 sin datos (25-11); producción 2.301/2.301 y 142 (20-11-2026).** `prueba-numeracion.ts` si toca la numeración; `scripts/sql/prova-signatura-institucional.sql` si toca roles o firmas.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; el circuito: `circuit-tomaquet`).
 5. Publicar con `/publicar` (base → funciones → frontend).
 6. Estilos solo con tokens; un token nuevo va a `tokens.json`, `index.css` y `preview.html`.

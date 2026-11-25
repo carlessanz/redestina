@@ -5,7 +5,8 @@
 //   POST /crear-oferta  { productor_id, datos } -> crea el excedente
 //   POST /crear-oferta/esborrany { id?, productor_id, datos } -> guarda un esborrany (fase C)
 //   POST /crear-oferta/publicar  { id, datos? }  -> publica un esborrany, igual que el alta
-//   POST /crear-oferta/editar    { id, canvis }  -> edita una oferta ya publicada
+//   POST /crear-oferta/editar    { id, canvis }  -> edita una oferta ya publicada (`canvis.espigolada`
+//                                                  marca o desmarca la espigolada, fase 3)
 //
 // Por qué una Edge Function y no un insert desde el navegador:
 //   · `id_excedente` es un correlativo por productor, producto y día, y `texto_oferta`
@@ -21,7 +22,8 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import {
-  canvisOferta, crearExcedente, desarEsborrany, esEspigolada, modalitatsAmbConveni, textoOfertaDeFila,
+  canvisOferta, crearExcedente, dadesAmbEspigolada, desarEsborrany, filaEditada, modalitatsAmbConveni,
+  textoOfertaDeFila,
 } from "../_shared/oferta.ts";
 import { modalitatsDe } from "../_shared/modalitats.ts";
 import { CAMPOS, FAMILIES_ES, SECCIONES, faltantes } from "../_shared/camposOferta.ts";
@@ -203,7 +205,8 @@ Deno.serve(async (req) => {
       if ("gmaps_url" in c && !mapsValid(c.gmaps_url)) {
         return responder({ error: "L'enllaç de Maps no és vàlid", code: "maps_invalid" }, 400);
       }
-      const texto = await textoOfertaDeFila(supabase, { ...fila, ...c, modalitat: null });
+      // El texto, con la fila como quedará: también lo que la RPC deriva de la espigolada (fase 3).
+      const texto = await textoOfertaDeFila(supabase, filaEditada(fila, c));
       const { data, error } = await supabase.rpc("editar_oferta", {
         p_id: id, p_canvis: c, p_texto: texto, p_actor: ctx.userId,
       });
@@ -333,20 +336,11 @@ Deno.serve(async (req) => {
       }
       return responder({ error: r.error ?? "No s'ha pogut crear l'oferta" }, 500);
     }
-    // «Espigolada» (20-11-2026, `20270614100000`): si la da de alta el EQUIPO, se convierte en el
-    // acto en una jornada `oberta` (pendiente de espigolar) con la misma RPC que el botón
-    // «Converteix en espigolada». Si la da de alta la productora, se queda con la marca y va a
-    // validación (lo impone el trigger): el destino lo decide el equipo.
-    let espigoladaId: string | null = null;
-    let espigoladaError: string | null = null;
-    if (esEspigolada(d.espigolada) && ctx.esIntern && r.excedenteId) {
-      const { data: esp, error: errEsp } = await supabase.rpc("crear_espigolada", {
-        p_productor: v.productor.id,
-        p_excedente: r.excedenteId,
-      });
-      if (errEsp) espigoladaError = errEsp.message;
-      else espigoladaId = (esp as { espigolada_id?: string } | null)?.espigolada_id ?? null;
-    }
+    // «Espigolada» (fase 3, 25-11-2026): es una oferta de DONACIÓN con el producto en el campo
+    // (`espigolada_demanada`, `tipus_operacio = 'espigolada'`) y sigue el circuito de cualquier
+    // donación: Mercat, interés, asignación, recogida, ENT + REC. Ya no se crea ninguna jornada
+    // (`crear_espigolada` está revocada): la del equipo nace publicada (asistida) y la de la
+    // productora va a validación, como siempre (lo decide el trigger `excedentes_validacio`).
     // La confirmación que el intake manda por WhatsApp, aquí por correo: quien publica desde el
     // panel también tiene derecho a su referencia por escrito.
     const confirmacio = await confirmarOfertaPerCorreu(
@@ -355,10 +349,8 @@ Deno.serve(async (req) => {
     return responder({
       ok: true, id: r.excedenteId, id_excedente: r.idExcedente, confirmacio_email: confirmacio,
       // `pendent_validacio` o `publicada` (05-10-2026): lo decide la base.
-      estado: espigoladaId ? "borrador" : r.estado ?? "publicada",
+      estado: r.estado ?? "publicada",
       modalitats_sense_conveni: v.senseConveni,
-      espigolada_id: espigoladaId,
-      espigolada_error: espigoladaError,
     }, 200);
   };
 
@@ -380,7 +372,8 @@ Deno.serve(async (req) => {
       if (!puedeOfertar(productorId)) {
         return responder({ error: "No pots desar ofertes en nom d'aquest productor", code: "forbidden" }, 403);
       }
-      const d = datos as Record<string, unknown>;
+      // Con «Espigolada», donación y producto en el campo también en lo guardado (fase 3).
+      const d = dadesAmbEspigolada(datos as Record<string, unknown>);
       const producte = String(d.producte ?? "").trim();
       if (!producte) {
         return responder({ error: "Cal triar el producte", code: "falta_producte", faltan: ["producte"] }, 400);
@@ -436,7 +429,9 @@ Deno.serve(async (req) => {
       if (fila.estado !== "esborrany") {
         return responder({ error: "Aquesta oferta ja està publicada", code: "no_es_esborrany" }, 409);
       }
-      const d = (datos && typeof datos === "object" ? datos : fila.dades_esborrany ?? {}) as Record<string, unknown>;
+      const d = dadesAmbEspigolada(
+        (datos && typeof datos === "object" ? datos : fila.dades_esborrany ?? {}) as Record<string, unknown>,
+      );
       // El producto SÍ puede cambiar mientras es esborrany: el `E-…` (que lo lleva) nace aquí.
       const v = await validarPublicacio(fila.productor_id, d);
       if (v instanceof Response) return v;
@@ -465,7 +460,9 @@ Deno.serve(async (req) => {
         403,
       );
     }
-    const d = datos as Record<string, unknown>;
+    // «Espigolada» (fase 3): la regla se aplica ANTES de validar, así que los obligatorios, el
+    // convenio exigido (el de donación) y la fila dicen lo mismo.
+    const d = dadesAmbEspigolada(datos as Record<string, unknown>);
     const v = await validarPublicacio(productorId, d);
     if (v instanceof Response) return v;
     return await publicar(d, v);

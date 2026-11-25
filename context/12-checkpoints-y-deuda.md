@@ -149,6 +149,10 @@ apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
 ⚠️ **19-11-2026 (`20270608100000`…`100400`, fase 3 de los puntos 4-6): se abren la 191 y la 192** (fixture de externos de canalización; el modelo heredado convive): **87 vivas** y la siguiente es la 193. La condición de la 154 («una venta sin albarán») ya se da: el CT retirado sigue marcando como retroactiva una venta sin OPE, parte del código muerto.
 
+⚠️ **25-11-2026 (plan DIC 26, fases 3 y 4): se cierra la 190 (retirada) y se abre la 206** (lote heredado sin pasos propios); la 192 suma la limpieza de `espigoladas` y la compatibilidad de Entrades i sortides: **98 vivas** y la siguiente es la 207.
+
+⚠️ **25-11-2026 (plan DIC 26, fase 5, `20270619100000`…`100300`): se abren de la 207 a la 212** (flecos de la operación registrada a posteriori): **104 vivas** y la siguiente es la 213.
+
 ⚠️ **19-11-2026 (`20270610100000`…`100200`, fase 5 de los puntos 4-6): se abren de la 193 a la 197** (flecos de la propuesta de cambios y del envío automático de albaranes): **92 vivas** y la siguiente es la 198.
 
 ⚠️ **19-11-2026 (`20270611100000`, fase 6 de los puntos 4-6, vaciado): se abren de la 198 a la 202**: **97 vivas** y la siguiente es la 203. La **192** queda redefinida (en el clon ya no hay REC heredado de oferta ni OPE; falta retirar las ramas heredadas, sin olvidar que la espigolada usa REC sin canalización) y la **194** se cierra cuando se vacíe producción.
@@ -961,10 +965,12 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
 189. **El E2E `preus-provisionals.e2e.ts` falla en el clon** (visto el 19-11-2026, también sin los cambios de ese día):
      el primer paso espera `coste_kg = 0,50` (M-2 validado) y obtiene 0,80 (el manual vigente). Depende del mes en curso
      y de los precios que dejan otras pasadas en el clon. Arreglo: que el `beforeAll` limpie o fije M-1 y la propuesta.
-190. **Anular una canalización de espigolada no reabre la jornada** (19-11-2026, `20270606100100`).
+190. ~~**Anular una canalización de espigolada no reabre la jornada** (19-11-2026, `20270606100100`).
      `anula_canalitzacio()` recalcula la oferta, pero `recalcula_estat_espigolada()` suma también las anuladas y su
      trigger no salta al cambiar el `estado`. Hoy la pantalla no ofrece anular las de espigolada. Arreglo: excluir
-     `anulada` en esa suma y disparar el recálculo desde `anula_canalitzacio()`. Precio: una migración y el arnés.
+     `anulada` en esa suma y disparar el recálculo desde `anula_canalitzacio()`. Precio: una migración y el arnés.~~
+     **Cerrada el 25-11-2026 por retirada** (plan DIC 26, fase 3): la espigolada es una oferta de donación sin jornada
+     (`20270617100000`…`100300`); ya no se reparten lotes ni se anulan canalizaciones de jornada.
 191. **Externos de una canalización sin fixture en el arnés** (19-11-2026, `20270608100400`). Los cinco checks de
      lectura de `documentos_externos` con `objeto_tipo='canalizacion'` salen «sin datos» porque
      `crear-datos-documentales-prueba.ts` no sube ninguno. Arreglo: un externo de prueba sobre una canalización del
@@ -973,6 +979,11 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      con REC por oferta (sin `canalizacion_id`) y los OPE ya emitidos siguen el camino viejo: REC que espera a todas las
      recogidas, «Concilia» manual y el defecto de que el REC heredado suma kilos de venta en una oferta mixta. Se
      resuelve solo con el vaciado de la fase 6; después, retirar las ramas heredadas. Precio: una migración de limpieza.
+     **25-11-2026 (plan DIC 26, fases 3 y 4)**: entran en la misma limpieza la tabla `espigoladas` y sus ramas
+     `espigolada_id` (dormidas: `crear_espigolada`/`repartir_espigolada` revocadas; en producción queda una jornada
+     heredada con canalización, E-261120-OFE-ALB-1), y la compatibilidad de Entrades i sortides con el frontend viejo
+     (`p_modalitat='espigolada'` traducido a tipo y la clave obsoleta `per_modalitat.espigolada`, `20270618100000`):
+     retirarlas cuando el frontend nuevo esté publicado.
 193. **No hay «retirar propuesta» propia** (19-11-2026, fase 5). El equipo la retira con `respondre_proposta(id, false)`
      por la vía asistida y en el rastro queda como un rechazo (`proposta_resposta_per` = quien del equipo). Precio: una RPC.
 194. ~~**Dos recogidas registradas sin `recollida_registrada_per`** se quedan con `recollida_origen` a null (no se puede
@@ -1005,3 +1016,17 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
 205. **La firma PNG de una cuenta del equipo queda huérfana en `activos/equip/<uid>/` al borrar la cuenta** (25-11-2026).
      Ninguna migración la lleva a `fitxers_orfes`, y no puede borrarse si un albarán la ha congelado en `signant_equip`.
      Arreglo: al borrar el miembro, registrar la ruta en `fitxers_orfes` si ningún `documentos.datos` la cita.
+206. **Un lote heredado (`origen='espigolament'`) no tiene pasos propios en el ciclo guiado** (25-11-2026, plan DIC 26,
+     fase 3). Al retirar `canal.bl_espigolada`, la escalera le pide los pasos normales, pero `fases/Recollida.tsx` y
+     `OfferDetail` siguen sin ofrecerle «Registrar la recollida». Afecta solo a las jornadas heredadas (dos en el clon, una
+     en producción). Arreglo: ocultar la escalera en lo heredado o retirarlo con la limpieza de la 192. Precio: un rato.
+207. **`siglas_oferta()` repite `siglas()` de `_shared/oferta.ts`** (25-11-2026, plan DIC 26 fase 5, `20270619100200`).
+     La paridad solo se prueba en SQL. Arreglo: un test de Vitest con casos comunes. Precio: un rato.
+208. **Una operación registrada sin `p_texto_oferta` deja `texto_oferta` vacío** y «Comparteix» de `FitxaOferta` no
+     tendría texto. La pantalla lo envía; la RPC no lo exige. Precio: un rato.
+209. **`periode_certificat` cuenta también los certificados en `prueba`** (decisión con precio): mientras los datos de la
+     Fundació sean provisionales todo se certifica en prueba, y bloquear solo lo real dejaría registrar dentro de un
+     periodo ya certificado en prueba.
+210. **El convenio se comprueba vigente a hoy**, no a la fecha de la operación registrada (`exigir_convenio()`).
+211. **`operacio_detall` no expone `registre_posteriori`**: `FitxaOperacio` tendría que leer `excedentes.origen`.
+212. **Un registro a posteriori con hora de un día con franja u horario no avisa** de que cae fuera; no se valida a propósito.

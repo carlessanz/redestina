@@ -3,11 +3,15 @@
 // kilos y los kilos recogidos de cada modalidad, como la hoja «Indicadors» del ARA. Al pie, el
 // total de lo filtrado. En móvil, solo el grupo, las salidas y los kilos de salida.
 //
+// FASE 4 (25-11-2026): las columnas de modalidad son las tres REALES y la cuarta es la de las
+// espigolades (`per_tipus_operacio.espigolada`, que también son donación: no se suman aparte).
+// `per_modalitat.espigolada`, que la RPC aún manda, no se lee.
+//
 // Sin detalle: un grupo no abre nada (AGENTS.md §2, «sin detalle, no»).
 
 import { useT } from '../../lib/i18n'
 import { kg, nombre } from '../../lib/format'
-import { MODALITATS_SORTIDA, clauAgrupacio, clauModalitatCurta, textGrup } from '../../lib/sortides'
+import { MODALITATS_SORTIDA, clauAgrupacio, clauModalitatCurta, clauTipusOperacio, textGrup } from '../../lib/sortides'
 import type { AgrupacioSortides, ResumSortides, XifresSortides } from '../../types'
 import { usePuntTall } from '../../hooks/usePuntTall'
 import {
@@ -31,6 +35,7 @@ function celles(x: XifresSortides) {
       {MODALITATS_SORTIDA.map((m) => (
         <TableCell key={m} className="hidden text-right whitespace-nowrap tabular-nums xl:table-cell">{kg(x.per_modalitat[m].kg_recollits)}</TableCell>
       ))}
+      <TableCell className="hidden text-right whitespace-nowrap tabular-nums xl:table-cell">{kg(x.per_tipus_operacio.espigolada.kg_recollits)}</TableCell>
     </>
   )
 }
@@ -51,6 +56,7 @@ export default function TaulaResum({ resum, per, buitKey, carregant }: Props) {
           {MODALITATS_SORTIDA.map((m) => (
             <TableHead key={m} className="hidden text-right xl:table-cell">{t(clauModalitatCurta(m))}</TableHead>
           ))}
+          <TableHead className="hidden text-right xl:table-cell">{t(clauTipusOperacio('espigolada'))}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>

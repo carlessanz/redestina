@@ -47,7 +47,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 export type OfertaInteres = Pick<Excedente, 'id' | 'modalitat' | 'kg_total' | 'preu_minim' | 'disponible_hasta'>
-  & Partial<Pick<Excedente, 'modalitats' | 'hora_recollida_inici' | 'hora_recollida_fi' | 'productor_id'>>
+  & Partial<Pick<Excedente, 'modalitats' | 'hora_recollida_inici' | 'hora_recollida_fi' | 'productor_id' | 'dies_recollida'>>
 
 /** Códigos de `assignar_directe()` que traduce `textError()` (antes que `clauErrorInteres()`). */
 const CODIS_DIRECTE = /^(cal_preu_acordat|cal_preu_acceptat|preu_invalid|ja_assignada|hora_passada)/
@@ -304,6 +304,7 @@ export default function FormulariInteresAssistit({
 
       <CampsRecollida idPrefix={idPrefix} dia={dia} hora={hora} onDia={setDia} onHora={setHora}
         disponibleFins={oferta.disponible_hasta} inici={oferta.hora_recollida_inici} fi={oferta.hora_recollida_fi}
+        diesRecollida={oferta.dies_recollida} nomesAvisa
         ajuda={t(potAprovar ? 'asg.rec_help' : 'canalz.interes_rec_help')} />
 
       <Button

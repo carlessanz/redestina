@@ -1,6 +1,8 @@
 // «Entrades i sortides» (punto 6.7): la tabla de salidas, un filtro, la ficha por URL, el Resum
-// y la exportación a Excel. Solo lectura, pero cuenta con las salidas del clon (22 vivas de
-// donación, venta y espigolada en la referencia del 20-11-2026), así que corre contra el clon.
+// y la exportación a Excel. Fase 4 (25-11-2026): la modalidad es la real (sin «espigolada») y el
+// tipus d'operació es un filtro, una agrupación del Resum y una etiqueta en la fila. Solo lectura,
+// pero cuenta con las salidas del clon (donación, venta, maquila y espigolada), así que corre
+// contra el clon.
 
 import { expect, test, type Page } from '@playwright/test'
 import { entra, motiuSaltClon, tria } from './ajuda'
@@ -72,6 +74,35 @@ test('la pestaña Resum agrupa por entidad productora', async ({ page }) => {
   // Tantos grupos como entidades productoras dice la franja.
   const ofertants = await xifra(page, 'ofertants')
   await expect(page.getByTestId('es-grup')).toHaveCount(ofertants)
+})
+
+test('la modalidad ya no ofrece «espigolada»: es un tipus d\'operació, filtro y agrupación', async ({ page }, info) => {
+  await entra(page, 'super_admin')
+  // `?tipus=espigolada` fija el filtro al llegar.
+  await page.goto('/equip/entrades-sortides?tipus=espigolada')
+  const files = page.getByTestId('es-fila')
+  await expect(files.first()).toBeVisible()
+  await expect.poll(() => xifra(page, 'sortides')).toBeGreaterThan(0)
+  const n = await files.count()
+  // Cada fila que queda lleva la etiqueta «Espigolada» bajo el producto (a todos los anchos).
+  await expect(page.getByTestId('es-tipus-espigolada')).toHaveCount(n)
+
+  await obreFiltres(page, info.project.name === 'mobil')
+  await page.locator('#es-modalitat').click()
+  const llista = page.getByRole('listbox')
+  await expect(llista.locator('[data-valor="donacio"]')).toHaveCount(1)
+  await expect(llista.locator('[data-valor="espigolada"]')).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: /Neteja els filtres|Quitar los filtros/ }).click()
+
+  // El Resum, agrupado por tipus d'operació: dos grupos como mucho, con su nombre traducido.
+  await page.getByTestId('es-tab-resum').click()
+  await tria(page.locator('#es-per'), 'tipus_operacio')
+  await expect(page).toHaveURL(/per=tipus_operacio/)
+  const grups = page.getByTestId('es-grup')
+  await expect(grups.first()).toBeVisible()
+  expect(await grups.count()).toBeLessThanOrEqual(2)
+  await expect(page.getByTestId('es-resum').locator('tbody')).toContainText(/Excedent ja collit|Excedente ya cosechado|Espigolada/)
 })
 
 test('«Exporta a Excel» descarga un .xlsx', async ({ page }) => {

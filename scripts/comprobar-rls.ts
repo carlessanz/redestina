@@ -948,7 +948,8 @@ const PROPOSTA_LECTURA_RECEPTOR: Check[] = [
 //   · `sortides_base` (la fila y los filtros) y `estat_recollida_canalitzacio` (el `case` del
 //     estado que comparte con `operacio_detall`) son internas: 42501 a toda sesión;
 //   · las dos públicas ponen la guarda antes que la validación: un externo, 42501; el equipo,
-//     22023 con argumentos inválidos (`limit_invalid`, `periode_invalid`, `agrupacio_invalida`).
+//     22023 con argumentos inválidos (`limit_invalid`, `periode_invalid`, `agrupacio_invalida`,
+//     `tipus_operacio_invalid` desde 20270618100000).
 //   · Devuelven `jsonb`, así que el «permitir» sale «ejecutada» con o sin canalizaciones: el
 //     `requiereFixture` documenta que el contenido solo se ve con alguna.
 const SORTIDES_INTERNES: Check[] = [
@@ -959,6 +960,7 @@ const SORTIDES_EXTERN: Check[] = [
   ...SORTIDES_INTERNES,
   { tabla: "entrades_sortides", op: "rpc", esperado: "denegar", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "NO veu les entrades i sortides (es de l'equip) (6.7)" },
   { tabla: "entrades_sortides_resum", op: "rpc", esperado: "denegar", args: { p_per: "ofertant" }, descripcion: "NO veu el resum d'entrades i sortides (es de l'equip) (6.7)" },
+  { tabla: "entrades_sortides", op: "rpc", esperado: "denegar", args: { p_tipus_operacio: "espigolada" }, descripcion: "NO veu les entrades i sortides per tipus d'operacio (permis abans que validacio) (fase 4, 3.5)" },
 ];
 const SORTIDES_EQUIP: Check[] = [
   ...SORTIDES_INTERNES,
@@ -967,6 +969,122 @@ const SORTIDES_EQUIP: Check[] = [
   { tabla: "entrades_sortides", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_limit: 0 }, descripcion: "un limit fora de rang es 22023 (autoritza; limit_invalid) (6.7)" },
   { tabla: "entrades_sortides", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_desde: "2026-12-31", p_hasta: "2026-01-01" }, descripcion: "un periode al reves es 22023 (autoritza; periode_invalid) (6.7)" },
   { tabla: "entrades_sortides_resum", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_per: "no_existeix" }, descripcion: "una agrupacio desconeguda es 22023 (autoritza; agrupacio_invalida) (6.7)" },
+  // 20270618100000 (fase 4, 3.5 A-B): `p_tipus_operacio` (excedent·espigolada) y `p_modalitat` real
+  // (donacio·venda·maquila); `p_modalitat = 'espigolada'` sigue valiendo por compatibilidad.
+  { tabla: "entrades_sortides", op: "rpc", esperado: "permitir", args: { p_tipus_operacio: "espigolada", p_limit: 25 }, descripcion: "filtra les entrades i sortides per tipus d'operacio (fase 4, 3.5)", requiereFixture: "alguna canalització" },
+  { tabla: "entrades_sortides", op: "rpc", esperado: "permitir", args: { p_modalitat: "espigolada" }, descripcion: "p_modalitat espigolada (frontend publicat) es tradueix a tipus d'operacio (fase 4, 3.5)", requiereFixture: "alguna canalització" },
+  { tabla: "entrades_sortides", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_tipus_operacio: "no_existeix" }, descripcion: "un tipus d'operacio desconegut es 22023 (autoritza; tipus_operacio_invalid) (fase 4, 3.5)" },
+  { tabla: "entrades_sortides_resum", op: "rpc", esperado: "permitir", args: { p_per: "tipus_operacio" }, descripcion: "veu el resum d'entrades i sortides per tipus d'operacio (fase 4, 3.5)", requiereFixture: "alguna canalització" },
+];
+
+// «Registrar operació realitzada» (20270619100000–100300, proceso 3.7; fase 5 del plan de
+// noviembre de 2026). Lo que el arnés afirma (el ciclo entero —oferta `registre`, asignación,
+// recogida validada con la fecha real, ENT+REC, destinos, cero avisos, periodo certificado— no es
+// de permisos y lo prueba `scripts/sql/prova-operacio-realitzada.sql` con ROLLBACK):
+//   · `siglas_oferta` (las letras del `E-…`) es interna: 42501 a toda sesión;
+//   · `registrar_operacio_realitzada` es de `pot_aprovar()` y la guarda va ANTES que nada: un
+//     externo, 42501 (también con uuid inventado); el equipo, 22023 sin escribir nada
+//     (`productor_inexistent` con uuid inventado; `fora_exercici` con una fecha de otro ejercicio).
+const OPERACIO_REALITZADA_UUID0 = "00000000-0000-0000-0000-000000000000";
+const operacioRealitzadaArgs = (data: string) => ({
+  p_productor: OPERACIO_REALITZADA_UUID0,
+  p_producto: "Carbassa",
+  p_kg: 10,
+  p_data: data,
+  p_modalitat: "donacio",
+  p_destinataris: [{ entidad_id: OPERACIO_REALITZADA_UUID0, kg: 10 }],
+});
+// Hoy (la fecha UTC nunca va por delante de la de Madrid: no puede dar `data_futura`).
+const OPERACIO_REALITZADA_AVUI = new Date().toISOString().slice(0, 10);
+const OPERACIO_REALITZADA_INTERNES: Check[] = [
+  { tabla: "siglas_oferta", op: "rpc", esperado: "denegar", args: { p_texto: "arnes" }, descripcion: "NO crida les sigles internes de l'identificador d'oferta (fase 5, 3.7)" },
+];
+const OPERACIO_REALITZADA_EXTERN: Check[] = [
+  ...OPERACIO_REALITZADA_INTERNES,
+  { tabla: "registrar_operacio_realitzada", op: "rpc", esperado: "denegar", args: operacioRealitzadaArgs(OPERACIO_REALITZADA_AVUI), descripcion: "NO registra cap operacio a posteriori (es de pot_aprovar; permis abans que existencia) (fase 5, 3.7)" },
+];
+const OPERACIO_REALITZADA_EQUIP: Check[] = [
+  ...OPERACIO_REALITZADA_INTERNES,
+  { tabla: "registrar_operacio_realitzada", op: "rpc", esperado: "permitir", errorExigit: "22023", args: operacioRealitzadaArgs(OPERACIO_REALITZADA_AVUI), descripcion: "pot registrar una operacio a posteriori (autoritza; 22023 productor_inexistent) (fase 5, 3.7)" },
+  { tabla: "registrar_operacio_realitzada", op: "rpc", esperado: "permitir", errorExigit: "22023", args: operacioRealitzadaArgs("2020-06-15"), descripcion: "una data d'un altre exercici es 22023 (autoritza; fora_exercici) (fase 5, 3.7)" },
+];
+
+// «Interaccions i seguiment» (20270616100000 + 20270616100100, proceso 1.2): las MISMAS filas de
+// `notes_internes`, con previsión de producto y resultado del seguimiento; lectura global solo
+// del equipo.
+//   · `interaccions_base` (la fila y los filtros) es interna: 42501 a toda sesión;
+//   · `interaccions_llistat` e `interaccions_opcions` ponen la guarda antes que la validación: un
+//     externo, 42501 aunque la vista sea inválida; el equipo, 22023 con argumentos inválidos
+//     (`vista_invalida`, `estat_invalid`, `tipus_invalid`, `limit_invalid`, `rang_invertit`).
+//   · `afegir_nota_interna` con los cinco de previsión y `tancar_seguiment(p_id, p_resultat)`:
+//     con uuid inventado, 22023 (`organitzacio_inexistent`, `nota_inexistent`).
+//   · Devuelven `jsonb`, así que el «permitir» sale «ejecutada» con o sin notas: el
+//     `requiereFixture` documenta que el contenido solo se ve con alguna.
+const INTERACCIONS_INTERNES: Check[] = [
+  { tabla: "interaccions_base", op: "rpc", esperado: "denegar", args: { p_desde: null }, descripcion: "NO crida la consulta interna d'interaccions (1.2)" },
+];
+const INTERACCIONS_EXTERN: Check[] = [
+  ...INTERACCIONS_INTERNES,
+  { tabla: "interaccions_llistat", op: "rpc", esperado: "denegar", args: { p_vista: "historial" }, descripcion: "NO veu les interaccions (són de l'equip) (1.2)" },
+  { tabla: "interaccions_llistat", op: "rpc", esperado: "denegar", args: { p_vista: "no_existeix" }, descripcion: "NO veu les interaccions: 42501 abans de validar la vista (1.2)" },
+  { tabla: "interaccions_opcions", op: "rpc", esperado: "denegar", args: {}, descripcion: "NO veu les opcions dels filtres d'interaccions (1.2)" },
+  { tabla: "afegir_nota_interna", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_canal: "visita", p_text: "arnes", p_tipus: "prospeccio", p_previsio_producte: "TEST-ARNES-INEXISTENT", p_previsio_kg: 10, p_previsio_data: "2027-01-15", p_previsio_ubicacio_id: null, p_previsio_ubicacio: "Camp" }, descripcion: "NO registra interaccions amb previsió de producte (1.2)" },
+  { tabla: "tancar_seguiment", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_resultat: "arnes" }, descripcion: "NO tanca seguiments amb resultat (1.2)" },
+];
+const INTERACCIONS_EQUIP: Check[] = [
+  ...INTERACCIONS_INTERNES,
+  { tabla: "interaccions_llistat", op: "rpc", esperado: "permitir", args: { p_vista: "pendents", p_limit: 25, p_offset: 0 }, descripcion: "veu els seguiments pendents de tota la base (1.2)", requiereFixture: "alguna nota interna amb proper pas" },
+  { tabla: "interaccions_llistat", op: "rpc", esperado: "permitir", args: { p_vista: "historial" }, descripcion: "veu l'historial d'interaccions (1.2)", requiereFixture: "alguna nota interna" },
+  { tabla: "interaccions_llistat", op: "rpc", esperado: "permitir", args: { p_vista: "previsions", p_prev_desde: "2026-01-01" }, descripcion: "veu les previsions de producte (1.2)", requiereFixture: "alguna nota interna amb previsió" },
+  { tabla: "interaccions_opcions", op: "rpc", esperado: "permitir", args: {}, descripcion: "veu les opcions dels filtres d'interaccions (1.2)", requiereFixture: "alguna nota interna" },
+  { tabla: "interaccions_llistat", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_vista: "no_existeix" }, descripcion: "una vista desconeguda es 22023 (autoritza; vista_invalida) (1.2)" },
+  { tabla: "interaccions_llistat", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_vista: "historial", p_estat: "no_existeix" }, descripcion: "un estat desconegut es 22023 (autoritza; estat_invalid) (1.2)" },
+  { tabla: "interaccions_llistat", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_vista: "historial", p_limit: 0 }, descripcion: "un limit fora de rang es 22023 (autoritza; limit_invalid) (1.2)" },
+  { tabla: "interaccions_llistat", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_vista: "previsions", p_prev_desde: "2026-12-31", p_prev_hasta: "2026-01-01" }, descripcion: "un rang de previsió al revés es 22023 (autoritza; rang_invertit) (1.2)" },
+  { tabla: "afegir_nota_interna", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_canal: "visita", p_text: "arnes", p_tipus: "prospeccio", p_previsio_producte: "TEST-ARNES-INEXISTENT", p_previsio_kg: 10, p_previsio_data: "2027-01-15", p_previsio_ubicacio_id: null, p_previsio_ubicacio: "Camp" }, descripcion: "pot registrar una interacció amb previsió (autoritza; 22023 producte_desconegut) (1.2)" },
+  { tabla: "afegir_nota_interna", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_canal: "visita", p_text: "arnes", p_previsio_producte: "TEST-ARNES-INEXISTENT", p_previsio_kg: 10 }, descripcion: "una previsió incompleta es 22023 (autoritza; previsio_incompleta) (1.2)" },
+  { tabla: "tancar_seguiment", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "00000000-0000-0000-0000-000000000000", p_resultat: "arnes" }, descripcion: "pot tancar un seguiment amb resultat (autoritza; 22023 nota_inexistent) (1.2)" },
+];
+
+// La espigolada es una oferta de DONACIÓN (20270617100000–100300, procesos 3.6, 3.5 C y 3.4): el
+// módulo de jornadas y lotes se retira. `crear_espigolada` y `repartir_espigolada` pierden el
+// EXECUTE de `authenticated` (solo `service_role`, por lo heredado), así que también el equipo y el
+// super_admin reciben 42501 —antes la conversión era un «permitir»—. Los externos ya las tenían
+// denegadas por la guarda; ahora, además, por el GRANT.
+//   · `editar_oferta` acepta `espigolada_demanada`, pero sigue siendo SOLO del servidor (la llama
+//     `crear-oferta/editar` con `p_actor`): el equipo con sesión, 42501 también con la clave nueva.
+//     Los casos de negocio (`espigolada_no_donacio`, `espigolada_sense_camp`) los cubre
+//     `scripts/sql/prova-espigolada-donacio.sql`.
+const ESPIGOLADA_RETIRADA: Check[] = [
+  {
+    tabla: "crear_espigolada",
+    op: "rpc",
+    esperado: "denegar",
+    args: {
+      p_productor: "00000000-0000-0000-0000-000000000000",
+      p_excedente: "00000000-0000-0000-0000-000000000000",
+    },
+    descripcion: "NO converteix cap oferta en espigolada (modul retirat; 42501 sense EXECUTE)",
+  },
+  {
+    tabla: "repartir_espigolada",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_id: "00000000-0000-0000-0000-000000000000", p_lotes: [] },
+    descripcion: "NO reparteix cap espigolada per lots (modul retirat; 42501 sense EXECUTE)",
+  },
+  {
+    tabla: "editar_oferta",
+    op: "rpc",
+    esperado: "denegar",
+    args: {
+      p_id: "00000000-0000-0000-0000-000000000000",
+      p_canvis: { espigolada_demanada: true },
+      p_texto: "",
+      p_actor: "00000000-0000-0000-0000-000000000000",
+    },
+    descripcion: "NO marca l'espigolada per RPC directa (editar_oferta es nomes del servidor)",
+  },
 ];
 
 // El bloque documental de CUALQUIER cuenta que no sea del equipo, sea cual sea su tipo.
@@ -1301,11 +1419,11 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // sabe que existen: el `select` le da 0 filas SIN error, y no escribe ni borra.
   { tabla: "notes_internes", op: "leer", esperado: "denegar", descripcion: "NO veu cap nota interna (0 files, sense error)" },
   { tabla: "notes_internes", op: "insertar", esperado: "denegar", descripcion: "NO escriu notes internes" },
-  { tabla: "afegir_nota_interna", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_canal: "telefon", p_text: "arnes" }, descripcion: "NO afegeix notes internes" },
+  { tabla: "afegir_nota_interna", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_canal: "telefon", p_text: "arnes", p_tipus: "operativa", p_responsable: null, p_propera_accio: null, p_propera_data: null, p_previsio_producte: null, p_previsio_kg: null, p_previsio_data: null, p_previsio_ubicacio_id: null, p_previsio_ubicacio: null }, descripcion: "NO afegeix notes internes" },
   { tabla: "esborrar_nota_interna", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO esborra notes internes" },
   // Taula mestra 1.5 (20270504100000): cerrar un seguimiento es del equipo, y activar la
   // organización entera, de `pot_aprovar()`.
-  { tabla: "tancar_seguiment", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO tanca seguiments del CRM" },
+  { tabla: "tancar_seguiment", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_resultat: null }, descripcion: "NO tanca seguiments del CRM" },
   // Consentimiento por enlace (20270506100000): pedirlo y listar es del equipo; guardarlo,
   // solo del servidor (`enlace-publico`).
   { tabla: "demanar_consentiment", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO demana consentiments" },
@@ -1534,6 +1652,14 @@ const DOCUMENTAL_EXTERN: Check[] = [
     },
     descripcion: "NO crea ni converteix cap espigolada (nomes l'equip)",
   },
+  // 20270617100100: el reparto por lotes, retirado (sin EXECUTE para ninguna sesión).
+  {
+    tabla: "repartir_espigolada",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_id: "00000000-0000-0000-0000-000000000000", p_lotes: [] },
+    descripcion: "NO reparteix cap espigolada per lots (modul retirat)",
+  },
   // El cierre automático de la espigolada (20270406100300) lo hace un TRIGGER; la función
   // que recalcula no la puede llamar nadie con sesión, ni el equipo (bloque de abajo).
   {
@@ -1593,6 +1719,10 @@ const DOCUMENTAL_EXTERN: Check[] = [
   ...PROPOSTA_SENSE_APROVAR,
   // «Entrades i sortides» (20270612100000, 6.7): ver `SORTIDES_EXTERN`.
   ...SORTIDES_EXTERN,
+  // «Registrar operació realitzada» (20270619100200, 3.7): ver `OPERACIO_REALITZADA_EXTERN`.
+  ...OPERACIO_REALITZADA_EXTERN,
+  // «Interaccions i seguiment» (20270616100000/100100, 1.2): ver `INTERACCIONS_EXTERN`.
+  ...INTERACCIONS_EXTERN,
 ];
 
 // Lo que CADA rol debe poder hacer. Es la especificación ejecutable de AGENTS.md §4:
@@ -1797,24 +1927,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "ve las espigoladas, y de qué oferta nació cada una",
       requiereFixture: "la espigolada de prueba (scripts/crear-datos-documentales-prueba.ts)",
     },
-    // La guarda de ROL de la conversión (F3). Va contra un uuid de ceros a propósito: lo
-    // que se mide es que `es_intern()` la deja pasar, no lo que contesta —contesta
-    // `22023 oferta_inexistent`, que es error de NEGOCIO y por tanto cuenta como
-    // ejecutada (ERRORES_DE_NEGOCIO)—.
-    //
-    // ⚠️ En positivo no se prueba NUNCA: convertir una oferta de verdad la sacaría del
-    //    mercado, le cambiaría el origen y le montaría un REC, contra producción. Mismo
-    //    criterio que `borrar_ficha_completa()` y que §12.97 con `acunar_enllac_propi`.
-    {
-      tabla: "crear_espigolada",
-      op: "rpc",
-      esperado: "permitir",
-      args: {
-      p_productor: "00000000-0000-0000-0000-000000000000",
-      p_excedente: "00000000-0000-0000-0000-000000000000",
-    },
-      descripcion: "pot convertir una oferta en espigolada (la guarda el deixa passar)",
-    },
+    // La conversión en jornada y el reparto por lotes, RETIRADOS (20270617100100): ver
+    // `ESPIGOLADA_RETIRADA`.
+    ...ESPIGOLADA_RETIRADA,
     {
       tabla: "recalcula_estat_espigolada",
       op: "rpc",
@@ -1887,6 +2002,10 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // La firma propia (20270615100200): `la_meva_firma` sí; las columnas y la escritura, no.
     ...FIRMA_EQUIP_EQUIP,
     ...SORTIDES_EQUIP,
+    // «Registrar operació realitzada» (20270619100200, 3.7): el Dinamitzador tiene `pot_aprovar()`.
+    ...OPERACIO_REALITZADA_EQUIP,
+    // «Interaccions i seguiment» (20270616100000/100100, 1.2): de todo el equipo.
+    ...INTERACCIONS_EQUIP,
     {
       tabla: "costes_producto",
       op: "leer",
@@ -2019,11 +2138,11 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // 22023 `organitzacio_inexistent`: la guarda dejó pasar), pero no las borra ni escribe directo.
     { tabla: "notes_internes", op: "leer", esperado: "permitir", descripcion: "veu les notes internes", requiereFixture: "alguna nota interna (afegir_nota_interna)" },
     { tabla: "notes_internes", op: "insertar", esperado: "denegar", descripcion: "NO escriu notes directament (només afegir_nota_interna)" },
-    { tabla: "afegir_nota_interna", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000", p_canal: "telefon", p_text: "arnes" }, descripcion: "pot afegir una nota interna (22023 si l'organització no existeix)" },
+    { tabla: "afegir_nota_interna", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000", p_canal: "telefon", p_text: "arnes", p_tipus: "operativa", p_responsable: null, p_propera_accio: null, p_propera_data: null, p_previsio_producte: null, p_previsio_kg: null, p_previsio_data: null, p_previsio_ubicacio_id: null, p_previsio_ubicacio: null }, descripcion: "pot afegir una nota interna (22023 si l'organització no existeix)" },
     { tabla: "esborrar_nota_interna", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO esborra notes internes (és del super_admin)" },
     // 1.5 (20270504100000): el equipo cierra seguimientos (uuid inventado → 22023
     // `nota_inexistent`).
-    { tabla: "tancar_seguiment", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot tancar un seguiment (22023 si la nota no existeix)" },
+    { tabla: "tancar_seguiment", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000", p_resultat: null }, descripcion: "pot tancar un seguiment (22023 si la nota no existeix)" },
     // Consentimiento por enlace (20270506100000): pedirlo y listar es del equipo; guardarlo,
     // solo del servidor (`enlace-publico`).
     { tabla: "demanar_consentiment", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot demanar el consentiment (22023 si l'organització no existeix)" },
@@ -2285,7 +2404,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // volviera vacía, es que la función ha dejado de cumplir su contrato y eso sí es un
     // fallo. `security invoker`, o sea que lo que cuenta es lo que esta cuenta ya podía
     // leer; lo que se comprueba es que la guarda le deja pasar.
-    { tabla: "pendents_equip", op: "rpc", esperado: "permitir", filasExactas: 19, descripcion: "consulta la cua de treball de l'equip (19 cues: +recollides_equip, fase 3)" },
+    { tabla: "pendents_equip", op: "rpc", esperado: "permitir", filasExactas: 18, descripcion: "consulta la cua de treball de l'equip (18 cues: sense espigolades_per_convertir, 20270617100100)" },
     // Borrado de una ficha (20270328100100, deuda §12.108). El Dinamitzador SÍ puede preguntar
     // qué bloquea un borrado —es una pregunta del día a día, y sin ella el panel no podría
     // explicar por qué el botón no va a funcionar— y NO puede borrar: eso sigue siendo del
@@ -2404,9 +2523,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // `nota_inexistent`): la guarda dejó pasar sin escribir ni borrar nada.
     { tabla: "notes_internes", op: "leer", esperado: "permitir", descripcion: "veu les notes internes", requiereFixture: "alguna nota interna (afegir_nota_interna)" },
     { tabla: "notes_internes", op: "insertar", esperado: "denegar", descripcion: "NO escriu notes directament (només afegir_nota_interna)" },
-    { tabla: "afegir_nota_interna", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000", p_canal: "telefon", p_text: "arnes" }, descripcion: "pot afegir una nota interna (22023 si l'organització no existeix)" },
+    { tabla: "afegir_nota_interna", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000", p_canal: "telefon", p_text: "arnes", p_tipus: "operativa", p_responsable: null, p_propera_accio: null, p_propera_data: null, p_previsio_producte: null, p_previsio_kg: null, p_previsio_data: null, p_previsio_ubicacio_id: null, p_previsio_ubicacio: null }, descripcion: "pot afegir una nota interna (22023 si l'organització no existeix)" },
     { tabla: "esborrar_nota_interna", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot esborrar una nota interna (22023 si no existeix)" },
-    { tabla: "tancar_seguiment", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot tancar un seguiment (22023 si la nota no existeix)" },
+    { tabla: "tancar_seguiment", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000", p_resultat: null }, descripcion: "pot tancar un seguiment (22023 si la nota no existeix)" },
     // Consentimiento por enlace (20270506100000): pedirlo y listar es del equipo; guardarlo,
     // solo del servidor (`enlace-publico`).
     { tabla: "demanar_consentiment", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot demanar el consentiment (22023 si l'organització no existeix)" },
@@ -2520,20 +2639,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       },
       descripcion: "pot donar per vigent un conveni signat en paper (la guarda el deixa passar)",
     },
-    // La guarda de rol de la conversión de una oferta en jornada (F3, 20270328101000).
-    // Mismo criterio que en `equip`: uuid de ceros, porque en positivo no se prueba nunca
-    // —convertiría una oferta real contra producción—. Devuelve `22023 oferta_inexistent`,
-    // que es error de negocio y cuenta como ejecutada.
-    {
-      tabla: "crear_espigolada",
-      op: "rpc",
-      esperado: "permitir",
-      args: {
-        p_productor: "00000000-0000-0000-0000-000000000000",
-        p_excedente: "00000000-0000-0000-0000-000000000000",
-      },
-      descripcion: "pot convertir una oferta en espigolada (la guarda el deixa passar)",
-    },
+    // La conversión en jornada y el reparto por lotes, RETIRADOS también para el super_admin
+    // (20270617100100): ver `ESPIGOLADA_RETIRADA`.
+    ...ESPIGOLADA_RETIRADA,
     {
       tabla: "recalcula_estat_espigolada",
       op: "rpc",
@@ -2580,6 +2688,10 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     ...PROPOSTA_SUPER,
     // «Entrades i sortides» (20270612100000, 6.7).
     ...SORTIDES_EQUIP,
+    // «Registrar operació realitzada» (20270619100200, 3.7).
+    ...OPERACIO_REALITZADA_EQUIP,
+    // «Interaccions i seguiment» (20270616100000/100100, 1.2).
+    ...INTERACCIONS_EQUIP,
     // --- La via assistida (20270328100200 / 20270328100300 / 20270328100400) ---
     // ⚠️ Los tres «permitir» se llaman con un uuid INEXISTENTE a propósito, igual que los
     //    del ciclo de cierre: lo que se afirma es que la guarda de ROL deja pasar, no que
@@ -2890,7 +3002,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       args: { p_id: "00000000-0000-0000-0000-000000000000" },
       descripcion: "pot validar una oferta (autoritza; l'oferta no existeix, 22023)",
     },
-    { tabla: "pendents_equip", op: "rpc", esperado: "permitir", filasExactas: 19, descripcion: "consulta la cua de treball de l'equip (19 cues: +recollides_equip, fase 3)" },
+    { tabla: "pendents_equip", op: "rpc", esperado: "permitir", filasExactas: 18, descripcion: "consulta la cua de treball de l'equip (18 cues: sense espigolades_per_convertir, 20270617100100)" },
     {
       tabla: "convenios",
       op: "leer",

@@ -2094,3 +2094,49 @@ La sección nueva del equipo lee **las mismas filas** de `notes_internes` que el
   p_hasta, p_org, p_zona, p_tipus, p_responsable, p_producte, p_prev_desde, p_prev_hasta, p_estat, p_cerca, p_limit,
   p_offset)` → `{total, files}` e `interaccions_opcions()` (responsables, productos, tipos). Solo `es_intern()`.
 - Prueba con rollback: `scripts/sql/prova-interaccions.sql` (54 casos).
+
+### Tipus d'operació y espigolada sin jornada (plan DIC 26, fase 3, `20270617100000`…`100300`, 25-11-2026)
+
+- `excedentes.tipus_operacio` **generada** (+ índice): `'espigolada'` si `espigolada_demanada` o `espigolada_id`; si no,
+  `'excedent'` (ya cosechado). CHECK `excedentes_espigolada_donacio`: una espigolada es donación.
+- `crear_espigolada` y `repartir_espigolada`: `revoke execute` (nadie las llama). La tabla `espigoladas` y las ramas
+  `espigolada_id` quedan dormidas para lo heredado (deuda 192). `pendents_equip()` sin `espigolades_per_convertir`.
+- `20270617100200`: deshace las jornadas `es_test` abiertas sin movimiento (en producción, BLE y MAG; ALB se queda porque
+  tiene canalización).
+- `editar_oferta` admite `espigolada_demanada` (`22023 espigolada_no_donacio`, `espigolada_sense_camp`).
+- Prueba con rollback: `scripts/sql/prova-espigolada-donacio.sql` (27 casos).
+
+### Filtros de salidas y lugares que heredan de la oferta (plan DIC 26, fase 4, `20270618100000`…`100200`, 25-11-2026)
+
+- `sortides_base`/`entrades_sortides`/`entrades_sortides_resum` (drop + create; borradas las firmas viejas):
+  `p_tipus_operacio` (`excedent|espigolada`, `22023 tipus_operacio_invalid`); `p_modalitat` = modalidad REAL
+  `coalesce(canalizaciones.valorizacion, excedentes.modalitat, 'donacio')`; compatibilidad: `p_modalitat='espigolada'`
+  se trata como tipo. La fila gana `tipus_operacio` (una espigolada sale como `donacio`). El resumen admite
+  `p_per='tipus_operacio'` y trae `per_tipus_operacio {excedent, espigolada}`; `per_modalitat.espigolada` sigue
+  llegando pero es OBSOLETA (deuda 192); `espigolades` cuenta ofertas distintas de tipo espigolada.
+- **El lugar hereda de la oferta** (`trg_excedentes_lloc_des_de_oferta`, AFTER INSERT/UPDATE OF estado, ubicacion_id,
+  dies_recollida, hora_recollida_*; estados publicada·pendent_validacio·parcial): copia `dies_recollida` →
+  `dies_setmana` y `[{inici,fi}]` → `franges` **si el lugar los tiene vacíos**; nunca pisa ni toca un lugar de otro
+  productor. Corrige lo de `20270528100000` («nada de la oferta toca la ficha»): ahora rellena huecos (proceso 3.2).
+  Formatos: `dies_recollida smallint[]` y `dies_setmana int[]`, ISO 1 = dilluns … 7 = diumenge.
+- **Los días limitan al receptor** (`comprova_hora_recollida`, `20270618100200`): `22023 dia_fora_dies` si
+  `dies_recollida` no está vacío y el día (Madrid) no está, **solo en sesiones externas** (bloquea `manifestar_interes`;
+  `assignar_directe`, `manifestar_interes_assistit` y `proposar_canvis` pasan). Orden: `hora_passada`,
+  `hora_fora_disponibilitat`, `dia_fora_dies`, `hora_fora_franja`.
+- Prueba con rollback: `scripts/sql/prova-llocs-i-sortides.sql` (22 casos).
+
+### Operación registrada a posteriori (plan DIC 26, fase 5, proceso 3.7, `20270619100000`…`100300`, 25-11-2026)
+
+- `excedentes.origen` admite `'registre'`: es la marca de «registrada a posteriori» (sin columna propia). No pasa por
+  «Per validar» (`trg_excedentes_validacio`).
+- Indicador de transacción `redestina.registre_posteriori`: `crear_avis()` devuelve `null` sin insertar (es la única
+  que inserta en `avisos`; sin fila no hay `trg_avisos_encola_envio`, ni correo ni WhatsApp) y `registrar_recollida_escriu()`
+  se salta `data_anterior`. El PDF del albarán se genera pero no se envía (`envia-albara.ts` solo con
+  `recollida_origen = 'entitat_receptora'`; aquí es `equip`).
+- `registrar_operacio_realitzada(...)` (firma en `context/04bis`): `siglas_oferta(text)` interna genera el `E-…` con la
+  fecha de la operación si no llega; pasos `assignar_directe` → precio del mes de la operación (`redestina.ajust_preus`,
+  motivo `registre_posteriori`) → `registrar_recollida_escriu(…,'coincideix',…, origen 'equip')` → `validar_recollida`
+  → `registrar_desti_final` → `recalcula_estat_excedent`. La fecha real fija ejercicio y número del ENT y el REC, y el
+  mes del precio.
+- `sortides_base` gana la columna `registre_posteriori` (`= ex.origen = 'registre'`); `entrades_sortides` no cambia de firma.
+- Prueba con rollback: `scripts/sql/prova-operacio-realitzada.sql`.

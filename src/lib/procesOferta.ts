@@ -113,7 +113,7 @@ export interface FetsOferta {
   pendentDeMi?: boolean
   /** `excedentes.producte_al_camp` (F3): lo ofrecido todavía está sin cosechar. */
   producteAlCamp?: boolean
-  /** `excedentes.espigolada_id`: la jornada de la que este lote ya forma parte, si forma. */
+  /** `excedentes.espigolada_id`: la jornada HEREDADA de la que este lote forma parte, si forma. */
   espigoladaId?: string | null
   /** `excedentes.id`: hace falta para enlazar al formulario de destino de ESTA oferta. */
   id?: string
@@ -244,16 +244,12 @@ export function puntOferta(fets: FetsOferta, rol: RolMira): PuntProces {
    * cinco de siempre, y darle una propia movería el indicador de progreso de todas las
    * demás ofertas para contar algo que solo le pasa a esta.
    *
-   * Dos casos y en este orden, porque el segundo deja de ser cierto en cuanto ocurre el
-   * primero: si ya hay jornada, lo que hay que decir es cuál; si no la hay, que la decisión
-   * de organizarla es del equipo.
+   * Dos casos y en este orden: un lote HEREDADO de una jornada (`espigolada_id`, ya no nace
+   * ninguno desde la fase 3 del 25-11-2026) dice que su entrada es la de la jornada; si no,
+   * que el producto está en el campo y quien lo recoja tendrá que ir a cosecharlo.
    *
-   * ⚠️ QUIÉN DECIDE, dicho en el texto: el generador avisa de que tiene un campo, pero el
-   *    destino lo elige Redestina (§6ter). Por eso el texto del panel del generador no le
-   *    ofrece nada que pulsar — no hay nada que él pueda decidir aquí.
-   *
-   * ⚠️ El enlace a la jornada SOLO lo recibe el equipo: `/equip/espigolades/:id` está bajo
-   *    `RoleGuard rol="intern"`, así que dárselo al generador sería mandarlo a «sense accés».
+   * Sin enlace: la pantalla de jornadas se retiró (fase 3) y `/equip/espigolades` redirige a
+   * Ofertes. El generador nunca lo tuvo (no hay nada que él pueda decidir aquí).
    */
   function nota(index: number): { notaClau?: string; notaEnllac?: string } {
     // Cancelada o sin destino: la jornada ya no es la historia de este lote.
@@ -271,7 +267,6 @@ export function puntOferta(fets: FetsOferta, rol: RolMira): PuntProces {
       return {
         // Cerrada, la jornada ya pasó: la nota del generador va en pasado (28-09-2026).
         notaClau: p === 'p' && index >= 4 ? 'proc.p_nota_espigolada_fet' : `proc.${p}_nota_espigolada`,
-        notaEnllac: rol === 'equip' ? `/equip/espigolades/${fets.espigoladaId}` : undefined,
       }
     }
     // Una vez recogido (index ≥ 2) la pregunta ya está contestada de hecho, así que
@@ -516,7 +511,7 @@ export interface FaseEquip {
  */
 export const FASES_EQUIP: readonly FaseEquip[] = [
   { clau: 'conveni', rutes: ['/equip/convenis'] },
-  { clau: 'entrada', rutes: ['/equip/ofertes', '/equip/espigolades'] },
+  { clau: 'entrada', rutes: ['/equip/ofertes'] },
   { clau: 'distribucio', rutes: ['/equip/ofertes'] },
   { clau: 'aprovacio', rutes: ['/equip/aprovacions'] },
   { clau: 'lliurament', rutes: ['/equip/albarans'] },

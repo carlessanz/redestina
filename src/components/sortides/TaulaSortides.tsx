@@ -7,10 +7,15 @@
 // puntos de corte miran la ventana, no el contenido: a 800 px el menú lateral se come un tercio y
 // con las ocho columnas la tabla se salía por la derecha, medido). La fila entera abre la ficha de la
 // operación (`FilaClicable` + `TitolFila` en el producto, que da el teclado).
+//
+// FASE 4 (25-11-2026): el TIPUS D'OPERACIÓ no tiene columna (es secundario y la tabla ya va justa):
+// una espigolada lleva su etiqueta bajo el producto, a todos los anchos; un excedente ya cosechado,
+// que es lo normal, no lleva nada. En el Excel sí es columna.
 
 import { useT } from '../../lib/i18n'
 import { kg } from '../../lib/format'
 import { classeEstat, clauEstat, clauModalitat, textDia } from '../../lib/sortides'
+import BadgeEspigolada from '../BadgeEspigolada'
 import type { FilaSortida } from '../../types'
 import { usePuntTall } from '../../hooks/usePuntTall'
 import { FilaClicable, TitolFila } from '../FilaClicable'
@@ -72,6 +77,11 @@ export default function TaulaSortides({ files, buitKey, onObre, carregant }: Pro
               <TitolFila onObre={() => onObre(f)} className="break-words">{f.producto ?? '—'}</TitolFila>
               {f.variedad && <span className="block text-xs break-words text-muted-foreground">{f.variedad}</span>}
               <span className="block text-xs text-muted-foreground tabular-nums md:hidden">{textDia(f.data_sortida)}</span>
+              {f.tipus_operacio === 'espigolada' && (
+                <span className="mt-1 block" data-testid="es-tipus-espigolada">
+                  <BadgeEspigolada className="max-w-full whitespace-normal" />
+                </span>
+              )}
             </TableCell>
             <TableCell className="hidden align-top whitespace-normal lg:table-cell">
               <span className="break-words">{f.entidad_nom ?? '—'}</span>

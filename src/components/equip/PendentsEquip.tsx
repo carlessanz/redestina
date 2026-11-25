@@ -60,10 +60,6 @@ const FILES: readonly FilaCua[] = [
   { cua: 'ofertes_sense_enviar', desti: '/equip/ofertes' },
   { cua: 'ofertes_modificades', desti: '/equip/ofertes' },
   { cua: 'ofertes_vencudes', desti: '/equip/ofertes' },
-  // F3. Va al listado de ofertas y NO a `/equip/espigolades`: la jornada todavía no
-  // existe —crearla es justamente lo que falta—, y se crea desde la oferta, que es donde
-  // están la productora, la finca y los kilos previstos. El listado marca cuáles son.
-  { cua: 'espigolades_per_convertir', desti: '/equip/ofertes' },
   // `?tab=` son los nombres reales de las pestañas de `Albarans.tsx`.
   { cua: 'albarans_esborrany', desti: '/equip/albarans?tab=esborranys' },
   { cua: 'albarans_conciliar', desti: '/equip/albarans?tab=conciliar' },
@@ -77,7 +73,7 @@ const FILES: readonly FilaCua[] = [
 /** Las colas que además de la cifra tienen una frase que explica la consecuencia. */
 const AMB_SUBTITOL: readonly CuaEquip[] = [
   'registres', 'convenis_contrasignar', 'ofertes_per_validar', 'respostes', 'ofertes_modificades',
-  'ofertes_vencudes', 'costos', 'preus', 'espigolades_per_convertir', 'recollides_per_validar', 'recollides_equip', 'signatures_per_tancar',
+  'ofertes_vencudes', 'costos', 'preus', 'recollides_per_validar', 'recollides_equip', 'signatures_per_tancar',
   // Fase 8: «què ha passat → què falta → acció» en todas las filas.
   'missatges', 'ofertes_sense_enviar', 'albarans_esborrany', 'documents_error',
 ]

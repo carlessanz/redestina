@@ -303,9 +303,6 @@ export async function creaOferta(
     estado?: string
     /** Las modalidades marcadas para las que falta el convenio (no impiden publicar). */
     modalitats_sense_conveni?: string[]
-    /** «Espigolada» del equipo (20270614100000): la jornada creada en el acto, o el error. */
-    espigolada_id?: string | null
-    espigolada_error?: string | null
   }> & {
     /**
      * Las claves (`CampoOferta.clave`) que la RPC echa en falta, cuando el rechazo es
@@ -558,6 +555,8 @@ export function clauErrorInteres(missatge: string | null | undefined): {
   if (m.includes('sense_conveni')) return { clau: 'mk.err_sense_conveni' }
   if (m.startsWith('cal_modalitat')) return { clau: 'mk.err_cal_modalitat' }
   if (m.startsWith('albara_pendent')) return { clau: 'mk.err_albara_pendent' }
+  // Fase 4 (20270618100200): un día de la semana que no está en `dies_recollida`.
+  if (m.startsWith('dia_fora_dies')) return { clau: 'rrec.err_dia_fora_dies' }
   if (m.startsWith('hora_')) return { clau: 'mk.err_hora' }
   if (m.startsWith('kg_maxim')) {
     const n = num(/(\d+(?:[.,]\d+)?)\s*kg/, 0)

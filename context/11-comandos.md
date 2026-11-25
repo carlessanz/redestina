@@ -506,4 +506,7 @@ subir de «sin datos»; volver a correr los dos fixtures lo devuelve a la refere
   `--no-verify-jwt`, `priorizar-entidades`, `pujar-document-signat`, `reenviar-documento`,
   `subir-documento-externo`, `whatsapp-send`), `generar-documento` (render del albarán) y la nueva `firma-equip`
   (con JWT); después `emitir_documento_prova()`.
+- **Plan DIC 26, fases 1-5 (25-11-2026)**: base `20270616100000`…`20270619100300` (en orden; `20270617100200` deshace
+  las jornadas de prueba abiertas sin movimiento) y después redesplegar `crear-oferta`, `whatsapp-webhook` y
+  `recollides-programades` (importan `_shared/oferta.ts`, `textOferta.ts`, `camposOferta.ts` o `intake.ts`).
 - **E2E fuera del sandbox**: Chromium de la caché, `PW_CHROMIUM_PATH="$(ls ~/Library/Caches/ms-playwright/chromium-1248/chrome-mac*/*.app/Contents/MacOS/* | head -1)"`.
