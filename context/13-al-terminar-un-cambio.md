@@ -439,3 +439,6 @@
   **2.668/2.668 y 43 sin datos** (+7 checks: `alta_membre_equip` denegada a todas las cuentas). Vitest **2.600 (118
   ficheros, 1 saltada)** + 65 de Deno. E2E nuevos `equip-alta` 6/6; regresión `equip`, `equip-gestio`,
   `multiproducte-circuit` y `missatges` en verde (22/22).
+  Publicado el mismo día (`e6116ea`; `20270621100000` + `alta-equip` y las 7 funciones que importan `_shared/whatsapp.ts`,
+  `intake.ts` o `plantillasMeta.ts`): producción **2.621/2.621 y 90 sin datos** (+9 sobre 2.612); CORS al dominio en
+  `alta-equip`, 401 sin sesión.
