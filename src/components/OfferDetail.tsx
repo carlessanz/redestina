@@ -33,6 +33,7 @@ import PasosProces from './proces/PasosProces'
 import QueTocaAra from './proces/QueTocaAra'
 import DialegMotiu from './DialegMotiu'
 import BadgeEspigolada from './BadgeEspigolada'
+import BadgeRegistrePosteriori from './BadgeRegistrePosteriori'
 import BotoAmbMotiu from './proces/BotoAmbMotiu'
 import ValidacioOferta from './equip/ValidacioOferta'
 import DestiFinal from './DestiFinal'
@@ -767,6 +768,8 @@ export default function OfferDetail({ excedente, onBack }: Props) {
               {t(estat.key)}
             </span>
             {espigolada && <BadgeEspigolada />}
+            {/* Proceso 3.7: una operación registrada por el equipo después de hacerse. */}
+            {exc.origen === 'registre' && <BadgeRegistrePosteriori />}
           </div>
           {/* De quién es y de dónde: la ficha del equipo no lo decía en ningún sitio más que
               dentro del texto de la oferta. Enlaza a la ficha de la productora. */}

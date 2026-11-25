@@ -5,8 +5,9 @@ import { confirmarOfertaPerCorreu } from "./correu-oferta.ts";
 import { ambPreu, modalitatsDe, principal } from "./modalitats.ts";
 import { llegeixHorari } from "./franja.ts";
 import {
-  componerTextoOferta, diesValids, textCaixes, textoEnvasos, textoOfertaDeDades,
+  componerTextoOferta, diesValids, textCaixes, textDisponibilitat, textoEnvasos, textoOfertaDeDades,
 } from "./textOferta.ts";
+import { appUrl } from "./resend.ts";
 import { TEXT_ERROR_INTAKE, textAgraimentIntake, textSenseConveniIntake } from "./textIntake.ts";
 
 // El texto de la oferta vive en `textOferta.ts` (módulo hoja, 27-10-2026); se reexporta para
@@ -363,6 +364,138 @@ export async function crearExcedente(
   return { ok: true, idExcedente, excedenteId: creada?.id, estado: creada?.estado };
 }
 
+/** Una oferta de una disponibilidad recién creada (lo que devuelve `crear_disponibilitat`). */
+export interface OfertaDeGrup {
+  id: string;
+  id_excedente: string;
+  estado: string;
+  producto: string;
+}
+
+/** Resultado de crear una disponibilidad multiproducto. */
+export interface ResultadoDisponibilitat {
+  ok: boolean;
+  disponibilitatId?: string;
+  /** `D-AAMMDD-XXX-N`. */
+  codi?: string;
+  ofertes?: OfertaDeGrup[];
+  /** El mensaje ÚNICO del grupo (`textDisponibilitat()`), para compartirlo desde el panel. */
+  textoDisponibilitat?: string;
+  /** El mensaje de error de la base (o `esborrany_inexistent`). */
+  error?: string;
+}
+
+/**
+ * Alta de una DISPONIBILIDAD MULTIPRODUCTO (proceso 3.3, fase 6a, 25-11-2026): N ≥ 2 ofertas
+ * del mismo productor publicadas a la vez, cada una con su `E-…`, su fila y su texto, más la
+ * cabecera `D-…` que las agrupa, todo en UNA transacción (`crear_disponibilitat`).
+ *
+ * `dades` son los juegos de datos de cada producto ya fundidos con lo común
+ * (`agrupaProductes()` de `disponibilitat.ts`) y validados por quien llama, igual que en el alta
+ * de un producto. Cada fila sale de `filaDeDades()` y su texto de `textoOfertaDeDades()`: un
+ * producto de un grupo es exactamente la oferta que se habría publicado sola. Lo común (lugar,
+ * causa, ficha del productor) se lee una vez.
+ *
+ * Con `esborranyId`, la PRIMERA oferta reescribe ese esborrany (como `crearExcedente()`).
+ * Ante un `23505` (un `E-…` que ya existe, ver `crearExcedente()`) se regeneran TODOS los
+ * identificadores y se repite la llamada entera: tres intentos.
+ */
+export async function crearDisponibilitat(
+  supabase: Cliente,
+  dades: readonly Record<string, unknown>[],
+  productor: { id: string; name: string },
+  origen: OrigenExcedente,
+  opcions: { esborranyId?: string; actor?: string | null } = {},
+): Promise<ResultadoDisponibilitat> {
+  const primera = dades[0] ?? {};
+  const noms = [...new Set(dades.map((d) => String(d.producte ?? "").trim()).filter(Boolean))];
+  const [{ data: prods }, { data: ubicacion }, causa, { data: fichaProductor }] = await Promise.all([
+    supabase.from("productos").select("nombre, eur_kg, familia").in("nombre", noms),
+    primera.ubicacio
+      ? supabase.from("productor_ubicaciones").select("*").eq("id", primera.ubicacio).maybeSingle()
+      : Promise.resolve({ data: null }),
+    // La causa es común: se resuelve una vez.
+    resolCausa(supabase, primera.causa),
+    supabase.from("productores").select("poblacion, empresa").eq("id", productor.id).maybeSingle(),
+  ]);
+  type Prod = { nombre: string; eur_kg: number | null; familia: string | null };
+  const cataleg = new Map(((prods ?? []) as Prod[]).map((p) => [p.nombre, p]));
+  const nomOrganitzacio = fichaProductor?.empresa || productor.name;
+  const ctxText = {
+    productor: nomOrganitzacio,
+    municipi: ubicacion?.municipio ?? fichaProductor?.poblacion ?? "",
+    mapsLloc: ubicacion?.gmaps_url ?? null,
+    causa: causa.causa ?? (primera.causa ? String(primera.causa) : null),
+    subcausa: causa.subcausa,
+  };
+
+  // Las filas, sin identificador: el texto no lo lleva, así que se compone una vez.
+  const files = dades.map((d) => {
+    const prod = cataleg.get(String(d.producte ?? "").trim());
+    const fila = filaDeDades(d, prod?.familia ?? null, causa);
+    const kg = Number(fila.kg_total ?? 0);
+    return {
+      fila,
+      producte: String(d.producte ?? ""),
+      valor: kg ? kg * Number(prod?.eur_kg ?? 1) : null,
+      texto: textoOfertaDeDades(fila, { ...ctxText, disponibleText: String(d.disponible_fins ?? "") }),
+    };
+  });
+
+  // Uno detrás de otro (y no en paralelo): con el mismo producto en dos variedades comparten
+  // serie, y así los N salen en el orden del formulario.
+  const nousIds = async () => {
+    const ids: string[] = [];
+    for (const f of files) ids.push(await generarId(supabase, nomOrganitzacio, f.producte));
+    return ids;
+  };
+
+  let ids = await nousIds();
+  let data: { disponibilitat_id: string; codi: string; ofertes: OfertaDeGrup[] } | null = null;
+  let error: { message: string; code?: string } | null = null;
+  for (let intento = 0; intento < 3; intento++) {
+    const pOfertes = files.map((f, i) => ({
+      ...f.fila,
+      id_excedente: ids[i],
+      valor_eur: f.valor,
+      texto_oferta: f.texto,
+      origen,
+      // La base decide si en realidad queda `pendent_validacio` (como en el alta suelta).
+      estado: "publicada",
+    }));
+    const r = await supabase.rpc("crear_disponibilitat", {
+      p_productor: productor.id,
+      p_ofertes: pOfertes,
+      p_esborrany: opcions.esborranyId ?? null,
+      p_actor: opcions.actor ?? null,
+    });
+    data = r.data;
+    error = r.error;
+    if (!error) break;
+    if (error.code !== "23505") break;
+    console.warn("crear_disponibilitat: id_excedente ocupado, reintentando:", ids.join(", "));
+    ids = await nousIds();
+  }
+
+  if (error || !data) {
+    const msg = error?.message ?? "resposta_buida";
+    console.error("crear_disponibilitat:", msg);
+    return { ok: false, error: msg.includes("esborrany_inexistent") ? "esborrany_inexistent" : msg };
+  }
+  return {
+    ok: true,
+    disponibilitatId: data.disponibilitat_id,
+    codi: data.codi,
+    ofertes: data.ofertes,
+    textoDisponibilitat: textDisponibilitat(files.map((f) => f.fila), {
+      ...ctxText,
+      disponibleText: String(primera.disponible_fins ?? ""),
+      disponibilitatId: data.disponibilitat_id,
+      appUrl: appUrl(),
+    }),
+  };
+}
+
 /**
  * Las columnas de `excedentes` a partir de lo que contesta el cuestionario (intake o panel),
  * SIN identificador, texto, origen ni estado. Pura: la usan el alta, la publicación de un
@@ -452,6 +585,12 @@ export async function desarEsborrany(
   productorId: string,
   origen: OrigenExcedente,
   id?: string,
+  /**
+   * Lo que se guarda en `dades_esborrany` si no es `d` (fase 6a, multiproducto): con varios
+   * productos, las columnas salen del PRIMERO (`d`) y se guarda el cuerpo entero con `productes[]`
+   * para reabrir el formulario como estaba y publicar el grupo.
+   */
+  guardades?: Record<string, unknown>,
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const producto = String(d.producte ?? "").trim();
   const [{ data: prod }, causa] = await Promise.all([
@@ -463,7 +602,7 @@ export async function desarEsborrany(
     // Un código de causa que no está en el catálogo no se guarda en la columna (la base lo
     // rechazaría); se queda en `dades_esborrany` y la publicación lo volverá a mirar.
     ...(causa.causa ? {} : { causa: null, causa_codigo: null, subcausa_codigo: null }),
-    dades_esborrany: d,
+    dades_esborrany: guardades ?? d,
   };
   if (id) {
     const { data, error } = await supabase.from("excedentes").update(valors)

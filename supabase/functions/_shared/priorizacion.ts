@@ -275,3 +275,112 @@ export function modalitatsAdmeses(
   if (perNaturalesa) ms = ms.filter((m) => perNaturalesa.has(m));
   return ms;
 }
+
+// ---------------------------------------------------------------------------
+// Disponibilidades multiproducto (proceso 3.3, fase 6a, 25-11-2026)
+// ---------------------------------------------------------------------------
+
+/** Una oferta del grupo, tal como se nombra en el ranking unido. */
+export interface OfertaDelGrup {
+  excedente_id: string;
+  id_excedente: string | null;
+  producto: string | null;
+  /** Las modalidades de esa oferta. */
+  modalitats: readonly string[];
+}
+
+/** Lo que el ranking de UNA oferta necesita de cada fila para unirse con los demás. */
+export interface FilaRankingUnible {
+  id: string;
+  puntuacion: number;
+  pendiente: boolean;
+  sense_conveni: boolean;
+  modalitats_possibles: string[];
+  interessa_producte: boolean | null;
+}
+
+/** Cómo encaja una entidad en una oferta concreta del grupo. */
+export interface EncaixOferta {
+  excedente_id: string;
+  id_excedente: string | null;
+  producto: string | null;
+  puntuacion: number;
+  sense_conveni: boolean;
+  modalitats_possibles: string[];
+}
+
+const ORDRE_MODALITATS = ["donacio", "venda", "maquila"];
+
+/**
+ * El ranking de una DISPONIBILIDAD a partir del de cada una de sus ofertas (el de siempre, que
+ * no cambia). Pura: la prueba `tests/disponibilitat.test.ts`.
+ *
+ * - Una entidad ENCAJA en una oferta si está en su ranking (activa, revisada, P8) y puede recibir
+ *   alguna de sus modalidades (`modalitats_possibles`, la matriz del Mercat y P8); una oferta sin
+ *   modalidades no descarta a nadie. Entra en el grupo si encaja en ALGUNA.
+ * - Su fila es la de la oferta donde mejor encaja (con convenio antes que sin él; después, más
+ *   puntuación; a igualdad, la primera del grupo): puntuación, motivos y canal salen de ahí, como
+ *   hoy.
+ * - Sobre esa fila: `pendiente`/`sense_conveni` solo si le falta el convenio en TODAS las que
+ *   encaja; `modalitats_possibles` = la unión; `interessa_producte` = sí si alguna, no si alguna
+ *   dice que no y ninguna que sí, null si no se sabe; y `ofertes_encaixen`, las ofertas del grupo
+ *   que encajan, en el orden del grupo.
+ * - Orden final como `priorizar()`: con convenio primero, por puntuación descendente.
+ */
+export function uneixRankings<T extends FilaRankingUnible>(
+  perOferta: readonly { oferta: OfertaDelGrup; ranking: readonly T[] }[],
+): (T & { ofertes_encaixen: EncaixOferta[] })[] {
+  const millor = new Map<string, T>();
+  const encaixos = new Map<string, EncaixOferta[]>();
+  const interessos = new Map<string, (boolean | null)[]>();
+  const ordre: string[] = [];
+  for (const { oferta, ranking } of perOferta) {
+    for (const fila of ranking) {
+      const encaixa = oferta.modalitats.length === 0 || fila.modalitats_possibles.length > 0;
+      if (!encaixa) continue;
+      if (!encaixos.has(fila.id)) {
+        encaixos.set(fila.id, []);
+        interessos.set(fila.id, []);
+        ordre.push(fila.id);
+      }
+      interessos.get(fila.id)!.push(fila.interessa_producte);
+      encaixos.get(fila.id)!.push({
+        excedente_id: oferta.excedente_id,
+        id_excedente: oferta.id_excedente,
+        producto: oferta.producto,
+        puntuacion: fila.puntuacion,
+        sense_conveni: fila.sense_conveni,
+        modalitats_possibles: [...fila.modalitats_possibles],
+      });
+      const ant = millor.get(fila.id);
+      const millora = !ant
+        || (ant.pendiente && !fila.pendiente)
+        || (ant.pendiente === fila.pendiente && fila.puntuacion > ant.puntuacion);
+      if (millora) millor.set(fila.id, fila);
+    }
+  }
+  const unides = ordre.map((id) => {
+    const base = millor.get(id)!;
+    const es = encaixos.get(id)!;
+    const totesSense = es.every((e) => e.sense_conveni);
+    const mods = new Set(es.flatMap((e) => e.modalitats_possibles));
+    const is = interessos.get(id)!;
+    const interessa = is.includes(true) ? true : is.includes(false) ? false : null;
+    return {
+      ...base,
+      pendiente: totesSense,
+      sense_conveni: totesSense,
+      modalitats_possibles: [
+        ...ORDRE_MODALITATS.filter((m) => mods.has(m)),
+        ...[...mods].filter((m) => !ORDRE_MODALITATS.includes(m)),
+      ],
+      interessa_producte: interessa,
+      ofertes_encaixen: es,
+    };
+  });
+  // `sort` es estable: a igualdad, el orden en que aparecieron.
+  return unides.sort((a, b) => {
+    if (a.pendiente !== b.pendiente) return a.pendiente ? 1 : -1;
+    return b.puntuacion - a.puntuacion;
+  });
+}

@@ -1046,6 +1046,69 @@ const INTERACCIONS_EQUIP: Check[] = [
   { tabla: "tancar_seguiment", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "00000000-0000-0000-0000-000000000000", p_resultat: "arnes" }, descripcion: "pot tancar un seguiment amb resultat (autoritza; 22023 nota_inexistent) (1.2)" },
 ];
 
+// Ofertas multiproducto (20270620100000–100600, proceso 3.3; fase 6 del plan de noviembre de 2026):
+// dos identificadores de grupo (`disponibilitats`, `sollicituds_recollida`) y RPC que llaman a las
+// puertas de siempre por línea, todo o nada. Lo que el arnés afirma (el circuito entero —alta,
+// solicitud, todo o nada, aprobación con un solo aviso, recogida y ENT+REC por producto, nivel 1,
+// borrado— lo prueba `scripts/sql/prova-multiproducte.sql` con ROLLBACK):
+//   · las dos tablas: solo SELECT para `authenticated` (nadie inserta a mano); lectura por rol con
+//     `requiereFixture` (`scripts/crear-multiproducte-prova.ts`: TEST-PROD-1 con una disponibilidad
+//     y una solicitud pendiente de TEST-ENT-SOCIAL);
+//   · `crear_disponibilitat` es SOLO del servidor (la llama `crear-oferta`): 42501 a toda sesión,
+//     también al equipo; las internas (`manifestar_interes_multiple_intern`,
+//     `avisa_sollicitud_resolta`, `recalcula_estat_sollicitud`, `comprova_linies_multiple`,
+//     `uuid_de_linia`), 42501 a toda sesión;
+//   · las RPC del equipo ponen la guarda ANTES que la existencia: un externo, 42501 con uuid
+//     inventado; el equipo, 22023 (`disponibilitat_inexistent`, `sollicitud_inexistent`);
+//   · `manifestar_interes_multiple` con una entidad que no es suya: 42501 (también al equipo, que no
+//     tiene entidad); `registrar_recollida_multiple` de una solicitud ajena o inventada: 42501 al
+//     externo, 22023 al equipo;
+//   · `ofertes_disponibilitat` con uuid inventado: 0 filas (misma regla que la RLS de `excedentes`).
+const MULTI_UUID0 = "00000000-0000-0000-0000-000000000000";
+const MULTI_LINIES = [{ excedente_id: MULTI_UUID0, kg: 1 }];
+const MULTIPRODUCTE_INTERNES: Check[] = [
+  { tabla: "crear_disponibilitat", op: "rpc", esperado: "denegar", args: { p_productor: MULTI_UUID0, p_ofertes: [] }, descripcion: "NO crea cap disponibilitat (nomes el servidor, crear-oferta) (fase 6a, 3.3)" },
+  { tabla: "manifestar_interes_multiple_intern", op: "rpc", esperado: "denegar", args: { p_disponibilitat: MULTI_UUID0, p_entidad: MULTI_UUID0, p_linies: MULTI_LINIES, p_recollida_at: null, p_assistit: false }, descripcion: "NO crida el nucli intern de la sol.licitud multiproducte (fase 6b)" },
+  { tabla: "avisa_sollicitud_resolta", op: "rpc", esperado: "denegar", args: { p_sollicitud: MULTI_UUID0, p_respostes: [] }, descripcion: "NO crea l'avis agrupat d'una sol.licitud (intern) (fase 6b)" },
+  { tabla: "recalcula_estat_sollicitud", op: "rpc", esperado: "denegar", args: { p_sollicitud: MULTI_UUID0 }, descripcion: "NO recalcula l'estat d'una sol.licitud (intern) (fase 6b)" },
+  { tabla: "comprova_linies_multiple", op: "rpc", esperado: "denegar", args: { p_linies: MULTI_LINIES }, descripcion: "NO crida la validacio interna de linies (fase 6b)" },
+  { tabla: "uuid_de_linia", op: "rpc", esperado: "denegar", args: { p_linia: {}, p_clau: "x" }, descripcion: "NO crida l'ajudant intern de linies (fase 6b)" },
+  { tabla: "disponibilitats", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap disponibilitat a ma (nomes per RPC) (fase 6a)" },
+  { tabla: "sollicituds_recollida", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap sol.licitud a ma (nomes per RPC) (fase 6b)" },
+  { tabla: "ofertes_disponibilitat", op: "rpc", esperado: "denegar", vacioEsDenegar: true, args: { p_disponibilitat: MULTI_UUID0 }, descripcion: "una disponibilitat inventada no retorna cap oferta (fase 6a)" },
+];
+const MULTIPRODUCTE_EXTERN: Check[] = [
+  ...MULTIPRODUCTE_INTERNES,
+  { tabla: "manifestar_interes_multiple", op: "rpc", esperado: "denegar", args: { p_disponibilitat: MULTI_UUID0, p_linies: MULTI_LINIES, p_recollida_at: "2099-01-01T10:00:00Z", p_entidad: MULTI_UUID0 }, descripcion: "NO demana en nom d'una entitat que no es seva (fase 6b)" },
+  { tabla: "manifestar_interes_multiple_assistit", op: "rpc", esperado: "denegar", args: { p_disponibilitat: MULTI_UUID0, p_entidad: MULTI_UUID0, p_linies: MULTI_LINIES, p_recollida_at: "2099-01-01T10:00:00Z" }, descripcion: "NO registra cap sol.licitud assistida (es de l'equip; permis abans que existencia) (fase 6b)" },
+  { tabla: "assignar_directe_multiple", op: "rpc", esperado: "denegar", args: { p_disponibilitat: MULTI_UUID0, p_entidad: MULTI_UUID0, p_linies: MULTI_LINIES }, descripcion: "NO assigna directament cap disponibilitat (pot_aprovar) (fase 6b)" },
+  { tabla: "resoldre_sollicitud", op: "rpc", esperado: "denegar", args: { p_sollicitud: MULTI_UUID0, p_linies: [] }, descripcion: "NO resol cap sol.licitud (pot_aprovar; permis abans que existencia) (fase 6b)" },
+  { tabla: "registrar_recollida_multiple", op: "rpc", esperado: "denegar", args: { p_sollicitud: MULTI_UUID0, p_linies: [] }, descripcion: "NO registra la recollida d'una sol.licitud que no es seva (fase 6c)" },
+  { tabla: "validar_recollides_sollicitud", op: "rpc", esperado: "denegar", args: { p_sollicitud: MULTI_UUID0 }, descripcion: "NO valida les recollides d'una sol.licitud (pot_aprovar) (fase 6c)" },
+];
+const MULTIPRODUCTE_SENSE_FITXA: Check[] = [
+  { tabla: "disponibilitats", op: "leer", esperado: "denegar", descripcion: "no veu cap disponibilitat multiproducte (fase 6)" },
+  { tabla: "sollicituds_recollida", op: "leer", esperado: "denegar", descripcion: "no veu cap sol.licitud de recollida (fase 6)" },
+];
+const MULTIPRODUCTE_PRODUCTOR: Check[] = [
+  { tabla: "disponibilitats", op: "leer", esperado: "permitir", descripcion: "veu les SEVES disponibilitats multiproducte (fase 6a)", requiereFixture: "alguna disponibilitat seva (scripts/crear-multiproducte-prova.ts)" },
+];
+const MULTIPRODUCTE_RECEPTOR: Check[] = [
+  { tabla: "disponibilitats", op: "leer", esperado: "permitir", descripcion: "veu les disponibilitats amb alguna oferta que ja veu (fase 6a)", requiereFixture: "alguna disponibilitat compatible (scripts/crear-multiproducte-prova.ts)" },
+  { tabla: "sollicituds_recollida", op: "leer", esperado: "permitir", descripcion: "veu les SEVES sol.licituds de recollida (fase 6b)", requiereFixture: "alguna sol.licitud de la seva entitat (scripts/crear-multiproducte-prova.ts)" },
+];
+const MULTIPRODUCTE_EQUIP: Check[] = [
+  ...MULTIPRODUCTE_INTERNES,
+  { tabla: "disponibilitats", op: "leer", esperado: "permitir", descripcion: "veu totes les disponibilitats multiproducte (fase 6a)", requiereFixture: "alguna disponibilitat (scripts/crear-multiproducte-prova.ts)" },
+  { tabla: "sollicituds_recollida", op: "leer", esperado: "permitir", descripcion: "veu totes les sol.licituds de recollida (fase 6b)", requiereFixture: "alguna sol.licitud (scripts/crear-multiproducte-prova.ts)" },
+  { tabla: "manifestar_interes_multiple", op: "rpc", esperado: "denegar", args: { p_disponibilitat: MULTI_UUID0, p_linies: MULTI_LINIES, p_recollida_at: "2099-01-01T10:00:00Z", p_entidad: MULTI_UUID0 }, descripcion: "NO demana pel panell de l'entitat (l'equip no en te; per a aixo, l'assistida) (fase 6b)" },
+  { tabla: "manifestar_interes_multiple_assistit", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_disponibilitat: MULTI_UUID0, p_entidad: MULTI_UUID0, p_linies: MULTI_LINIES, p_recollida_at: "2099-01-01T10:00:00Z" }, descripcion: "pot registrar una sol.licitud assistida (autoritza; 22023 disponibilitat_inexistent) (fase 6b)" },
+  { tabla: "assignar_directe_multiple", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_disponibilitat: MULTI_UUID0, p_entidad: MULTI_UUID0, p_linies: MULTI_LINIES }, descripcion: "pot assignar directament una disponibilitat (autoritza; 22023 disponibilitat_inexistent) (fase 6b)" },
+  { tabla: "resoldre_sollicitud", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_sollicitud: MULTI_UUID0, p_linies: [] }, descripcion: "pot resoldre una sol.licitud (autoritza; 22023 sollicitud_inexistent) (fase 6b)" },
+  { tabla: "registrar_recollida_multiple", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_sollicitud: MULTI_UUID0, p_linies: [] }, descripcion: "pot registrar la recollida d'una sol.licitud (autoritza; 22023 sollicitud_inexistent) (fase 6c)" },
+  { tabla: "validar_recollides_sollicitud", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_sollicitud: MULTI_UUID0 }, descripcion: "pot validar totes les recollides d'una sol.licitud (autoritza; 22023 sollicitud_inexistent) (fase 6c)" },
+];
+
 // La espigolada es una oferta de DONACIÓN (20270617100000–100300, procesos 3.6, 3.5 C y 3.4): el
 // módulo de jornadas y lotes se retira. `crear_espigolada` y `repartir_espigolada` pierden el
 // EXECUTE de `authenticated` (solo `service_role`, por lo heredado), así que también el equipo y el
@@ -1722,7 +1785,8 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // «Registrar operació realitzada» (20270619100200, 3.7): ver `OPERACIO_REALITZADA_EXTERN`.
   ...OPERACIO_REALITZADA_EXTERN,
   // «Interaccions i seguiment» (20270616100000/100100, 1.2): ver `INTERACCIONS_EXTERN`.
-  ...INTERACCIONS_EXTERN,
+  ...INTERACCIONS_EXTERN,  // Ofertas multiproducto (20270620100000–100600, 3.3): ver `MULTIPRODUCTE_EXTERN`.
+  ...MULTIPRODUCTE_EXTERN,
 ];
 
 // Lo que CADA rol debe poder hacer. Es la especificación ejecutable de AGENTS.md §4:
@@ -2006,6 +2070,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     ...OPERACIO_REALITZADA_EQUIP,
     // «Interaccions i seguiment» (20270616100000/100100, 1.2): de todo el equipo.
     ...INTERACCIONS_EQUIP,
+    // Ofertas multiproducto (20270620100000–100600, 3.3): el Dinamitzador tiene `pot_aprovar()`.
+    ...MULTIPRODUCTE_EQUIP,
     {
       tabla: "costes_producto",
       op: "leer",
@@ -2692,6 +2758,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     ...OPERACIO_REALITZADA_EQUIP,
     // «Interaccions i seguiment» (20270616100000/100100, 1.2).
     ...INTERACCIONS_EQUIP,
+    // Ofertas multiproducto (20270620100000–100600, 3.3).
+    ...MULTIPRODUCTE_EQUIP,
     // --- La via assistida (20270328100200 / 20270328100300 / 20270328100400) ---
     // ⚠️ Los tres «permitir» se llaman con un uuid INEXISTENTE a propósito, igual que los
     //    del ciclo de cierre: lo que se afirma es que la guarda de ROL deja pasar, no que
@@ -3119,6 +3187,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
   ],
   productor: [
     ...ASSIGNACIO_LECTURA_PRODUCTOR,
+    ...MULTIPRODUCTE_PRODUCTOR,
     ...CANALITZACIO_EXTERNS_PART,
     ...PROPOSTA_LECTURA_PRODUCTOR,
     { tabla: "impacte_productor", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu el seu impacte (fase 10)" },
@@ -3441,6 +3510,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
   // tenga ofertas compatibles (hoy, la social).
   receptor: [
     ...ASSIGNACIO_LECTURA_RECEPTOR,
+    ...MULTIPRODUCTE_RECEPTOR,
     ...CANALITZACIO_EXTERNS_PART,
     ...PROPOSTA_LECTURA_RECEPTOR,
     // Un esborrany no circula (fase C del punto 3, 20270530100000): ni en el Mercat ni por
@@ -3648,6 +3718,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "fixar_lloc_principal", op: "rpc", esperado: "denegar", args: { p_lloc: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO tria el lloc principal de cap productor (A4)" },
     // A3 (20270522100000): sin ficha de productor, ningún excedente del diagnóstico es suyo.
     ...DIAGNOSTIC_EXCEDENTS_SENSE_PRODUCTOR,
+    ...MULTIPRODUCTE_SENSE_FITXA,
     ...DOCUMENTAL_EXTERN,
   ],
   // Registro público recién enviado: membresía `aprovacio = 'pendent'` + `activo =
@@ -3681,6 +3752,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "fixar_lloc_principal", op: "rpc", esperado: "denegar", args: { p_lloc: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO tria el lloc principal de cap productor (A4)" },
     // A3 (20270522100000): sin ficha de productor, ningún excedente del diagnóstico es suyo.
     ...DIAGNOSTIC_EXCEDENTS_SENSE_PRODUCTOR,
+    ...MULTIPRODUCTE_SENSE_FITXA,
     ...DOCUMENTAL_EXTERN,
   ],
 };
@@ -3688,6 +3760,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
 // Cuerpos mínimos para probar un INSERT que DEBE fallar. Nunca llegan a la base si
 // la política está bien; si llegara, la fila se borra en el `finally`.
 const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
+  // Fase 6 (3.3): filas con columnas reales, para que el rechazo sea el GRANT (solo SELECT).
+  disponibilitats: { codi: "D-000000-RLS-1", productor_id: "00000000-0000-0000-0000-000000000000" },
+  sollicituds_recollida: { disponibilitat_id: "00000000-0000-0000-0000-000000000000", entidad_id: "00000000-0000-0000-0000-000000000000" },
   // A5: una fila VÁLIDA de la regla, para que el rechazo sea el GRANT y no una columna que no existe.
   modalitat_naturalesa_compat: { modalitat: "donacio", naturalesa: "empresa" },
   // D2: una fila con las columnas reales, para que el rechazo sea el GRANT (sin INSERT).

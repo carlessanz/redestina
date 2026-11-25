@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { Eye, Loader2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
+import { useAppContext } from '../../hooks/useAppContext'
 import { filtraCerca } from '../../lib/cerca'
 import { useCerca } from '../../hooks/useCerca'
 import { textError } from '../../lib/textError'
@@ -31,6 +32,7 @@ import { Button } from '@/components/ui/button'
 import BotoIcona from '../../components/BotoIcona'
 import { FilaClicable } from '../../components/FilaClicable'
 import DialegNovaOfertaAssistida from '../../components/equip/DialegNovaOfertaAssistida'
+import DialegOperacioRealitzada from '../../components/equip/DialegOperacioRealitzada'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import {
@@ -115,6 +117,10 @@ export default function Canalitzacio() {
   const [error, setError] = useState<string | null>(null)
   const { cerca, setCerca, q } = useCerca()
   const [dlgNova, setDlgNova] = useState(false)
+  // Proceso 3.7: registrar a posteriori una operación que ya pasó fuera del circuito.
+  const [dlgRealitzada, setDlgRealitzada] = useState(false)
+  // Solo quien puede aprobar (Superadmin y Dinamitzador): la RPC exige `pot_aprovar()`.
+  const potAprovar = useAppContext().ctx?.potAprovar ?? false
   const navega = useNavigate()
 
   const carrega = useCallback(async () => {
@@ -150,9 +156,16 @@ export default function Canalitzacio() {
         </div>
         {/* Empezar un lote, que es lo que faltaba: hasta ahora solo se podían continuar los
             que ya existían, porque el alta asistida vivía DENTRO del ciclo. */}
-        <Button className="h-11 whitespace-normal md:h-8" onClick={() => setDlgNova(true)}>
-          {t('canalz.nova_oferta')}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {potAprovar && (
+            <Button variant="outline" className="h-11 whitespace-normal md:h-8" onClick={() => setDlgRealitzada(true)}>
+              {t('opr.boto')}
+            </Button>
+          )}
+          <Button className="h-11 whitespace-normal md:h-8" onClick={() => setDlgNova(true)}>
+            {t('canalz.nova_oferta')}
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -288,6 +301,8 @@ export default function Canalitzacio() {
         // Un esborrany no entra en el ciclo: se sigue desde Ofertes › Esborranys.
         onEsborranyDesat={() => { setDlgNova(false); navega('/equip/ofertes?tab=esborranys') }}
       />
+      {/* Nace cerrada, así que no entra en este índice: el toast enlaza a su detalle. */}
+      <DialegOperacioRealitzada obert={dlgRealitzada} onTancar={() => setDlgRealitzada(false)} />
     </div>
   )
 }

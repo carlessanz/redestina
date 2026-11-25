@@ -5,6 +5,12 @@
 //   POST /crear-oferta  { productor_id, datos } -> crea el excedente
 //   POST /crear-oferta/esborrany { id?, productor_id, datos } -> guarda un esborrany (fase C)
 //   POST /crear-oferta/publicar  { id, datos? }  -> publica un esborrany, igual que el alta
+//
+//   MULTIPRODUCTO (proceso 3.3, fase 6a, 25-11-2026): en el alta, el esborrany y la publicación,
+//   `datos.productes: [{producte, kg, varietat?, familia?, caixes?, preu_minim?, cost_kg?}, …]`
+//   con lo común una vez en `datos` (`_shared/disponibilitat.ts`). Con DOS o más productos se
+//   crea una disponibilidad (`crear_disponibilitat`): N ofertas con su `E-…` y una cabecera
+//   `D-…`. Sin `productes`, o con uno solo, exactamente el alta de siempre.
 //   POST /crear-oferta/editar    { id, canvis }  -> edita una oferta ya publicada (`canvis.espigolada`
 //                                                  marca o desmarca la espigolada, fase 3)
 //
@@ -22,9 +28,11 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import {
-  canvisOferta, crearExcedente, dadesAmbEspigolada, desarEsborrany, filaEditada, modalitatsAmbConveni,
-  textoOfertaDeFila,
+  canvisOferta, crearDisponibilitat, crearExcedente, dadesAmbEspigolada, desarEsborrany, filaEditada,
+  modalitatsAmbConveni, textoOfertaDeFila,
 } from "../_shared/oferta.ts";
+import { agrupaProductes, type Agrupacio, type CodiErrorProductes, MAX_PRODUCTES } from "../_shared/disponibilitat.ts";
+import { llistaProductes } from "../_shared/textOferta.ts";
 import { modalitatsDe } from "../_shared/modalitats.ts";
 import { CAMPOS, FAMILIES_ES, SECCIONES, faltantes } from "../_shared/camposOferta.ts";
 import { agrupaCauses, motiuSubcausa, type FilaCausa, type FilaSubcausa } from "../_shared/causes.ts";
@@ -247,20 +255,45 @@ Deno.serve(async (req) => {
    * de un esborrany (fase C del punto 3): una sola lista, así que publicar un esborrany no puede
    * ser más permisivo que el alta. Devuelve la respuesta de error o lo que hace falta para crear.
    */
-  const validarPublicacio = async (
-    productorId: string,
-    d: Record<string, unknown>,
-  ): Promise<Response | { productor: { id: string; name: string; email: string | null }; senseConveni: string[] }> => {
+  type Validada = { productor: { id: string; name: string; email: string | null }; senseConveni: string[] };
+
+  /**
+   * Lo que se mira CAMPO A CAMPO de un juego de datos (obligatorios, kilos, formato). En un grupo
+   * se mira en cada producto y el error dice cuál (`producte_index`).
+   */
+  const errorCamps = (productorId: string, d: Record<string, unknown>, index?: number): Response | null => {
+    const on = index === undefined ? {} : { producte_index: index };
     const faltan = faltantes(d);
     if (faltan.length > 0) {
-      return responder({ error: "Falten camps obligatoris", code: "campos_faltantes", faltan }, 400);
+      return responder({ error: "Falten camps obligatoris", code: "campos_faltantes", faltan, ...on }, 400);
     }
     // 17-11-2026: los kilos, positivos (un «0» pasaba `faltantes()`).
-    if (!kgValid(d.kg)) return responder({ error: MISSATGE_FORMAT.kg_invalid, code: "kg_invalid" }, 400);
+    if (!kgValid(d.kg)) return responder({ error: MISSATGE_FORMAT.kg_invalid, code: "kg_invalid", ...on }, 400);
     // Los envases a devolver, un entero; el enlace de Maps, un http(s); las fotos, como mucho 3 y
     // todas de la carpeta de ESTE productor (`<productor>/<uuid>.<ext>`, B7); el coste, positivo.
     const format = errorFormatOferta(d, productorId);
-    if (format) return responder({ error: MISSATGE_FORMAT[format], code: format }, 400);
+    if (format) return responder({ error: MISSATGE_FORMAT[format], code: format, ...on }, 400);
+    return null;
+  };
+
+  const validarPublicacio = async (
+    productorId: string,
+    d: Record<string, unknown>,
+  ): Promise<Response | Validada> => {
+    const camps = errorCamps(productorId, d);
+    if (camps) return camps;
+    return await validarComu(productorId, d);
+  };
+
+  /**
+   * Lo que se mira UNA vez aunque haya varios productos, porque es común: la subcausa, el lugar,
+   * el productor, el convenio de las modalidades y el bloqueo por albarán. Para un producto solo,
+   * va justo después de `errorCamps()`: el mismo orden que antes de la fase 6a.
+   */
+  const validarComu = async (
+    productorId: string,
+    d: Record<string, unknown>,
+  ): Promise<Response | Validada> => {
 
     // Fase B del punto 3 (fila 3.6): en el panel se elige una SUBCAUSA activa; la causa sale de
     // ella. Una categoría a secas (o una causa de las de antes) = falta la subcausa. El intake
@@ -354,6 +387,91 @@ Deno.serve(async (req) => {
     }, 200);
   };
 
+  /** Los mensajes de los errores de la lista de productos (`agrupaProductes()`). */
+  const MISSATGE_PRODUCTES: Record<CodiErrorProductes, string> = {
+    productes_invalid: "La llista de productes no és vàlida",
+    massa_productes: `Com a màxim ${MAX_PRODUCTES} productes per oferta`,
+    falta_producte: "Cal triar el producte",
+    producte_repetit: "Aquest producte ja és a la llista",
+  };
+  const errorAgrupacio = (g: Extract<Agrupacio, { tipus: "error" }>) =>
+    responder({
+      error: MISSATGE_PRODUCTES[g.code],
+      code: g.code,
+      ...(g.index === undefined ? {} : { producte_index: g.index }),
+      ...(g.code === "falta_producte" ? { faltan: ["producte"] } : {}),
+    }, 400);
+
+  /**
+   * Los productos de un grupo contra el catálogo (una consulta): todos tienen que estar, y cada uno
+   * lleva SU familia (la del catálogo; si no, la que diga su línea). En un grupo la familia común
+   * no sirve: es de un producto. Devuelve el índice del primero que no está, o los datos completos.
+   */
+  const ambFamilies = async (
+    dades: readonly Record<string, unknown>[],
+  ): Promise<{ fora: number } | { dades: Record<string, unknown>[] }> => {
+    const noms = dades.map((d) => String(d.producte ?? "").trim());
+    const { data } = await supabase.from("productos").select("nombre, familia").in("nombre", [...new Set(noms)]);
+    const familia = new Map(((data ?? []) as { nombre: string; familia: string | null }[]).map((p) => [p.nombre, p.familia]));
+    const i = noms.findIndex((n) => !familia.has(n));
+    if (i >= 0) return { fora: i };
+    return { dades: dades.map((d, j) => ({ ...d, familia: familia.get(noms[j]) ?? d.familia ?? null })) };
+  };
+  const producteDesconegut = (i: number) =>
+    responder({ error: "Producte desconegut", code: "producte_invalid", producte_index: i }, 400);
+
+  /**
+   * Todo lo que se comprueba antes de publicar un GRUPO: cada producto (catálogo, obligatorios,
+   * kilos, formato) y lo común una vez. Devuelve también los datos con la familia de cada uno.
+   */
+  const validarGrup = async (
+    productorId: string,
+    crus: readonly Record<string, unknown>[],
+  ): Promise<Response | { v: Validada; dades: Record<string, unknown>[] }> => {
+    const f = await ambFamilies(crus);
+    if ("fora" in f) return producteDesconegut(f.fora);
+    for (let i = 0; i < f.dades.length; i++) {
+      const e = errorCamps(productorId, f.dades[i], i);
+      if (e) return e;
+    }
+    const v = await validarComu(productorId, f.dades[0]);
+    if (v instanceof Response) return v;
+    return { v, dades: f.dades };
+  };
+
+  /** Crea el grupo (o publica el esborrany como grupo) y manda UNA confirmación. */
+  const publicarGrup = async (dades: readonly Record<string, unknown>[], v: Validada, esborranyId?: string) => {
+    const t0 = performance.now();
+    const r = await crearDisponibilitat(supabase, dades, v.productor, ctx.esIntern ? "asistido" : "panel", {
+      esborranyId, actor: ctx.userId,
+    });
+    if (!r.ok || !r.ofertes || r.ofertes.length === 0) {
+      if (r.error === "esborrany_inexistent") {
+        return responder({ error: "Aquest esborrany ja no existeix", code: "esborrany_inexistent" }, 409);
+      }
+      return responder({ error: r.error ?? "No s'ha pogut crear l'oferta" }, 500);
+    }
+    const primera = r.ofertes[0];
+    // Una sola confirmación por correo para todo el grupo, con el código `D-…` y la lista de
+    // productos (el ofertante no ve los `E-…`).
+    const confirmacio = await confirmarOfertaPerCorreu(
+      v.productor, r.codi ?? "", primera.id,
+      { producte: llistaProductes(r.ofertes.map((o) => o.producto)) },
+      supabase, "crear-oferta", primera.estado,
+    );
+    console.log(`crear-oferta: disponibilitat ${r.codi} (${r.ofertes.length} productes) en ${Math.round(performance.now() - t0)} ms`);
+    return responder({
+      ok: true,
+      // Compatibilidad: lo de siempre, de la PRIMERA oferta del grupo.
+      id: primera.id, id_excedente: primera.id_excedente, confirmacio_email: confirmacio,
+      estado: primera.estado ?? "publicada",
+      modalitats_sense_conveni: v.senseConveni,
+      // Lo nuevo del grupo.
+      disponibilitat_id: r.disponibilitatId, codi: r.codi, ofertes: r.ofertes,
+      texto_disponibilitat: r.textoDisponibilitat ?? null,
+    }, 200);
+  };
+
   const ruta = new URL(req.url).pathname;
 
   // ── Guardar un ESBORRANY (fase C del punto 3, filas 3.1.2 y 3.7.1) ──
@@ -374,15 +492,29 @@ Deno.serve(async (req) => {
       }
       // Con «Espigolada», donación y producto en el campo también en lo guardado (fase 3).
       const d = dadesAmbEspigolada(datos as Record<string, unknown>);
-      const producte = String(d.producte ?? "").trim();
-      if (!producte) {
-        return responder({ error: "Cal triar el producte", code: "falta_producte", faltan: ["producte"] }, 400);
+      // Multiproducto (fase 6a): las columnas salen del PRIMER producto y `dades_esborrany` guarda
+      // el cuerpo entero, con `productes[]`. Sin `productes`, `primera` es `d`.
+      const g = agrupaProductes(d);
+      if (g.tipus === "error") return errorAgrupacio(g);
+      const primera = g.tipus === "un" ? g.dades : g.dades[0];
+      if (g.tipus === "grup") {
+        const f = await ambFamilies(g.dades);
+        if ("fora" in f) return producteDesconegut(f.fora);
+        for (let i = 0; i < g.dades.length; i++) {
+          const f = errorFormatOferta(g.dades[i], productorId);
+          if (f) return responder({ error: MISSATGE_FORMAT[f], code: f, producte_index: i }, 400);
+        }
+      } else {
+        const producte = String(primera.producte ?? "").trim();
+        if (!producte) {
+          return responder({ error: "Cal triar el producte", code: "falta_producte", faltan: ["producte"] }, 400);
+        }
+        const { data: prod } = await supabase.from("productos").select("nombre").eq("nombre", producte).maybeSingle();
+        if (!prod) return responder({ error: "Producte desconegut", code: "producte_invalid" }, 400);
+        const format = errorFormatOferta(primera, productorId);
+        if (format) return responder({ error: MISSATGE_FORMAT[format], code: format }, 400);
       }
-      const { data: prod } = await supabase.from("productos").select("nombre").eq("nombre", producte).maybeSingle();
-      if (!prod) return responder({ error: "Producte desconegut", code: "producte_invalid" }, 400);
-      const format = errorFormatOferta(d, productorId);
-      if (format) return responder({ error: MISSATGE_FORMAT[format], code: format }, 400);
-      if (await ubicacioAliena(d.ubicacio, productorId)) {
+      if (await ubicacioAliena(primera.ubicacio, productorId)) {
         return responder({ error: "Aquesta ubicació no és d'aquest productor", code: "ubicacio_aliena" }, 400);
       }
       // Reescribir uno existente: tiene que ser un esborrany de ESTE productor (el productor de
@@ -400,7 +532,10 @@ Deno.serve(async (req) => {
           return responder({ error: "El productor d'un esborrany no canvia", code: "productor_fix" }, 400);
         }
       }
-      const r = await desarEsborrany(supabase, d, productorId, ctx.esIntern ? "asistido" : "panel", id ?? undefined);
+      const r = await desarEsborrany(
+        supabase, primera, productorId, ctx.esIntern ? "asistido" : "panel", id ?? undefined,
+        primera === d ? undefined : d,
+      );
       if (!r.ok) {
         const status = r.error === "esborrany_inexistent" ? 409 : 500;
         return responder({ error: r.error, code: r.error === "esborrany_inexistent" ? r.error : undefined }, status);
@@ -433,9 +568,18 @@ Deno.serve(async (req) => {
         (datos && typeof datos === "object" ? datos : fila.dades_esborrany ?? {}) as Record<string, unknown>,
       );
       // El producto SÍ puede cambiar mientras es esborrany: el `E-…` (que lo lleva) nace aquí.
-      const v = await validarPublicacio(fila.productor_id, d);
+      // Con `productes[]` de dos o más (fase 6a), el esborrany se publica como GRUPO: su fila es
+      // la primera oferta y el resto se crean en la misma transacción.
+      const g = agrupaProductes(d);
+      if (g.tipus === "error") return errorAgrupacio(g);
+      if (g.tipus === "grup") {
+        const vg = await validarGrup(fila.productor_id, g.dades);
+        if (vg instanceof Response) return vg;
+        return await publicarGrup(vg.dades, vg.v, id);
+      }
+      const v = await validarPublicacio(fila.productor_id, g.dades);
       if (v instanceof Response) return v;
-      return await publicar(d, v, id);
+      return await publicar(g.dades, v, id);
     } catch (err) {
       console.error("crear-oferta/publicar:", err instanceof Error ? err.message : String(err));
       return responder({ error: "Error interno o JSON inválido" }, 500);
@@ -463,9 +607,18 @@ Deno.serve(async (req) => {
     // «Espigolada» (fase 3): la regla se aplica ANTES de validar, así que los obligatorios, el
     // convenio exigido (el de donación) y la fila dicen lo mismo.
     const d = dadesAmbEspigolada(datos as Record<string, unknown>);
-    const v = await validarPublicacio(productorId, d);
+    // Multiproducto (fase 6a): con dos o más productos, una disponibilidad. Sin `productes`,
+    // `g.dades` es el mismo `d` y todo sigue como siempre.
+    const g = agrupaProductes(d);
+    if (g.tipus === "error") return errorAgrupacio(g);
+    if (g.tipus === "grup") {
+      const vg = await validarGrup(productorId, g.dades);
+      if (vg instanceof Response) return vg;
+      return await publicarGrup(vg.dades, vg.v);
+    }
+    const v = await validarPublicacio(productorId, g.dades);
     if (v instanceof Response) return v;
-    return await publicar(d, v);
+    return await publicar(g.dades, v);
   } catch (err) {
     console.error("crear-oferta:", err instanceof Error ? err.message : String(err));
     return responder({ error: "Error interno o JSON inválido" }, 500);

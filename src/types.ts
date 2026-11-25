@@ -339,6 +339,8 @@ export interface Excedente {
    * espigolada es una oferta de DONACIÓN normal: no crea jornada.
    */
   tipus_operacio?: TipusOperacio
+  /** Oferta multiproducto: su cabecera (`disponibilitats`, fase 6, 20270620100000). */
+  disponibilitat_id?: string | null
   /** Derivados por el trigger `excedentes_ubica` (20270331100000). El receptor ve la comarca. */
   municipi_ine: string | null
   comarca: string | null
@@ -380,6 +382,8 @@ export interface Excedente {
 
 export interface Canalizacion {
   id: string
+  /** Solicitud multiproducto de la que sale (fase 6, 20270620100100). */
+  sollicitud_id?: string | null
   excedente_id: string | null
   entidad_id: string | null
   kg_confirmados: number | null
@@ -433,6 +437,8 @@ export interface Canalizacion {
 
 export interface OfertaRespuesta {
   id: string
+  /** Solicitud multiproducto (una entidad, una fecha; fase 6, 20270620100100). */
+  sollicitud_id?: string | null
   excedente_id: string
   entidad_id: string | null
   /** E.164 sin '+'; casa la respuesta entrante con la fila pendiente */
@@ -1876,4 +1882,56 @@ export interface ResultatOperacioRealitzada {
     albara: { id: string; numero: string | null; estat: string } | null
     rec: { id: string; numero: string | null; estat: string } | null
   }[]
+}
+
+// ---------------------------------------------------------------------------
+// Ofertas multiproducto (proceso 3.3, fase 6, 20270620100000…100600). Oferta, interés y
+// canalización siguen siendo uno por producto; esto son solo los identificadores de grupo.
+// ---------------------------------------------------------------------------
+export interface Disponibilitat {
+  id: string
+  /** `D-AAMMDD-XXX-N` */
+  codi: string
+  productor_id: string
+  created_by: string | null
+  created_at: string
+}
+export type EstatSollicitud = 'pendent' | 'resolta' | 'rebutjada'
+export interface SollicitudRecollida {
+  id: string
+  disponibilitat_id: string
+  entidad_id: string
+  recollida_at: string | null
+  canal: 'whatsapp' | 'email' | 'panel' | 'asistido' | 'manual'
+  estat: EstatSollicitud
+  resolta_at: string | null
+  created_by: string | null
+  created_at: string
+}
+/** Fila de `ofertes_disponibilitat()` (20270620100300). `modalitats_meves`: null para equipo y productor. */
+export interface OfertaDisponibilitat {
+  excedente_id: string
+  id_excedente: string | null
+  disponibilitat_id: string
+  productor_id: string
+  producto: string
+  variedad: string | null
+  kg_total: number | null
+  kg_lliures: number | null
+  estado: EstadoExcedente
+  modalitat: Modalitat | null
+  modalitats: Modalitat[] | null
+  modalitats_meves: Modalitat[] | null
+  preu_minim: number | null
+  disponible_desde: string | null
+  disponible_hasta: string | null
+  hora_recollida_inici: string | null
+  hora_recollida_fi: string | null
+  dies_recollida: number[] | null
+  ubicacion_id: string | null
+  municipi_ine: string | null
+  comarca: string | null
+  gmaps_url: string | null
+  tipus_operacio: TipusOperacio
+  created_at: string
 }

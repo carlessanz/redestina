@@ -2140,3 +2140,28 @@ La sección nueva del equipo lee **las mismas filas** de `notes_internes` que el
   mes del precio.
 - `sortides_base` gana la columna `registre_posteriori` (`= ex.origen = 'registre'`); `entrades_sortides` no cambia de firma.
 - Prueba con rollback: `scripts/sql/prova-operacio-realitzada.sql`.
+
+### Ofertas multiproducto (plan DIC 26, fase 6, proceso 3.3, `20270620100000`…`100600`, 25-11-2026)
+
+Principio: **oferta, interés y canalización siguen siendo uno por producto**; solo se añaden dos identificadores de grupo.
+Un solo producto funciona exactamente igual.
+
+- `disponibilitats` (`codi` `D-AAMMDD-XXX-N` único, `productor_id` en cascada, `created_by`) + `excedentes.disponibilitat_id`
+  (`on delete set null`: borrar una cabecera nunca arrastra ofertas ni albaranes).
+- `sollicituds_recollida` (`disponibilitat_id` y `entidad_id` en cascada, `recollida_at`, `canal`, `estat`
+  pendent·resolta·rebutjada, `resolta_at`) + `oferta_respuestas.sollicitud_id` y `canalizaciones.sollicitud_id` (`set null`).
+  `estat` lo mantiene solo el trigger `oferta_respuestas_estat_sollicitud` → `recalcula_estat_sollicitud()` (pendent si
+  alguna línea pendent/proposada; si no, resolta si hay alguna aprobada; si no, rebutjada), así que sigue siendo cierto
+  aunque una línea cambie por las puertas antiguas.
+- Las columnas de grupo solo por RPC: `trg_protegeix_grup()` → `42501 grup_protegit` salvo `service_role`, la marca
+  `redestina.escriu_grup` o el vaciado.
+- RLS de lectura: equipo todo; productor lo suyo; receptor por `disponibilitats_visibles_meves()` (misma regla que
+  `excedentes`) y sus solicitudes; el productor ve una solicitud cuando ya hay canalización de una oferta suya
+  (`sollicituds_dels_meus_productors()`). `authenticated` solo SELECT.
+- Vaciado: `sollicituds_recollida`, `disponibilitats` en `v_ordre` tras `excedentes`/`espigoladas`. `borrar_ficha_completa`
+  sin cambios (cascada con la ficha).
+- Aviso `sollicitud_resolta` (`objecte_tipo='sollicitud_recollida'`): uno a la entidad y, si hay aprobadas, uno al
+  productor; la marca `redestina.agrupa_sollicitud` suprime en `crear_avis()` los `interes_aprovat`, `interes_rebutjat` y
+  `sortida_trobada` por línea.
+- Fixture: `scripts/crear-multiproducte-prova.ts` (idempotente, solo `TEST-*`/`es_test`; `D-261125-OFE-1` en el clon).
+- Prueba con rollback: `scripts/sql/prova-multiproducte.sql`.

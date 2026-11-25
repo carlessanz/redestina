@@ -158,6 +158,26 @@ const CODIS: Record<string, string> = {
   kg_invalid: 'ni.err_kg',
   producte_desconegut: 'ni.err_producte',
   organitzacio_inexistent: 'ni.err_org_inexistent',
+  // «Registrar operació realitzada» (proceso 3.7, `registrar_operacio_realitzada()`, 20270619100200).
+  // Los que ya estaban arriba (`kg_invalids`, `data_futura`, `preu_invalid`, `cal_preu_acordat`,
+  // `modalitat_invalida`, `producte_desconegut`, `ubicacio_aliena`, `sense_conveni`,
+  // `entitat_inactiva`) conservan su texto. Ninguno de estos contiene a otro de la lista ni lo
+  // contienen sus mensajes; `espigolada_nomes_donacio` no es `espigolada_no_donacio` (arriba).
+  espigolada_nomes_donacio: 'opr.err_espigolada',
+  cal_data: 'opr.err_data',
+  fora_exercici: 'opr.err_fora_exercici',
+  observacions_llargues: 'opr.err_observacions',
+  productor_inexistent: 'opr.err_productor_inexistent',
+  cal_destinatari: 'opr.err_cal_destinatari',
+  destinatari_invalid: 'opr.err_destinatari_invalid',
+  entitat_repetida: 'opr.err_entitat_repetida',
+  entitat_inexistent: 'ni.err_org_inexistent',
+  destins_invalids: 'opr.err_destins_invalids',
+  desti_desconegut: 'desti.err_desti_desconegut',
+  kg_no_quadren: 'opr.err_kg_no_quadren',
+  periode_certificat: 'opr.err_periode_certificat',
+  id_excedent_invalid: 'opr.err_id_excedent',
+  id_excedent_ocupat: 'opr.err_id_excedent',
 }
 
 /** Códigos que algunas Edge Functions y envoltorios devuelven COMO mensaje. */

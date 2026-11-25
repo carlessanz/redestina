@@ -22,7 +22,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
-import { supabase } from '../../lib/supabase'
+import { useProductorsActius } from '../../hooks/useProductorsActius'
 import FormulariNovaOferta from '../FormulariNovaOferta'
 import CercadorOpcions from '../CercadorOpcions'
 import type { ResultatNovaOferta } from '../FormulariNovaOferta'
@@ -43,30 +43,14 @@ interface Props {
   onEsborranyDesat?: (id: string) => void
 }
 
-interface Fitxa { id: string; nom: string; poblacio: string | null }
-
 export default function DialegNovaOfertaAssistida({ obert, onTancar, onCreada, onEsborranyDesat }: Props) {
   const { t } = useT()
-  const [productors, setProductors] = useState<Fitxa[]>([])
-  const [carregant, setCarregant] = useState(true)
+  // La lista de productoras activas, compartida con «Registrar operació realitzada».
+  const { productors, carregant } = useProductorsActius(obert)
   const [triat, setTriat] = useState('')
 
   useEffect(() => {
-    if (!obert) { setTriat(''); return }
-    let viu = true
-    void (async () => {
-      setCarregant(true)
-      const { data } = await supabase
-        .from('productores')
-        .select('id, name, empresa, poblacion')
-        .eq('activo', true)
-        .order('name')
-      if (!viu) return
-      const files = (data as { id: string; name: string | null; empresa: string | null; poblacion: string | null }[] | null) ?? []
-      setProductors(files.map((x) => ({ id: x.id, nom: x.empresa || x.name || '—', poblacio: x.poblacion })))
-      setCarregant(false)
-    })()
-    return () => { viu = false }
+    if (!obert) setTriat('')
   }, [obert])
 
   // Por nombre (y la población de detalle, en la que también se busca), sin acentos.

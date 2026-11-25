@@ -119,3 +119,29 @@ posteriores al último `outbound` de ese teléfono. Lo usan `ProducersList` (bad
   `automatic = false`, el job no descarga (`desactivat`). User-Agent genérico, sin datos de nadie; una petición al día.
 - El parser es puro (`_shared/preusFonts.ts`, también lo importa el panel para las coincidencias); fixtures reales en
   `tests/fixtures/preus/` (Gencat XLS del 12-11-2026, Mercabarna del 16-11-2026, el CSV roto).
+
+## Alta multiproducto y mensaje único (plan DIC 26, fase 6, 25-11-2026)
+
+- **`crear-oferta`** (alta, `/esborrany`, `/publicar`): `datos.productes: [{producte, kg, varietat?, familia?, caixes?,
+  preu_minim?, cost_kg?}]` (máx. 10; `_shared/disponibilitat.ts`, hoja). Por producto solo esas claves (vacía = el valor
+  común); la familia, del catálogo; lo demás (lugar, fechas, días y franja, modalidades, causa, fotos, espigolada,
+  envases, observaciones) va una vez. Sin `productes` o con `[]`: el camino de siempre; con uno: alta de un producto; con
+  2-10: cada fila con `filaDeDades()`, su `generarId()` y su `textoOfertaDeDades()` → `crear_disponibilitat(...)` (una
+  transacción; ante `23505` regenera y repite, 3 intentos). Errores 400 `productes_invalid`, `massa_productes`,
+  `falta_producte`, `producte_repetit` (mismo producto y variedad), `producte_invalid`, con `producte_index`. Respuesta del
+  grupo: la de siempre (de la primera oferta) + `disponibilitat_id`, `codi`, `ofertes[]`, `texto_disponibilitat`; una sola
+  confirmación por correo con el `D-…`. El esborrany guarda `productes[]` y `/publicar` crea el grupo (el esborrany pasa a
+  ser la primera oferta). El intake de WhatsApp sigue siendo de un producto.
+- **Texto único**: `textDisponibilitat(ofertes, ctx)` (`_shared/textOferta.ts`): cabecera «OFERTA DISPONIBLE · N
+  PRODUCTES», una línea por producto (kg, cajas, precio si hay venta), lo común y **un enlace**
+  `/receptor/mercat?disponibilitat=<id>`; sin `E-…` ni `D-…` ni botones del bot. `correuDisponibilitat()` para el correo.
+  Se envía como texto (`whatsapp-send` dentro de la ventana de 24 h, o correo); plantilla de Meta = checkpoint de negocio.
+- **`priorizar-entidades { disponibilitat_id }`**: rankea las ofertas vivas del grupo (fuera esborrany, cerrada,
+  cancelada, no_colocada) y las une con `uneixRankings()` (`_shared/priorizacion.ts`): una entidad entra si encaja en alguna
+  oferta (en su ranking y con modalidades posibles); su fila es la de la mejor oferta (con convenio primero);
+  `sense_conveni` solo si falta en todas; `ofertes_encaixen[]` por fila. 404 `no_trobada`, 409 `disponibilitat_sense_ofertes`.
+- **Aviso `sollicitud_resolta`** (`_shared/textAvis.ts`): a la entidad, lo asignado y lo no asignado con motivo, la
+  recogida y quién lo ofrece (ruta `/receptor/interessos`); al productor, lo asignado a esa entidad (ruta
+  `/productor/ofertes/<primera>`). En el panel: `rutaAvis` y `avis.t_sollicitud_resolta`.
+- Orden: las N ofertas nacen con el mismo `created_at`; `ofertes_disponibilitat` y `priorizar-entidades` las ordenan por
+  `id_excedente`, no por el orden del formulario.

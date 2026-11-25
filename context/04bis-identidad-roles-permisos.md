@@ -978,3 +978,31 @@ p_subcausa text, p_hora time, p_coste_kg numeric, p_observacions text, p_id_exce
 - `periode_certificat`: CDP de periodo con número del donante, CD anual del ejercicio o CR de una entidad destinataria
   (cuentan también los de prueba, deuda 209).
 - `siglas_oferta(text)`: interna, sin EXECUTE. Arnés: `OPERACIO_REALITZADA_*` (clon 2.546/2.546 y 41 sin datos).
+
+### Multiproducto (proceso 3.3, `20270620100300`…`100600`, 25-11-2026)
+
+Todas `security definer` con `revoke … from public, anon`. **Todo o nada**: cada línea pasa por la puerta de siempre y, si
+una falla, se relanza **su** SQLSTATE y mensaje con `detail` JSON `{"linia":n,"excedente_id"|"resposta_id"|"canalizacion_id":…}`.
+Comunes `22023`: `cal_linies`, `linia_invalida`, `linia_duplicada`. Permiso antes que existencia.
+
+| RPC | Quién | Notas |
+| --- | --- | --- |
+| `crear_disponibilitat(p_productor, p_ofertes jsonb, p_esborrany, p_actor)` | solo `service_role` | ≥2 filas compuestas por `crear-oferta`; `cal_dos_productes`, `columna_no_permesa: <k>`, `23505` si un `E-…` existe |
+| `ofertes_disponibilitat(p_disponibilitat)` | lectura | visibilidad de `excedentes`; `kg_lliures`, `modalitats_meves` (null para equipo y productor) |
+| `manifestar_interes_multiple(p_disponibilitat, p_linies, p_recollida_at, p_entidad)` | la entidad | por línea `manifestar_interes()`; `cal_entitat`, `disponibilitat_inexistent`, `cal_recollida`, `linia_fora_disponibilitat`, `sollicitud_pendent` |
+| `manifestar_interes_multiple_assistit(p_disponibilitat, p_entidad, p_linies, p_recollida_at)` | `es_intern()` | canal `asistido` |
+| `assignar_directe_multiple(p_disponibilitat, p_entidad, p_linies, p_recollida_at, p_motiu)` | `pot_aprovar()` | por línea `assignar_directe()`; nace `resolta`; un aviso |
+| `resoldre_sollicitud(p_sollicitud, p_linies [{resposta_id, accio, kg?, …}], p_recollida_at, p_motiu)` | `pot_aprovar()` | cubre todas las pendientes (`falten_linies`); `linia_ja_resolta`, `accio_invalida`; un aviso |
+| `registrar_recollida_multiple(p_sollicitud, p_linies [{canalizacion_id, resultat, kg_reals?, …}], p_quan, p_motiu)` | la entidad declara; el equipo registra y valida | `no_recollit` anula esa canalización (libera kg); parcial permitido |
+| `validar_recollides_sollicitud(p_sollicitud, p_motiu)` | `pot_aprovar()` con sesión | «Valida totes»; `cal_motiu_validacio` si alguna difiere sin motivo |
+
+Internas sin EXECUTE: `avisa_sollicitud_resolta`, `manifestar_interes_multiple_intern`, `comprova_linies_multiple`,
+`uuid_de_linia`, `recalcula_estat_sollicitud`, `trg_protegeix_grup`. Arnés: `MULTIPRODUCTE_*` (clon 2.660/2.660 y 44 sin datos).
+
+### Precios D1-D2: resumen que vivía en AGENTS.md §4bis (movido el 25-11-2026)
+
+`preus_proposta_mes`, `noms_fonts_preus` (equipo); validar mes/periodo, `fixar_preu_referencia` (motivo si difiere),
+equivalencias, `fixar_preu_manual`, `fixar_origen_cost_producte`, `crear_producte`, `marcar_carrega_preus` (`pot_aprovar`);
+`fixar_font_preus` (super_admin). Propuesta: Gencat (el mes o su último) → Mercabarna (último día, mes cerrado) → manual;
+`font_mes`: su mes; alta, solo Mercabarna: precio del día. **D2**: `preus_canalitzacions_mes` (equipo); nadie escribe
+`preu_*` ni el coste de una conciliada o certificada (`42501`, `canalizaciones_protegeix_preu`).

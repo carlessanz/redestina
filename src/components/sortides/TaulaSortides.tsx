@@ -16,6 +16,7 @@ import { useT } from '../../lib/i18n'
 import { kg } from '../../lib/format'
 import { classeEstat, clauEstat, clauModalitat, textDia } from '../../lib/sortides'
 import BadgeEspigolada from '../BadgeEspigolada'
+import BadgeRegistrePosteriori from '../BadgeRegistrePosteriori'
 import type { FilaSortida } from '../../types'
 import { usePuntTall } from '../../hooks/usePuntTall'
 import { FilaClicable, TitolFila } from '../FilaClicable'
@@ -80,6 +81,12 @@ export default function TaulaSortides({ files, buitKey, onObre, carregant }: Pro
               {f.tipus_operacio === 'espigolada' && (
                 <span className="mt-1 block" data-testid="es-tipus-espigolada">
                   <BadgeEspigolada className="max-w-full whitespace-normal" />
+                </span>
+              )}
+              {/* Proceso 3.7: la oferta se registró a posteriori (`origen = 'registre'`). */}
+              {f.registre_posteriori && (
+                <span className="mt-1 block" data-testid="es-registre-posteriori">
+                  <BadgeRegistrePosteriori className="max-w-full whitespace-normal" />
                 </span>
               )}
             </TableCell>

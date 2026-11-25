@@ -327,6 +327,8 @@ export function llegeixFila(v: unknown): FilaSortida {
     valor: numONull(f.valor),
     albara_ent: albara(f.albara_ent),
     albara_rec: albara(f.albara_rec),
+    // Proceso 3.7 (20270619100300): la oferta se registró a posteriori. Una RPC anterior no lo manda.
+    registre_posteriori: f.registre_posteriori === true,
   }
 }
 
@@ -461,6 +463,8 @@ export const COLUMNES_SORTIDES = [
   { clau: 'valor', capcalera: 'sort.x_valor', ample: 12 },
   { clau: 'albara_ent', capcalera: 'sort.x_albara_ent', ample: 18 },
   { clau: 'albara_rec', capcalera: 'sort.x_albara_rec', ample: 18 },
+  // Proceso 3.7: «Sí» si la operación se registró a posteriori; vacía si no.
+  { clau: 'registre_posteriori', capcalera: 'sort.x_registre_posteriori', ample: 14 },
 ] as const
 
 /** Una celda de `write-excel-file`: texto, número o fecha (null = vacía). */
@@ -506,6 +510,7 @@ export function filaExcel(f: FilaSortida, t: T): CellaSortides[] {
     cNum(f.valor, '#,##0.00'),
     cText(f.albara_ent?.numero ?? null),
     cText(f.albara_rec?.numero ?? null),
+    cText(f.registre_posteriori ? t('c.yes') : null),
   ]
 }
 

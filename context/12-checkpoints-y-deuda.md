@@ -153,6 +153,8 @@ apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
 ⚠️ **25-11-2026 (plan DIC 26, fase 5, `20270619100000`…`100300`): se abren de la 207 a la 212** (flecos de la operación registrada a posteriori): **104 vivas** y la siguiente es la 213.
 
+⚠️ **25-11-2026 (plan DIC 26, fase 6, `20270620100000`…`100600`): se abren de la 213 a la 219** (flecos del multiproducto y dos pruebas SQL antiguas) y se cierra la 208: **110 vivas** y la siguiente es la 220.
+
 ⚠️ **19-11-2026 (`20270610100000`…`100200`, fase 5 de los puntos 4-6): se abren de la 193 a la 197** (flecos de la propuesta de cambios y del envío automático de albaranes): **92 vivas** y la siguiente es la 198.
 
 ⚠️ **19-11-2026 (`20270611100000`, fase 6 de los puntos 4-6, vaciado): se abren de la 198 a la 202**: **97 vivas** y la siguiente es la 203. La **192** queda redefinida (en el clon ya no hay REC heredado de oferta ni OPE; falta retirar las ramas heredadas, sin olvidar que la espigolada usa REC sin canalización) y la **194** se cierra cuando se vacíe producción.
@@ -1022,11 +1024,23 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      en producción). Arreglo: ocultar la escalera en lo heredado o retirarlo con la limpieza de la 192. Precio: un rato.
 207. **`siglas_oferta()` repite `siglas()` de `_shared/oferta.ts`** (25-11-2026, plan DIC 26 fase 5, `20270619100200`).
      La paridad solo se prueba en SQL. Arreglo: un test de Vitest con casos comunes. Precio: un rato.
-208. **Una operación registrada sin `p_texto_oferta` deja `texto_oferta` vacío** y «Comparteix» de `FitxaOferta` no
-     tendría texto. La pantalla lo envía; la RPC no lo exige. Precio: un rato.
+208. ~~**Una operación registrada sin `p_texto_oferta` deja `texto_oferta` vacío** y «Comparteix» de `FitxaOferta` no
+     tendría texto.~~ **Cerrada el 25-11-2026**: la pantalla lo compone con `textoOfertaDeDades()` y lo envía (E2E).
 209. **`periode_certificat` cuenta también los certificados en `prueba`** (decisión con precio): mientras los datos de la
      Fundació sean provisionales todo se certifica en prueba, y bloquear solo lo real dejaría registrar dentro de un
      periodo ya certificado en prueba.
 210. **El convenio se comprueba vigente a hoy**, no a la fecha de la operación registrada (`exigir_convenio()`).
 211. **`operacio_detall` no expone `registre_posteriori`**: `FitxaOperacio` tendría que leer `excedentes.origen`.
 212. **Un registro a posteriori con hora de un día con franja u horario no avisa** de que cae fuera; no se valida a propósito.
+213. **Con `validacio_ofertes` encendido, una disponibilidad del productor nace con N ofertas `pendent_validacio`** que se
+     validan una a una; no hay «valida el grupo» (25-11-2026, plan DIC 26 fase 6).
+214. **«Valida totes» acepta un solo motivo común** (`cal_motiu_validacio` si alguna línea difiere); no hay motivo por línea.
+215. **Cuando la entidad declara `no_recollit`**, la anulación también le manda a ella el aviso `assignacio_anulada`.
+216. **No hay «retirar solicitud»**: con una pendiente, la entidad no puede rehacerla (`sollicitud_pendent`).
+217. **`kg_lliures` no descuenta los intereses pendientes** (igual que el Mercat de hoy).
+218. **En 6c, las validaciones siguen avisando una por canalización** (`recollida_confirmada` ×N), sin agrupar.
+219. **Dos pruebas SQL antiguas no pasan en el clon** (vistas el 25-11-2026): `prova-signatura.sql` se para por falta de
+     un ENT pendiente de TEST-ENT-SOCIAL en el fixture documental, y `prueba-conciliacion-y-certificados.sql` (05-11)
+     espera el modelo heredado de REC por oferta («el trigger no ha creat els albarans esperats»). No pasan por el código
+     de la fase 6; probablemente fallan desde la fase 3 de los puntos 4-6. Arreglo: rehacer el fixture o adaptarlas al
+     REC por recogida. Precio: un rato cada una.

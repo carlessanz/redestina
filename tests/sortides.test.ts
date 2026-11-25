@@ -215,6 +215,11 @@ describe('lectura de las RPC', () => {
     expect(vella.tipus_operacio).toBe('espigolada')
   })
 
+  it('el registro a posteriori (proceso 3.7): solo `true` lo marca; una RPC anterior no lo manda', () => {
+    expect(llegeixFila({ ...FILA, registre_posteriori: true }).registre_posteriori).toBe(true)
+    expect(llegeixFila({ ...FILA, registre_posteriori: undefined }).registre_posteriori).toBe(false)
+  })
+
   it('la página y sus totales', () => {
     const r = llegeixEntrades({ total: '22', kg_sortida: '2720', kg_recollits: '2346.00', files: [FILA] })
     expect(r).toMatchObject({ total: 22, kg_sortida: 2720, kg_recollits: 2346 })
@@ -248,13 +253,14 @@ describe('Excel', () => {
     expect(nomFitxerSortides('2026-11-20')).toBe('entrades-sortides-2026-11-20.xlsx')
   })
 
-  it('la hoja «Sortides»: veinte columnas en el orden pedido (con el tipus d\'operació)', () => {
+  it('la hoja «Sortides»: veintiuna columnas en el orden pedido (con el tipus d\'operació y el registro a posteriori)', () => {
     const fulla = fullaSortides([FILA], t)
     const cap = fulla[0].map((c) => (c as { value: string }).value)
     expect(cap).toEqual([
       'Data de sortida', 'Núm. oferta', 'Entitat productora', 'Producte', 'Varietat', 'Entitat receptora',
       'Kg de sortida', 'Kg recollits', 'Modalitat', 'Tipus d’operació', 'Estat', 'Causa', 'Municipi', 'Zona',
       'Caixes entregades', 'Caixes retornades', '€/kg', 'Valor (€)', 'Albarà d’entrega', 'Albarà de recepció',
+      'Registrada a posteriori',
     ])
     expect(fulla).toHaveLength(2)
   })
@@ -273,6 +279,9 @@ describe('Excel', () => {
     expect(filaExcel({ ...FILA, tipus_operacio: 'espigolada' }, t)[9]).toEqual({ value: 'Espigolada' })
     expect(fila[18]).toEqual({ value: 'ENT-2026-00014' })
     expect(fila[19]).toEqual({ value: 'REC-2026-00012' })
+    // Proceso 3.7: «Sí» solo si la oferta se registró a posteriori.
+    expect(fila[20]).toBeNull()
+    expect(filaExcel({ ...FILA, registre_posteriori: true }, t)[20]).toEqual({ value: 'Sí' })
     expect(cellaDia('no')).toEqual({ value: 'no' })
   })
 

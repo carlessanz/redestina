@@ -164,6 +164,9 @@ del albarán** (D2: `preu_*`, rastro `canalizaciones_preu_hist`; `context/04`), 
 `excedente_destins` + catálogo `destins_finals`; `excedentes_canvis`; `avisos` (lo que se le
 cuenta a una organización; los crean triggers); `intake_sessions`; `espigoladas`.
 
+**Multiproducto (fase 6)**: `disponibilitats` (`D-…`, `excedentes.disponibilitat_id`) y `sollicituds_recollida` (una entidad,
+una fecha; `sollicitud_id`). Solo agrupan: oferta, interés y canalización siguen siendo por producto; un aviso `sollicitud_resolta`.
+
 **Catálogos**: `productos` (iconos en `public/icones-productes/`), `causas` (C1–C7; las 8 de antes, inactivas) + `subcausas` (`C<n>.<m>`),
 `factores_conversion`, `costes_producto` (coste de **referencia**, uno por producto, +hist; un manual **no es oficial**: `criteri`+`font_origen`),
 **precios de referencia por mes** (D1; `context/04`): `preus_referencia` (producto × año × mes
@@ -274,12 +277,13 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
 - **Operació realitzada (3.7)**: `registrar_operacio_realitzada(p_productor, p_producto, p_kg, p_data, p_modalitat,
   p_destinataris, p_destins, …)` (`pot_aprovar`, con sesión) registra en un acto: oferta `origen='registre'` → asignación →
   recogida validada con la fecha real → destinos; solo ejercicio en curso y fuera de periodo certificado; sin avisos.
+- **Multiproducto** (`context/04bis`; todo o nada, cada línea por su puerta de siempre, `detail` JSON con la línea):
+  `crear_disponibilitat` (servidor), `ofertes_disponibilitat`, `manifestar_interes_multiple[_assistit]`, `assignar_directe_multiple`,
+  `resoldre_sollicitud`, `registrar_recollida_multiple` (`no_recollit` anula) y `validar_recollides_sollicitud`.
 - **Interacciones (1.2)**: `afegir_nota_interna(…, previsión)`, `tancar_seguiment(p_id, p_resultat)`; lectura del equipo
   `interaccions_llistat(p_vista, <12 filtros>, p_limit, p_offset)` → `{total, files}` e `interaccions_opcions()`.
-- **Precios (D1)**: `preus_proposta_mes`, `noms_fonts_preus` (equipo); validar mes/periodo, `fixar_preu_referencia`
-  (motivo si difiere), equivalencias, `fixar_preu_manual`, `fixar_origen_cost_producte`, `crear_producte`, `marcar_carrega_preus` (`pot_aprovar`);
-  `fixar_font_preus` (super_admin). Propuesta: Gencat (el mes o su último) → Mercabarna (último día, mes cerrado) → manual; `font_mes`: su mes; alta, solo Mercabarna: precio del día. **D2**: `preus_canalitzacions_mes`
-  (equipo); nadie escribe `preu_*` ni el coste de una conciliada o certificada (`42501`, `canalizaciones_protegeix_preu`).
+- **Precios (D1-D2)** (lista y regla de propuesta en `context/04bis`): lectura del equipo, escritura `pot_aprovar`, fuentes
+  super_admin; nadie escribe `preu_*` ni el coste de una conciliada o certificada (`42501`, `canalizaciones_protegeix_preu`).
 - **Naturalesa (A5)**: `fixar_naturalesa(p_org, p_naturalesa)` la deja **confirmada**; el equipo siempre, el titular solo
   mientras no lo esté (`42501 naturalesa_confirmada`). Nadie escribe `organizaciones` directo.
 - Triggers de respaldo: `respuestas_control_aprovacio`, `membresias_control_aprovacio`,
@@ -299,9 +303,9 @@ Envío: `sendWhatsApp()` → `whatsapp-send` (JWT, reglas §8) → Graph API →
 Recepción: webhook valida `X-Hub-Signature-256`, upsert por `wa_message_id`, **siempre 200**;
 orden: registrar → `last_inbound_at` → interruptor → gate `es_test` → ALTA/BAIXA →
 confirmación de albarán (`conf:<enlace>:ok|dif`) → respuesta a oferta (diálogo sí → kg con tope →
-precio) → intake. Recordatorio de intake a los 10 min por `pg_cron` → `pg_net` →
-`intake-recordatorios` (secreto `x-recordatorios-secret`). Un rechazo de Meta se registra con
-`status='error'` (§8ter).
+precio) → intake (recordatorio a los 10 min: `intake-recordatorios`). Un rechazo de Meta: `status='error'` (§8ter).
+**Multiproducto** (fase 6): `crear-oferta` con `datos.productes[]` (2-10) → `crear_disponibilitat`; mensaje único
+`textDisponibilitat()` con un enlace; `priorizar-entidades { disponibilitat_id }` (`context/05`).
 
 ## 6. Datos maestros
 
@@ -364,6 +368,8 @@ Lo que manda hoy, en una línea cada uno:
   Producte · Progrés · Estat, **sin referencia** (la encuentra el buscador) ni receptores; filtros tipus d'operació y
   modalidad prevista (también Històric, servidor); Missatges: solo oferta y RECOLLIDA CONFIRMADA; pestañas Per validar ·
   Actives · Esborranys · **Històric** (`?tab=`); paso bajo el badge (`lib/llistatOfertes.ts`). Canalització, sin cerradas.
+- **Registrar operació realitzada** (3.7): junto a «Nova oferta assistida» → `DialegOperacioRealitzada` → la RPC con la
+  sesión; distintivo `BadgeRegistrePosteriori`.
 - **Días de recogida** (fase 4): con `dies_recollida`, `CampsRecollida` solo ofrece esos días (`lib/diesRecollida.ts`;
   el equipo, `nomesAvisa`); `EditorDiesFranges` en la ficha y en el lugar nuevo del alta; la oferta solo marca los días del lugar.
   **Selectores predictivos** (`SelectorEntitat`) y buscador en Aprovacions, Tancament y Plans; «Transformació en obrador» = `maquila`.
@@ -382,10 +388,9 @@ Lo que manda hoy, en una línea cada uno:
 
 `SessioProvider → RouterProvider`; `ArrelApp` desvía `PASSWORD_RECOVERY` a `/restablir`;
 `RequireSessio` monta `AppContextProvider` solo con sesión; **el contexto falla cerrado**.
-Rutas: `/` · `/login` (accesos de prueba tras `VITE_ACCESSOS_TEST`) · `/admin` (equipo) · `/registre`
-· `/restablir` · `/privacitat` · `/confirmar/:token` · `/signar/:token` · `/signar-document/:token`
-(firma de CD/CR/REC/ENT) · `/factura/:token` · `/consentiment/:token` · `/verificar/:codi` · `/panell`
-(raíz por rol) · `/sense-acces`. `RoleGuard` avisa y lleva a `/panell`; la ruta pedida sobrevive al login (`lib/destiLogin.ts`). Aprovacions: seis colas
+Rutas públicas: `/` · `/login` · `/admin` · `/registre` · `/restablir` · `/privacitat` · enlaces con token
+(`/confirmar` · `/signar` · `/signar-document` · `/factura` · `/consentiment` `/:token`) · `/verificar/:codi`; privadas
+`/panell` (raíz por rol) y `/sense-acces` (lista con su porqué en `context/06quater`). `RoleGuard` avisa y lleva a `/panell`; la ruta pedida sobrevive al login (`lib/destiLogin.ts`). Aprovacions: seis colas
 (registros, convenios, intereses, recogidas por validar y por registrar, firmas); aprobar
 un alta manda el acceso por correo (`enviar-acceso`).
 
@@ -415,7 +420,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270619100300`. Tabla operativa nueva → `v_ordre` del vaciado (§6).
+  Compatibles hacia atrás con el frontend publicado. Última: `20270620100600`. Tabla operativa nueva → `v_ordre` del vaciado (§6).
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -426,11 +431,10 @@ un alta manda el acceso por correo (`enviar-acceso`).
 - **Interruptores de notificaciones** (Configuració › Notificacions, solo super_admin):
   general `notificacions_actives`, `email_activo`, `whatsapp_activo`; canal efectivo = general
   **y** canal; apagar el general apaga los dos. 🔴 **Cortan lo AUTOMÁTICO** (triggers, jobs, avisos,
-  el PDF al generarse; un solo punto por canal: `sendEmail()` y `enviar()`, 503
-  `email_desactivat`/`notificacions_desactivades`/`whatsapp_desactivat`, nunca un simulado); **no**
+  el PDF al generarse; un solo punto por canal: `sendEmail()` y `enviar()`, 503 con su código); **no**
   lo transaccional (`enviar-acceso`, `recuperar-password`: `{transaccional:true}`) **ni lo MANUAL**:
-  una lista cerrada de botones del equipo sale si quien pulsa lo acepta (`acceptaEnviament`,
-  `{manual:true}`, traza `<funció>:manual`; el modo test sigue; la tabla de botones, en `context/08`); lo masivo, la oferta y el correo libre, no. La interfaz
+  una lista cerrada de botones del equipo sale si quien pulsa lo acepta (`acceptaEnviament`;
+  tabla en `context/08`); lo masivo, la oferta y el correo libre, no. La interfaz
   esconde o deja gris lo de un canal apagado (`motiuCanal()`). **En producción, los tres apagados.** Automático también:
   el ENT/REC conciliado de una recogida **declarada por la entidad** sale por correo con su PDF (`_shared/envia-albara.ts`).
 - 🔴 **Las notas internas (`notes_internes`) nunca salen por ningún canal**: ni correo, WhatsApp,
@@ -469,9 +473,8 @@ correo; sin ninguno, `cap`. `canal_preferido` se respeta si es viable. Lo decide
 
 ## 9. Seguridad (detalle en `context/09-…md`)
 
-- 🔴 **Cortina de contraseña** (`middleware.js` generado de `cortina/`; cookie 7 días): la enciende, apaga y
-  cambia el super_admin en Configuració › General (`cortina_config`, `cortina-config`; **nace APAGADA**). El
-  middleware lee `cortina-estat` (caché 20 s, **fail-closed**; `HASH_TOKEN` = respaldo). Detalle en `context/09`.
+- 🔴 **Cortina de contraseña** (`middleware.js` generado de `cortina/`): la gobierna el super_admin en Configuració ›
+  General (**nace APAGADA**); el middleware lee `cortina-estat` (**fail-closed**). Detalle en `context/09`.
 - Todo dato exige sesión de Supabase Auth; `anon` sin privilegios. Login `signInWithPassword`;
   recuperación por `recuperar-password` + `admin.generateLink` + Resend; `enable_signup=false` y el
   **mailer nativo apagado** (nunca `resetPasswordForEmail`, `inviteUserByEmail` ni magic links). Resend
@@ -521,10 +524,9 @@ git config core.hooksPath .githooks            # una vez por clon
 
 - **Clon local** (Docker, «Redestina»): API `127.0.0.1:55321`, Postgres `55322` (`postgres/postgres`), Studio `55323`;
   skill `supabase-local`; se refresca con `scripts/local/`; correo y WhatsApp simulados (detalle y fallos: `context/11`).
-- **Producción, con token temporal**: `bash scripts/sesion-supabase-temporal.sh` en la terminal del
-  usuario (PAT `Redestina - Admin - Producción`); dentro, `aplicar-migracion.ts <f> [--dry-run]`,
-  `functions deploy <f> [--no-verify-jwt según config.toml]`, `secrets set`, Management API. El
-  asistente **no pide ni lee el token**; una sola pestaña, scripts por fase en `scripts/data/` con log.
+- **Producción, con token temporal**: `bash scripts/sesion-supabase-temporal.sh` en la terminal del usuario; dentro,
+  `aplicar-migracion.ts`, `functions deploy`, `secrets set`. El asistente **no pide ni lee el token**; una sola
+  pestaña, scripts por fase en `scripts/data/` con log (`context/11`).
 - **Publicar**: skill `/publicar`, orden **base → Edge Functions → frontend** (`git push` el último).
   Tras redesplegar `generar-documento` (y `diagnostic-pdf`), `emitir_documento_prova()`. Tocar `_shared/` obliga a
   redesplegar todas las que lo importan (`context/11`). `preus-fonts` con `--no-verify-jwt`.
@@ -537,22 +539,22 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones; 13 a qué causa nueva van FC y GD.
 
-**Deuda abierta (104 vivas; siguiente: 213; los números no se reutilizan)**. Casi todas, decisiones con precio o a la espera (§12bis). Defectos o trabajo pendiente (qué es cada una, en `context/12`): **5** · **126** · **127** · **135** · **136** ·
+**Deuda abierta (110 vivas; siguiente: 220; los números no se reutilizan)**. Casi todas, decisiones con precio o a la espera (§12bis). Defectos o trabajo pendiente (qué es cada una, en `context/12`): **5** · **126** · **127** · **135** · **136** ·
 **138** · **143** · **146** · **149** · **151-156** · **157-164** (flecos de la firma) · **165-167** y **171** (importador) ·
 **169** (alta del equipo) · **170** · **172**/**179** (`drop` pendientes) · **173** · **181-189** · **191** · **192** (modelo
-heredado y espigoladas) · **193·195-203** · **204** · **205** · **206** · **207-212** (operación a posteriori).
+heredado y espigoladas) · **193·195-203** · **204** · **205** · **206** · **207·209-212** (operación a posteriori) · **213-218** (multiproducto) · **219** (dos pruebas SQL antiguas).
 Decisiones de negocio pendientes (en `context/12`): **69**, **131**,
 **133·134** (frenos), **137**, **141**, **148**. El resto (entradas 4–116), en §12bis.
 
-**§12bis** y **§12ter** (101 cerradas, indexadas) viven en `context/`.
+**§12bis** y **§12ter** (102 cerradas, indexadas) viven en `context/`.
 
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.398 de Vitest (110 ficheros, 1 saltada) + 65 de Deno.**
+   **Referencia: 2.481 de Vitest (113 ficheros, 1 saltada) + 65 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.546/2.546 y 41 sin datos (25-11); producción 2.301/2.301 y 142 (20-11-2026).** `prueba-numeracion.ts` si toca la numeración; `scripts/sql/prova-signatura-institucional.sql` si toca roles o firmas.
+   **Referencia: clon 2.660/2.660 y 44 sin datos (25-11); producción 2.301/2.301 y 142 (20-11-2026).** `prueba-numeracion.ts` si toca la numeración; `scripts/sql/prova-signatura-institucional.sql` si toca roles o firmas.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; el circuito: `circuit-tomaquet`).
 5. Publicar con `/publicar` (base → funciones → frontend).
 6. Estilos solo con tokens; un token nuevo va a `tokens.json`, `index.css` y `preview.html`.

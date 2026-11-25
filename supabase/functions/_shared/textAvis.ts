@@ -31,13 +31,18 @@ export type TipusAvis =
   | "assignacio_anulada"
   // 19-11-2026 (fase 5 de los puntos 4-6): el equipo propone cambios a un interés y la entidad
   // los acepta o los rechaza (`proposar_canvis`, 20270610100000).
-  | "canvis_proposats";
+  | "canvis_proposats"
+  // 25-11-2026 (fase 6b, multiproducto): UN aviso por solicitud de recogida resuelta
+  // (`resoldre_sollicitud`, `assignar_directe_multiple`; 20270620100400): a la entidad, todas
+  // las líneas; al productor, solo las aprobadas.
+  | "sollicitud_resolta";
 
 export const TIPUS_AVIS: readonly TipusAvis[] = [
   "oferta_validada", "oferta_rebutjada", "sortida_trobada", "interes_aprovat", "interes_rebutjat",
   "oferta_sense_desti", "recollida_canviada", "kg_assignats_canviats", "recollida_confirmada",
   "oferta_modificada", "oferta_enviada", "certificat_per_revisar", "recollida_per_registrar",
   "recollida_retornada", "document_signat", "assignacio_anulada", "canvis_proposats",
+  "sollicitud_resolta",
 ];
 
 /** La modalidad en palabras, para los avisos (el vocabulario de `_shared/modalitats.ts`). */
@@ -132,6 +137,8 @@ export function textAvis(
     : (es ? "Ver la oferta" : "Veure l’oferta");
 
   switch (tipus) {
+    case "sollicitud_resolta":
+      return textSollicitudResolta(params, idioma, destinatari);
     case "recollida_canviada": {
       const q = quan(params.recollida_at, idioma);
       return {
@@ -444,6 +451,107 @@ export function textAvis(
       };
     }
   }
+}
+
+/** Una línea de `sollicitud_resolta`, tal como la guarda la base (20270620100400). */
+interface LiniaSollicitud {
+  excedente_id?: unknown;
+  producte?: unknown;
+  kg?: unknown;
+  kg_sol?: unknown;
+  kg_apr?: unknown;
+  modalitat?: unknown;
+  estat?: unknown;
+  motiu?: unknown;
+}
+
+function liniesDe(v: unknown): LiniaSollicitud[] {
+  return Array.isArray(v) ? v.filter((x) => x && typeof x === "object") as LiniaSollicitud[] : [];
+}
+
+/**
+ * `sollicitud_resolta` (fase 6b, multiproducto): el equipo ha resuelto de una vez la solicitud de
+ * recogida de varios productos de una disponibilidad. Un solo aviso por destinatario:
+ *
+ * - **Entidad** (`params.linies` con `estat` aprobada/rebutjada): qué se le ha asignado y con
+ *   cuántos kg (y lo que había pedido si difiere), qué no y por qué, quién lo ofrece y cuándo es
+ *   la recogida. Lleva a «Els meus interessos».
+ * - **Productor** (`params.linies`, solo las aprobadas, con `kg`): qué se ha asignado, a quién y
+ *   cuándo se recoge. Lleva a la ficha de la primera oferta de la lista.
+ *
+ * Sin códigos internos (`ref`, `E-…`, `D-…`): el ofertante no los ve (revisión del 08-10-2026).
+ */
+function textSollicitudResolta(params: Params, idioma: Idioma, destinatari: DestinatariAvis): TextAvis {
+  const es = idioma === "es";
+  const linies = liniesDe(params.linies);
+  const q = quan(params.recollida_at, idioma);
+  const nomMod = (m: unknown) => (s(m) ? ` (${nomModalitat(s(m), idioma)})` : "");
+  const prod = (l: LiniaSollicitud) => s(l.producte) || (es ? "producto" : "producte");
+
+  if (destinatari === "entidad") {
+    const aprovades = linies.filter((l) => s(l.estat) === "aprovada");
+    const rebutjades = linies.filter((l) => s(l.estat) !== "aprovada");
+    const productor = s(params.productor);
+    const municipi = s(params.municipi);
+    const qui = productor ? `${productor}${municipi ? ` (${municipi})` : ""}` : "";
+    const cos: string[] = [];
+    if (aprovades.length > 0) {
+      cos.push(es ? "Te hemos asignado:" : "T’hem assignat:");
+      for (const l of aprovades) {
+        const sol = Number(l.kg_sol);
+        const apr = Number(l.kg_apr);
+        const dif = Number.isFinite(sol) && Number.isFinite(apr) && sol !== apr
+          ? (es ? ` (habías pedido ${kg(sol, idioma)} kg)` : ` (n’havies demanat ${kg(sol, idioma)} kg)`)
+          : "";
+        cos.push(`• ${prod(l)}: ${kg(l.kg_apr, idioma)} kg${nomMod(l.modalitat)}${dif}`);
+      }
+    }
+    if (rebutjades.length > 0) {
+      cos.push(es ? "No te hemos podido asignar:" : "No t’hem pogut assignar:");
+      for (const l of rebutjades) {
+        const motiu = s(l.motiu);
+        cos.push(`• ${prod(l)}${motiu ? ` — ${motiu}` : ""}`);
+      }
+    }
+    if (aprovades.length > 0 && q) cos.push(es ? `Recogida: ${q}.` : `Recollida: ${q}.`);
+    if (aprovades.length > 0 && qui) cos.push(es ? `Lo ofrece: ${qui}.` : `L’ofereix: ${qui}.`);
+    const totes = aprovades.length > 0 && rebutjades.length === 0;
+    const cap = aprovades.length === 0;
+    return {
+      asunto: cap
+        ? (es ? "No te hemos podido asignar tu solicitud" : "No t’hem pogut assignar la teva sol·licitud")
+        : (es ? `Solicitud resuelta: ${aprovades.length} de ${linies.length} productos asignados`
+          : `Sol·licitud resolta: ${aprovades.length} de ${linies.length} productes assignats`),
+      titulo: cap
+        ? (es ? "Solicitud no aprobada" : "Sol·licitud no aprovada")
+        : totes
+        ? (es ? "Solicitud aprobada" : "Sol·licitud aprovada")
+        : (es ? "Solicitud aprobada en parte" : "Sol·licitud aprovada en part"),
+      cuerpo: cos.length > 0
+        ? cos.join("\n")
+        : (es ? "El equipo de Redestina ha resuelto tu solicitud de recogida." : "L’equip de Redestina ha resolt la teva sol·licitud de recollida."),
+      boton: es ? "Ver mis intereses" : "Veure els meus interessos",
+      ruta: "/receptor/interessos",
+    };
+  }
+
+  const entitat = s(params.entitat);
+  const cos: string[] = [
+    (es ? "Se han asignado" : "S’han assignat") + (entitat ? (es ? ` a ${entitat}:` : ` a ${entitat}:`) : ":"),
+    ...linies.map((l) => `• ${prod(l)}: ${kg(l.kg ?? l.kg_apr, idioma)} kg${nomMod(l.modalitat)}`),
+  ];
+  if (q) cos.push(es ? `Recogida: ${q}.` : `Recollida: ${q}.`);
+  const primera = linies.map((l) => s(l.excedente_id)).find(Boolean);
+  const n = linies.length;
+  return {
+    asunto: es
+      ? `Hemos encontrado salida para ${n === 1 ? "1 producto" : `${n} productos`}`
+      : `Hem trobat sortida per a ${n === 1 ? "1 producte" : `${n} productes`}`,
+    titulo: es ? "Salida encontrada" : "Sortida trobada",
+    cuerpo: cos.join("\n"),
+    boton: es ? "Ver la oferta" : "Veure l’oferta",
+    ruta: primera ? `/productor/ofertes/${primera}` : "/productor/ofertes",
+  };
 }
 
 /**

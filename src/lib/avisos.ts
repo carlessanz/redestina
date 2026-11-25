@@ -26,6 +26,8 @@ export type TipusAvis =
   | 'assignacio_anulada'
   // Puntos 4-6, fase 5: el equipo propone cambios a un interés (`objecte_id` = la respuesta).
   | 'canvis_proposats'
+  // Plan DIC 26, fase 6: una solicitud multiproducto resuelta (uno por destinatario y solicitud).
+  | 'sollicitud_resolta'
 
 export interface Avis {
   id: string
@@ -33,6 +35,7 @@ export interface Avis {
   destinatari_id: string
   tipus: TipusAvis
   objecte_tipo: 'excedente' | 'oferta_resposta' | 'canalizacion' | 'cierre_donante' | 'cierre_periodo' | 'documento'
+    | 'sollicitud_recollida'
   objecte_id: string
   params: Record<string, unknown>
   llegit_at: string | null
@@ -98,7 +101,17 @@ export function noLlegitsPerPanell(llista: Avis[]): { ofertes: number; interesso
 }
 
 /** A dónde lleva un aviso en la aplicación. */
-export function rutaAvis(a: Pick<Avis, 'objecte_tipo' | 'objecte_id'> & Partial<Pick<Avis, 'destinatari_tipo' | 'tipus'>>): string {
+export function rutaAvis(a: Pick<Avis, 'objecte_tipo' | 'objecte_id'> & Partial<Pick<Avis, 'destinatari_tipo' | 'tipus' | 'params'>>): string {
+  // Una solicitud multiproducto resuelta (fase 6): la entidad, a sus intereses; el productor, a la
+  // primera oferta del grupo que se ha asignado (`params.linies[0].excedente_id`).
+  if (a.objecte_tipo === 'sollicitud_recollida') {
+    const linies = a.params?.linies
+    const primera = Array.isArray(linies) ? (linies[0] as { excedente_id?: unknown } | undefined) : undefined
+    if (a.destinatari_tipo === 'productor' && typeof primera?.excedente_id === 'string') {
+      return `/productor/ofertes/${primera.excedente_id}`
+    }
+    return a.destinatari_tipo === 'productor' ? '/productor/ofertes' : '/receptor/interessos'
+  }
   // Una propuesta de cambios se abre directamente para aceptarla o rechazarla (fase 5).
   if (a.tipus === 'canvis_proposats' && a.objecte_tipo === 'oferta_resposta') return rutaPropostaCanvis(a.objecte_id)
   // Un documento firmado (`document_signat`) va a «Els meus documents» del papel que firmó.

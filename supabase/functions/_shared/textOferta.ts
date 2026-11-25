@@ -165,6 +165,163 @@ export function textOfertaPerCopiar(texto: string, enllac?: string | null): stri
   return `${base}\n\n${tancament}`;
 }
 
+// ---------------------------------------------------------------------------
+// Ofertas MULTIPRODUCTO (proceso 3.3, fase 6a, 25-11-2026): UN mensaje por disponibilidad
+// ---------------------------------------------------------------------------
+
+/** Los productos de un grupo en una frase: «Tomàquet, Pebrot i Albergínia». */
+export function llistaProductes(noms: readonly string[]): string {
+  const n = noms.map((x) => x.trim()).filter(Boolean);
+  if (n.length <= 1) return n[0] ?? "";
+  return `${n.slice(0, -1).join(", ")} i ${n[n.length - 1]}`;
+}
+
+/** El enlace ÚNICO de una disponibilidad: el Mercat del receptor con el diálogo de solicitud. */
+export function enllacDisponibilitat(appUrl: string, disponibilitatId: string): string {
+  return `${appUrl.replace(/\/+$/, "")}/receptor/mercat?disponibilitat=${encodeURIComponent(disponibilitatId)}`;
+}
+
+/** Lo que el texto de una disponibilidad necesita además del de una oferta. */
+export interface ContextTextDisponibilitat extends ContextTextOferta {
+  /** `disponibilitats.id`: va en el enlace. */
+  disponibilitatId: string;
+  /** La URL pública de la aplicación (`APP_URL` en el servidor, `window.location.origin` en el panel). */
+  appUrl: string;
+}
+
+/** El cierre del mensaje de grupo: no hay diálogo del bot, se responde por el enlace. */
+export function tancamentDisponibilitat(url: string): string {
+  return `✅ Si t'interessa, obre l'enllaç, tria els productes i indica els kg que vols recollir, el dia i l'hora de recollida:\n${url}`;
+}
+
+function modalitatsFila(fila: Record<string, unknown>) {
+  return modalitatsDe(
+    Array.isArray(fila.modalitats) && fila.modalitats.length > 0 ? fila.modalitats : fila.modalitat,
+  );
+}
+
+/** «300 kg aprox» con la coma decimal; vacío sin kilos. */
+function kgText(v: unknown): string {
+  const kg = Number(v ?? 0);
+  return Number.isFinite(kg) && kg > 0 ? `${String(kg).replace(".", ",")} kg aprox` : "";
+}
+
+/**
+ * La línea de un producto del grupo: «• Tomàquet (Cor de bou): 300 kg aprox (12 caixes) · 0,80 €/kg».
+ * El precio, solo si ESA oferta incluye venta; la modalidad, solo si no es la misma que la del
+ * grupo (`modalitatComuna`), que va en su propia línea.
+ */
+function liniaProducteText(fila: Record<string, unknown>, modalitatComuna: string): string {
+  const varietat = fila.variedad ? ` (${String(fila.variedad).trim()})` : "";
+  const parts: string[] = [];
+  const kg = kgText(fila.kg_total);
+  const n = Number(fila.num_caixes);
+  const caixes = (fila.format_entrega === "caixes" || fila.format_entrega === "palet") && Number.isInteger(n) && n > 0
+    ? ` (${textCaixes(n, fila.format_entrega)})` : "";
+  if (kg) parts.push(`${kg}${caixes}`);
+  const ms = modalitatsFila(fila);
+  const preu = ambPreu(ms) && fila.preu_minim != null && fila.preu_minim !== "" ? Number(fila.preu_minim) : null;
+  if (preu != null && Number.isFinite(preu)) parts.push(`${preu.toFixed(2).replace(".", ",")} €/kg`);
+  const etiqueta = etiquetaModalitats(ms);
+  if (etiqueta && etiqueta !== modalitatComuna) parts.push(etiqueta);
+  const cap = `• ${String(fila.producto ?? "").trim()}${varietat}`;
+  return parts.length > 0 ? `${cap}: ${parts.join(" · ")}` : cap;
+}
+
+/**
+ * 🔴 EL texto de una DISPONIBILIDAD (varias ofertas de un productor publicadas a la vez): UN solo
+ * mensaje por entidad, con la lista de productos y UN enlace al Mercat
+ * (`/receptor/mercat?disponibilitat=<id>`), donde la entidad elige productos y kg. Pura.
+ *
+ * `ofertes` son las filas de `excedentes` del grupo (o lo que devuelve `ofertes_disponibilitat`),
+ * en su orden. Lo común —producto en el campo, municipio, lugar, fecha, días y franja, modalidad,
+ * causa, envases y observaciones— se lee de la PRIMERA (en el alta es idéntico en todas); por
+ * producto van los kilos, las cajas, el precio (si esa oferta tiene venta) y la modalidad si no
+ * coincide con la común. Ninguna línea con la etiqueta vacía, como en `componerTextoOferta()`.
+ *
+ * Sin el cierre del bot: el diálogo de WhatsApp (sí → kg → precio) es de UNA oferta y no se usa
+ * para grupos; se responde por el enlace.
+ */
+export function textDisponibilitat(
+  ofertes: readonly Record<string, unknown>[],
+  ctx: ContextTextDisponibilitat,
+): string {
+  return `${cosDisponibilitat(ofertes, ctx)}\n\n${
+    tancamentDisponibilitat(enllacDisponibilitat(ctx.appUrl, ctx.disponibilitatId))
+  }`;
+}
+
+/** El cuerpo de `textDisponibilitat()` sin el cierre ni el enlace (el correo lleva botón). */
+export function cosDisponibilitat(
+  ofertes: readonly Record<string, unknown>[],
+  ctx: ContextTextOferta,
+): string {
+  const ple = (v: string | undefined | null): v is string => typeof v === "string" && v.trim() !== "";
+  const primera = ofertes[0] ?? {};
+  // La modalidad común: la de la primera si TODAS dicen lo mismo; si no, cada línea la suya.
+  const etiquetes = ofertes.map((f) => etiquetaModalitats(modalitatsFila(f)));
+  const modalitatComuna = etiquetes.every((e) => e === etiquetes[0]) ? etiquetes[0] ?? "" : "";
+
+  const lineas = [
+    `📢 *OFERTA DISPONIBLE · ${ofertes.length} PRODUCTES*`,
+    "",
+    "🌿 PRODUCTES:",
+    ...ofertes.map((f) => liniaProducteText(f, modalitatComuna)),
+  ];
+  if (primera.espigolada_demanada === true) {
+    lineas.push("🌱 ESPIGOLADA: el producte és al camp i el cull qui el reculli (entitat o voluntariat)");
+  } else if (primera.producte_al_camp === true) {
+    lineas.push("🌱 PRODUCTE AL CAMP: sí (encara no s'ha collit)");
+  }
+  if (ple(ctx.productor)) lineas.push(`👩‍🌾 PRODUCTOR: ${ctx.productor}`);
+  if (ple(ctx.municipi)) lineas.push(`📍 MUNICIPI: ${ctx.municipi}`);
+  const mapsPropi = typeof primera.gmaps_url === "string" && /^https?:\/\/\S+$/i.test(primera.gmaps_url.trim())
+    ? primera.gmaps_url.trim() : "";
+  const maps = mapsPropi || (ctx.mapsLloc ?? "").trim();
+  if (maps) lineas.push("🗺️ PUNT DE RECOLLIDA:", maps);
+  const data = typeof primera.disponible_hasta === "string" && /^\d{4}-\d{2}-\d{2}/.test(primera.disponible_hasta)
+    ? primera.disponible_hasta.slice(0, 10).split("-").reverse().join("/")
+    : String(ctx.disponibleText ?? "").trim();
+  if (data) lineas.push(`📅 DISPONIBLE FINS: ${data}`);
+  const horari = [textDies(primera.dies_recollida), primera.horari_recollida ? String(primera.horari_recollida) : ""]
+    .filter(ple).map((x) => x.trim()).join(" · ");
+  if (horari) lineas.push(`⏰ HORARI DE RECOLLIDA: ${horari}`);
+  if (modalitatComuna) lineas.push(`💰 MODALITAT: ${modalitatComuna}`);
+  const causa = ctx.causa ?? (primera.causa ? String(primera.causa) : "");
+  if (ple(causa)) lineas.push(`🔴 CAUSA: ${textCausa(causa, ctx.subcausa)}`);
+  // Los envases sin el número de cajas, que va en la línea de cada producto.
+  const envasos = textoEnvasos(
+    primera.format_entrega, primera.retorn_envasos, primera.retorn_envasos_detall,
+    primera.retorn_envasos_quantitat, null,
+  );
+  if (envasos) lineas.push(`♻️ ENVASOS: ${envasos}`);
+  if (primera.observacions && String(primera.observacions).trim()) {
+    lineas.push(`📝 OBSERVACIONS: ${String(primera.observacions).trim()}`);
+  }
+  return lineas.join("\n");
+}
+
+/**
+ * La versión de CORREO de una disponibilidad (lo que el panel pasa a `enviar-email`): el asunto,
+ * el título, el cuerpo sin el cierre (el enlace va en el botón) y el texto plano completo. En
+ * catalán, como el texto de la oferta.
+ */
+export function correuDisponibilitat(
+  ofertes: readonly Record<string, unknown>[],
+  ctx: ContextTextDisponibilitat,
+): { assumpte: string; titol: string; preheader: string; cos: string; text: string; boto: { texto: string; url: string } } {
+  const productes = llistaProductes(ofertes.map((f) => String(f.producto ?? "")));
+  const url = enllacDisponibilitat(ctx.appUrl, ctx.disponibilitatId);
+  return {
+    assumpte: `Oferta disponible: ${productes}`,
+    titol: "Oferta disponible",
+    preheader: ctx.productor ? `${ofertes.length} productes de ${ctx.productor}` : `${ofertes.length} productes`,
+    cos: cosDisponibilitat(ofertes, ctx),
+    text: textDisponibilitat(ofertes, ctx),
+    boto: { texto: "Tria els productes", url },
+  };
+}
+
 /** «1 caixa», «3 caixes», «1 palet», «2 palets». */
 export function textCaixes(n: number, format: unknown): string {
   const palet = format === "palet";

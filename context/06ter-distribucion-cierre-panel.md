@@ -2920,3 +2920,25 @@ Organitzacions → «Interaccions i seguiment» (`/equip/interaccions`, `RoleGua
   se avisa si queda fuera de las del lugar.
 - Fuera de alcance: `DetallOfertaReceptor` no enseña los días (el receptor los ve en el diálogo de interés).
 - E2E: `ofertes-llistat`, `entrades-sortides`, `dies-recollida` (a/b/c), `filtres`, `filtres-territori`.
+
+## Registrar operació realitzada (proceso 3.7, plan DIC 26 fase 5, 25-11-2026)
+
+Para una operación que ya pasó fuera del circuito. Botón «Registrar operació realitzada» (`outline`) junto a «Nova oferta
+assistida» en `/equip/ofertes` y `/equip/canalitzacio`, solo con `ctx.potAprovar`; abre `DialegOperacioRealitzada`
+(estado local, como el botón vecino).
+
+- **Campos**: productora (`useProductorsActius`, compartido con el alta asistida), producto, lugar (principal por
+  defecto) y subcausa del descriptor de `crear-oferta/campos`, variedad, kg recogidos, fecha (1 de enero del ejercicio en
+  curso → hoy, Madrid), hora opcional, tipus d'operació (espigolada ⇒ donación), modalidad, entidades
+  (`useEntitatsAssignables`, filtradas por tipo y P8; kg, precio en venta, cajas) y destinos finales del sobrante
+  (`destins_finals`). Contador «Queden X kg per assignar» siempre visible.
+- **Validación local** en `lib/operacioRealitzada.ts` (pura, 40 casos): las reglas de la RPC; los códigos se traducen en
+  `textError.ts`; `sense_conveni` dice a qué parte le falta (`comprovaConvenis`).
+- **Llamada**: `lib/operacioRealitzadaApi.ts` → `supabase.rpc('registrar_operacio_realitzada')` con la sesión. El texto
+  de la oferta lo compone `textoOfertaDeDades()` (`_shared/textOferta.ts`, módulo hoja).
+- **Al acabar**: toast «Operació registrada: E-…» con «Obre l'oferta». La oferta nace `cerrada` (Ofertes › Històric).
+- **Distintivo** `BadgeRegistrePosteriori` (`secondary` + `History`): cabecera de `OfferDetail`, fila de `OffersList`
+  (`origen = 'registre'`), `TaulaSortides` (`registre_posteriori`) y columna del Excel.
+- Pendiente conocido: la cabecera del detalle cuenta solo canalizaciones («90/100 kg · falten 10» aunque los 10 kg tienen
+  destino final); el bloque «Què ha passat amb el producte» sí lo cuenta.
+- E2E `tests/e2e/operacio-realitzada.e2e.ts`.

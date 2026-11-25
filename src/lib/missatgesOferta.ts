@@ -122,6 +122,8 @@ export const FASE_AVIS: Record<TipusAvis, FaseMissatge> = {
   interes_aprovat: 'aprovacio',
   interes_rebutjat: 'aprovacio',
   sortida_trobada: 'aprovacio',
+  // Fase 6 del plan DIC 26: una solicitud multiproducto resuelta (un aviso por solicitud).
+  sollicitud_resolta: 'aprovacio',
   // Fase 5 de los puntos 4-6: el equipo propone otros kilos, modalidad u hora a un interés.
   canvis_proposats: 'aprovacio',
   recollida_canviada: 'lliurament',

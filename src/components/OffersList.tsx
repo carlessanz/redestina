@@ -69,6 +69,7 @@ import {
 } from '../lib/llistatOfertes'
 import LlegendaEstats from './proces/LlegendaEstats'
 import BadgeEspigolada from './BadgeEspigolada'
+import BadgeRegistrePosteriori from './BadgeRegistrePosteriori'
 import type { Excedente } from '../types'
 import CarregantSeccio from './CarregantSeccio'
 import BotoIcona from './BotoIcona'
@@ -510,6 +511,12 @@ export default function OffersList({ onOpen, accio }: Props) {
                     {espigolada && (
                       <span data-testid="oferta-espigolada" className="max-w-full">
                         <BadgeEspigolada className="max-w-full whitespace-normal" />
+                      </span>
+                    )}
+                    {/* Proceso 3.7: registrada por el equipo después de hacerse. */}
+                    {o.origen === 'registre' && (
+                      <span data-testid="oferta-registre-posteriori" className="max-w-full">
+                        <BadgeRegistrePosteriori className="max-w-full whitespace-normal" />
                       </span>
                     )}
                   </div>
