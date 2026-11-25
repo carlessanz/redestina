@@ -6,8 +6,10 @@ import { describe, expect, it } from 'vitest'
 import {
   enllacInteresOferta, enllacPropostaCanvis, enllacRegistreRecollida, rutaAssignaOferta, rutaInteresOferta,
   rutaPropostaCanvis, rutaRecollidaEquip, rutaRegistreRecollida,
+  enllacRecollidaSollicitud, rutaDisponibilitat, rutaRecollidaSollicitud, rutaRecollidaSollicitudEquip,
 } from '../src/lib/enllacosDirectes'
 import { destiValid } from '../src/lib/destiLogin'
+import { enllacDisponibilitat } from '../supabase/functions/_shared/textOferta.ts'
 
 describe('enlaces directos', () => {
   it('la oferta del Mercat con el formulario de interés', () => {
@@ -39,8 +41,19 @@ describe('enlaces directos', () => {
 
   it('todas las rutas son destinos válidos tras el login', () => {
     for (const r of [rutaInteresOferta('a'), rutaRegistreRecollida(['c']), rutaRegistreRecollida([]),
-      rutaAssignaOferta('o'), rutaRecollidaEquip('o', 'c'), rutaPropostaCanvis('r')]) {
+      rutaAssignaOferta('o'), rutaRecollidaEquip('o', 'c'), rutaPropostaCanvis('r'),
+      rutaDisponibilitat('d'), rutaRecollidaSollicitud('s'), rutaRecollidaSollicitudEquip('s')]) {
       expect(destiValid(r)).toBe(r)
     }
+  })
+
+  it('multiproducto (fase 6): la disponibilidad en el Mercat y la recogida de una solicitud', () => {
+    expect(rutaDisponibilitat('d1')).toBe('/receptor/mercat?disponibilitat=d1')
+    // El mensaje único lo compone el servidor: tiene que llevar a la misma pantalla.
+    expect(enllacDisponibilitat('https://x.test/', 'd1')).toBe(`https://x.test${rutaDisponibilitat('d1')}`)
+    expect(rutaRecollidaSollicitud('s1')).toBe('/receptor/interessos?recollida=s1')
+    expect(enllacRecollidaSollicitud('https://x.test/', 's1')).toBe('https://x.test/receptor/interessos?recollida=s1')
+    expect(rutaRecollidaSollicitudEquip('s1')).toBe('/equip/aprovacions?recollida=s1')
+    expect(rutaRecollidaSollicitud('a&b')).toBe('/receptor/interessos?recollida=a%26b')
   })
 })

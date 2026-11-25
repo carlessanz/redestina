@@ -20,6 +20,11 @@
 // el interés con la propuesta del equipo (otros kilos, modalidad u hora, con motivo) para
 // aceptarla o rechazarla (`PropostaEntitat`). Es el enlace del aviso `canvis_proposats` y de
 // «Pendent de tu». Si no es de esta entidad o ya no está `proposada`, se dice arriba.
+//
+// 🧺 RECOGIDA CONJUNTA (multiproducto, fase 6c, 25-11-2026): `?recollida=<sollicitud>` —el enlace de
+// RECOLLIDA CONFIRMADA de una solicitud— abre `DialegRecollidaMultiproducte` para declarar lo
+// recogido de todos sus productos a la vez. Arriba de la lista, un bloque con las solicitudes que
+// tienen alguna recogida por registrar.
 
 import BarraFiltres from '../../components/BarraFiltres'
 import { useTerritori } from '../../hooks/useTerritori'
@@ -48,6 +53,7 @@ import DetallOfertaReceptor from '../../components/DetallOfertaReceptor'
 import FitxaOperacio from '../../components/FitxaOperacio'
 import MissatgesDelPunt from '../../components/MissatgesDelPunt'
 import PropostaEntitat from '../../components/PropostaEntitat'
+import DialegRecollidaMultiproducte from '../../components/DialegRecollidaMultiproducte'
 import { refrescaAvisos } from '../../lib/refrescAvisos'
 import { useMissatgesOferta } from '../../hooks/useMissatgesOferta'
 import { declinaOferta } from '../../lib/operacio'
@@ -145,6 +151,9 @@ export function Interessos() {
   /** La ficha se abre con «Registra la recollida» ya desplegado (enlace `accio=recollida`). */
   const [registraObert, setRegistraObert] = useState(false)
   const [pestanya, setPestanya] = useState<'interessos' | 'per_a_tu'>('interessos')
+  /** Multiproducto: de cada solicitud con recogidas por registrar, esas canalizaciones. */
+  const [perRegistrar, setPerRegistrar] = useState<{ sollicitudId: string; canals: string[] }[]>([])
+  const dialegRecollida = useDialegPerUrl(['recollida'] as const)
   const [declinant, setDeclinant] = useState(false)
   const entidadId = organitzacio?.id ?? null
   const dialeg = useDialegPerUrl(['operacio', 'accio', 'resposta'] as const)
@@ -177,7 +186,7 @@ export function Interessos() {
       // está aplicada, esta lectura falla sola y la pantalla sigue como antes.
       supabase
         .from('canalizaciones')
-        .select('id, estado, incidencia_recollida, kg_declarats, recollida_registrada_at, recollida_validada_at, recollida_retornada_at, motiu_retorn')
+        .select('id, estado, incidencia_recollida, kg_declarats, recollida_registrada_at, recollida_validada_at, recollida_retornada_at, motiu_retorn, sollicitud_id')
         .eq('entidad_id', entidadId),
     ])
     // Un fallo de carga no es «todavía no has pedido nada»: se dice.
@@ -190,6 +199,7 @@ export function Interessos() {
     // Si esta lectura falla, sin marca: la frase vuelve a la de siempre, que no miente.
     type CanalVal = DatesValidacio & {
       id: string; estado: string | null; incidencia_recollida: unknown; kg_declarats: number | null; motiu_retorn: string | null
+      sollicitud_id: string | null
     }
     const canals = inc.error ? [] : ((inc.data as unknown as CanalVal[] | null) ?? [])
     setAmbIncidencia(new Set(canals.filter((c) => c.incidencia_recollida != null).map((c) => c.id)))
@@ -201,6 +211,15 @@ export function Interessos() {
       else if (e === 'retornada') vals[c.id] = { estat: 'retornada', kgDeclarats: c.kg_declarats, motiu: c.motiu_retorn }
     }
     setValidacions(vals)
+    // Las solicitudes multiproducto con alguna recogida por registrar (sin registro o devuelta).
+    const grups = new Map<string, string[]>()
+    for (const c of canals) {
+      if (!c.sollicitud_id || c.estado === 'anulada') continue
+      const e = estatValidacio(c)
+      if (e !== 'sense_registre' && e !== 'retornada') continue
+      grups.set(c.sollicitud_id, [...(grups.get(c.sollicitud_id) ?? []), c.id])
+    }
+    setPerRegistrar([...grups].map(([sollicitudId, ids]) => ({ sollicitudId, canals: ids })))
     setFiles(resp.data ?? [])
     setCarregant(false)
   }, [entidadId])
@@ -376,6 +395,22 @@ export function Interessos() {
             </Button>
           </div>
         )}
+        {/* Multiproducto (fase 6c): registrar de una vez la recogida de todos los productos. */}
+        {pestanya === 'interessos' && perRegistrar.map((g) => {
+          const productes = g.canals
+            .map((c) => files.find((f) => f.canalizacion_id === c)?.excedentes?.producto)
+            .filter(Boolean).join(', ')
+          return (
+            <div key={g.sollicitudId} data-testid="int-recollida-conjunta" data-sollicitud={g.sollicitudId}
+              className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md bg-aviso-fondo p-3 text-sm text-aviso">
+              <p className="min-w-0 flex-1 basis-60">{t('smp.int_per_registrar', { productes: productes || '—' })}</p>
+              <Button className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
+                onClick={() => dialegRecollida.obre({ recollida: g.sollicitudId })}>
+                {t('smp.int_registra')}
+              </Button>
+            </div>
+          )
+        })}
         {!carregant && !errorCarrega && visibles.length === 0 && (
           <p className="text-sm text-muted-foreground">{t(pestanya === 'per_a_tu' ? 'int.per_a_tu_empty' : 'int.empty')}</p>
         )}
@@ -541,6 +576,13 @@ export function Interessos() {
           )
         })()}
       </Dialog>
+
+      <DialegRecollidaMultiproducte
+        sollicitudId={dialegRecollida.valors.recollida}
+        equip={false}
+        onTanca={dialegRecollida.tanca}
+        onFet={() => { dialegRecollida.tanca(); void carrega(); refrescaAvisos() }}
+      />
     </Card>
   )
 }

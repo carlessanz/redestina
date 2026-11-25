@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CLAUS_MISSATGES_FITXA_OFERTA, FASE_AVIS, missatgeDAvis, missatgesDeLOferta, missatgesFitxaOferta,
-  textRecollidaGrup,
+  textRecollidaGrup, textRecollidaSollicitud,
 } from '../src/lib/missatgesOferta'
 import type { AvisMissatge, FetsMissatges } from '../src/lib/missatgesOferta'
 import {
@@ -206,4 +206,60 @@ describe('las claves compuestas de los mensajes existen en los dos idiomas', () 
       expect(DICTS.es[`msg.dest_${dest}`]).toBeTruthy()
     })
   }
+})
+
+describe('RECOLLIDA CONFIRMADA de una solicitud multiproducto (fase 6c)', () => {
+  const linies = [
+    { producte: 'Carbassa', kg: 30, estado: 'confirmada', entidad_id: 'ent-1', data_hora_recollida: '2026-12-02T09:00:00Z', comentarios: null },
+    { producte: 'Ceba', kg: 12.5, estado: 'confirmada', entidad_id: 'ent-1', data_hora_recollida: '2026-12-02T09:00:00Z', comentarios: 'Porta caixes' },
+    { producte: 'Porro', kg: 10, estado: 'anulada', entidad_id: 'ent-1', data_hora_recollida: '2026-12-02T09:00:00Z', comentarios: null },
+  ]
+
+  it('un mensaje con todos los productos confirmados, la fecha común y UN enlace', () => {
+    const txt = textRecollidaSollicitud({ sollicitudId: 's1', linies, entitat: 'Menjador', idioma: 'ca', appUrl: APP })
+    expect(txt).toContain('RECOLLIDA CONFIRMADA')
+    expect(txt).toContain('SDA / ENTITAT: Menjador')
+    expect(txt).toContain('• Carbassa: 30 kg')
+    expect(txt).toContain('• Ceba: 12.5 kg')
+    // Las anuladas no cuentan.
+    expect(txt).not.toContain('Porro')
+    expect(txt).toContain('KG RECOLLITS: 42.5')
+    expect(txt).toMatch(/DATA i HORA: 02\/12 · 10:00\n/)
+    expect(txt).toContain('Porta caixes')
+    expect(txt.match(/https?:\/\//g)).toHaveLength(1)
+    expect(txt.endsWith(`${APP}/receptor/interessos?recollida=s1`)).toBe(true)
+    // Sin `appUrl`, sin enlace.
+    expect(textRecollidaSollicitud({ sollicitudId: 's1', linies, entitat: 'M', idioma: 'ca' })).not.toContain('http')
+  })
+
+  it('la oferta de una solicitud tiene su mensaje propio; las entregas sueltas, el de siempre', () => {
+    const ms = missatgesDeLOferta({
+      ...BASE,
+      canalitzacions: [
+        { id: 'c1', entidad_id: 'ent-1', kg_confirmados: 30, data_hora_recollida: '2026-12-02T09:00:00Z', estado: 'confirmada', sollicitud_id: 's1' },
+        { id: 'c2', entidad_id: 'ent-1', kg_confirmados: 50, data_hora_recollida: null, estado: 'confirmada' },
+      ],
+      sollicituds: { s1: { linies } },
+    }, OPC)
+    const grups = ms.filter((m) => m.clau === 'recollida_grup')
+    expect(grups.map((m) => m.id)).toEqual(['recollida_grup', 'recollida_grup:s1'])
+    // El suelto cuenta lo que falta contra TODO lo asignado (300 − 50 − 30).
+    expect(grups[0].whatsapp).toContain('KG RECOLLITS: 50')
+    expect(grups[0].whatsapp).toContain('KG FALTEN RECOLLIR: 220')
+    expect(grups[1].whatsapp).toContain('• Ceba: 12.5 kg')
+    expect(grups[1].whatsapp.endsWith(`${APP}/receptor/interessos?recollida=s1`)).toBe(true)
+    // La ficha de la oferta enseña los dos, cada uno una vez.
+    expect(missatgesFitxaOferta([...ms, ...ms]).map((m) => m.id)).toEqual(['oferta', 'recollida_grup', 'recollida_grup:s1'])
+  })
+
+  it('sin las líneas hermanas, el mensaje se compone con las entregas de esta oferta', () => {
+    const ms = missatgesDeLOferta({
+      ...BASE,
+      canalitzacions: [{ id: 'c1', entidad_id: 'ent-1', kg_confirmados: 30, data_hora_recollida: null, estado: 'confirmada', sollicitud_id: 's9' }],
+    }, OPC)
+    const m = ms.find((x) => x.id === 'recollida_grup:s9')!
+    expect(m.whatsapp).toContain('• Tomàquet: 30 kg')
+    expect(m.whatsapp).toContain('SDA / ENTITAT: Menjador Social de Prova')
+    expect(ms.some((x) => x.id === 'recollida_grup')).toBe(false)
+  })
 })

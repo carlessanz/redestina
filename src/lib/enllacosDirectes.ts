@@ -48,6 +48,33 @@ export function enllacPropostaCanvis(appUrl: string, respostaId: string): string
   return `${origen(appUrl)}${rutaPropostaCanvis(respostaId)}`
 }
 
+/**
+ * Ofertas multiproducto (fase 6b, 25-11-2026): la disponibilidad entera en el Mercat, con el
+ * diálogo «Demana diversos productes» abierto. Es el enlace del mensaje único (el servidor lo
+ * compone con `enllacDisponibilitat()` de `_shared/textOferta.ts`; el test vigila que coincidan).
+ */
+export function rutaDisponibilitat(disponibilitatId: string): string {
+  return `/receptor/mercat?disponibilitat=${encodeURIComponent(disponibilitatId)}`
+}
+
+/**
+ * Registrar la recogida de TODA una solicitud multiproducto (fase 6c): «Els meus interessos» con
+ * `?recollida=<sollicitud>`, que abre `DialegRecollidaMultiproducte` con un producto por fila. Es
+ * el enlace de RECOLLIDA CONFIRMADA de una solicitud.
+ */
+export function rutaRecollidaSollicitud(sollicitudId: string): string {
+  return `/receptor/interessos?recollida=${encodeURIComponent(sollicitudId)}`
+}
+
+export function enllacRecollidaSollicitud(appUrl: string, sollicitudId: string): string {
+  return `${origen(appUrl)}${rutaRecollidaSollicitud(sollicitudId)}`
+}
+
+/** Equipo: el mismo diálogo, en Aprovacions (registra y valida en un acto, nivel 1). */
+export function rutaRecollidaSollicitudEquip(sollicitudId: string): string {
+  return `/equip/aprovacions?recollida=${encodeURIComponent(sollicitudId)}`
+}
+
 /** Equipo: la ficha de la oferta con el formulario «Assigna l’oferta» a la vista. */
 export function rutaAssignaOferta(excedenteId: string): string {
   return `/equip/ofertes/${encodeURIComponent(excedenteId)}?accio=assigna`

@@ -41,6 +41,12 @@
 // producto, entidad, referencia de oferta, número…— con la regla común de los listados
 // (`useCerca` + `filtraCerca`). El recuento del título sigue siendo el total de la cola.
 //
+// MULTIPRODUCTO (fase 6b-6c, 25-11-2026): los intereses de una SOLICITUD conjunta
+// (`oferta_respuestas.sollicitud_id`) van en una sola tarjeta (`TargetaSollicitud`, «Confirma» →
+// `resoldre_sollicitud`); las recogidas declaradas de una solicitud se pueden validar juntas
+// («Valida totes», `validar_recollides_sollicitud`); y `?recollida=<sollicitud>` abre el registro
+// conjunto de la recogida (`DialegRecollidaMultiproducte`, el equipo registra y valida).
+//
 // ⚠️ Las cuatro colas son independientes a propósito: si una migración todavía no está
 //    aplicada, su consulta falla por tabla o columna inexistente y esa sección se queda
 //    vacía, pero las otras siguen funcionando igual.
@@ -83,6 +89,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
+import TargetaSollicitud from '../../components/equip/TargetaSollicitud'
+import DialegRecollidaMultiproducte, { DialegValidaTotes } from '../../components/DialegRecollidaMultiproducte'
+import { agrupaPerSollicitud } from '../../lib/sollicitudMultiproducte'
+import { useDialegPerUrl } from '../../hooks/useDialegPerUrl'
 
 interface Fila {
   id: string
@@ -106,6 +116,8 @@ interface Fila {
   proposta_original: OfertaRespuesta['proposta_original']
   proposta_resposta: OfertaRespuesta['proposta_resposta']
   proposta_resposta_motiu: string | null
+  /** Multiproducto (fase 6b): la solicitud conjunta; sus intereses van en una sola tarjeta. */
+  sollicitud_id: string | null
   entidades: { nombre: string; poblacion: string | null } | null
   excedentes: {
     id_excedente: string | null
@@ -212,6 +224,8 @@ interface RecollidaPendent {
   valorizacion: string | null
   /** Quién la registró: la entidad desde su panel (nivel 2) o el equipo (nivel 1). 20270610100100. */
   recollida_origen: 'entitat_receptora' | 'equip' | null
+  /** Multiproducto (fase 6c): la solicitud conjunta («Valida totes»). */
+  sollicitud_id: string | null
   entidades: { nombre: string | null } | null
   excedentes: {
     id_excedente: string | null
@@ -308,6 +322,10 @@ export default function Aprovacions() {
   // Sin contexto, no: los permisos se conceden explícitamente o no se conceden (fail-cerrado,
   // 07-10-2026). La RPC revalida de todas formas y devuelve 42501.
   const potAprovar = ctx?.potAprovar ?? false
+  // Multiproducto: el registro conjunto de la recogida de una solicitud (`?recollida=<id>`).
+  const dialegRecollida = useDialegPerUrl(['recollida'] as const)
+  /** «Valida totes» de una solicitud: su id (null = cerrado). */
+  const [validaTotes, setValidaTotes] = useState<string | null>(null)
   // Contrafirmar (la firma institucional) es solo del Superadmin desde el 25-11-2026.
   const esSuperAdmin = ctx?.esSuperAdmin ?? false
   const { cerca, setCerca, q } = useCerca()
@@ -317,7 +335,7 @@ export default function Aprovacions() {
     // concatenadas, que es justo lo que hace que supabase-js se rinda con el tipo de la fila.
     const { data, error } = await supabase
       .from('oferta_respuestas')
-      .select('id, excedente_id, entidad_id, kg_solicitados, preu_ofert, modalitat, recollida_at, canal, respondido_at, enviado_at, aprovacio, proposta_kg, proposta_modalitat, proposta_recollida_at, proposta_original, proposta_resposta, proposta_resposta_motiu, entidades(nombre, poblacion), excedentes(id_excedente, producto, kg_total, modalitat, modalitats, productor_id, preu_minim, hora_recollida_inici, hora_recollida_fi)')
+      .select('id, excedente_id, entidad_id, kg_solicitados, preu_ofert, modalitat, recollida_at, canal, respondido_at, enviado_at, aprovacio, proposta_kg, proposta_modalitat, proposta_recollida_at, proposta_original, proposta_resposta, proposta_resposta_motiu, sollicitud_id, entidades(nombre, poblacion), excedentes(id_excedente, producto, kg_total, modalitat, modalitats, productor_id, preu_minim, hora_recollida_inici, hora_recollida_fi)')
       .eq('estado', 'acceptada')
       .eq('aprovacio', 'pendent')
       .order('respondido_at', { ascending: true, nullsFirst: false })
@@ -413,7 +431,7 @@ export default function Aprovacions() {
     // oferta (`excedentes.productor_id → productores`), y la receptora por la de la canalización.
     const { data, error } = await supabase
       .from('canalizaciones')
-      .select('id, excedente_id, kg_confirmados, kg_reales, kg_declarats, resultat_recollida, incidencia_recollida, observacions_recollida, data_hora_recollida, recollida_real_at, recollida_registrada_at, recollida_validada_at, recollida_retornada_at, valorizacion, recollida_origen, entidades(nombre), excedentes(id_excedente, producto, productores(name, empresa))')
+      .select('id, excedente_id, kg_confirmados, kg_reales, kg_declarats, resultat_recollida, incidencia_recollida, observacions_recollida, data_hora_recollida, recollida_real_at, recollida_registrada_at, recollida_validada_at, recollida_retornada_at, valorizacion, recollida_origen, sollicitud_id, entidades(nombre), excedentes(id_excedente, producto, productores(name, empresa))')
       .not('recollida_registrada_at', 'is', null)
       .is('recollida_validada_at', null)
       .neq('estado', 'anulada')
@@ -912,7 +930,25 @@ export default function Aprovacions() {
             <p className="text-sm text-muted-foreground">{t('appr.empty')}</p>
           )}
           {senseCoincidencies(files.length, filesVisibles.length)}
-          {filesVisibles.map((f) => {
+          {/* Multiproducto: una tarjeta por solicitud conjunta, con todas sus líneas. */}
+          {agrupaPerSollicitud(filesVisibles).grups.map((g) => (
+            <TargetaSollicitud
+              key={g.sollicitudId}
+              sollicitudId={g.sollicitudId}
+              files={g.files}
+              faltenDe={(id) => {
+                const f = g.files.find((x) => x.excedente_id === id)
+                return f ? faltenDe(f) : 0
+              }}
+              potAprovar={potAprovar}
+              onFet={() => {
+                setFiles((prev) => prev.filter((x) => x.sollicitud_id !== g.sollicitudId))
+                void carrega()
+                void refrescaComptadors()
+              }}
+            />
+          ))}
+          {agrupaPerSollicitud(filesVisibles).soltes.map((f) => {
             const total = Number(f.excedentes?.kg_total ?? 0)
             return (
               <div key={f.id} className="rounded-lg border p-3" data-testid="appr-resposta" data-resposta={f.id}>
@@ -994,6 +1030,25 @@ export default function Aprovacions() {
             <p className="text-sm text-muted-foreground">{t('vrec.empty')}</p>
           )}
           {senseCoincidencies(recollides.length, recollidesVisibles.length)}
+          {/* Multiproducto (fase 6c): las recogidas declaradas de una misma solicitud se validan
+              juntas («Valida totes»); cada una sigue con su ENT y su REC. */}
+          {agrupaPerSollicitud(recollidesVisibles).grups.map((g) => (
+            <div key={g.sollicitudId} data-testid="valida-totes-grup" data-sollicitud={g.sollicitudId}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed p-3">
+              <p className="min-w-0 flex-1 basis-60 text-sm">
+                {t('smp.vt_grup', {
+                  entitat: g.files[0].entidades?.nombre ?? '—',
+                  productes: g.files.map((x) => x.excedentes?.producto ?? '—').join(', '),
+                })}
+              </p>
+              <BotoAmbMotiu size="sm" className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
+                data-testid="valida-totes" disabled={!potAprovar || ocupat !== null}
+                motiu={potAprovar ? undefined : t('vrec.need_admin')}
+                onClick={() => setValidaTotes(g.sollicitudId)}>
+                {t('smp.vt_go', { n: g.files.length })}
+              </BotoAmbMotiu>
+            </div>
+          ))}
           {recollidesVisibles.map((r) => {
             const assignats = r.kg_confirmados != null ? Number(r.kg_confirmados) : null
             const declarats = kgDeclarats(r)
@@ -1066,6 +1121,30 @@ export default function Aprovacions() {
       {/* ── 5. Signatures per tancar (05-11-2026): lo que una organización firmó fuera y subió.
              Componente propio: lee su vista, decide el super_admin y se ancla en `#signatures`. */}
       <CuaSignatures q={q} />
+
+      {/* Multiproducto (fase 6c): registro conjunto de la recogida y «Valida totes». */}
+      <DialegRecollidaMultiproducte
+        sollicitudId={dialegRecollida.valors.recollida}
+        equip
+        onTanca={dialegRecollida.tanca}
+        onFet={() => { dialegRecollida.tanca(); void carregaRecollides(); void refrescaComptadors() }}
+      />
+      <DialegValidaTotes
+        sollicitudId={validaTotes}
+        entitat={recollides.find((r) => r.sollicitud_id === validaTotes)?.entidades?.nombre ?? null}
+        recollides={recollides.filter((r) => validaTotes != null && r.sollicitud_id === validaTotes).map((r) => ({
+          id: r.id, producte: r.excedentes?.producto ?? '—',
+          kgAssignats: r.kg_confirmados != null ? Number(r.kg_confirmados) : null, kgDeclarats: kgDeclarats(r),
+        }))}
+        onTanca={() => setValidaTotes(null)}
+        onFet={() => {
+          const sid = validaTotes
+          setValidaTotes(null)
+          setRecollides((prev) => prev.filter((x) => x.sollicitud_id !== sid))
+          void carregaRecollides()
+          void refrescaComptadors()
+        }}
+      />
 
       <DialegValidacio
         estat={validant}

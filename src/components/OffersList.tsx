@@ -70,6 +70,9 @@ import {
 import LlegendaEstats from './proces/LlegendaEstats'
 import BadgeEspigolada from './BadgeEspigolada'
 import BadgeRegistrePosteriori from './BadgeRegistrePosteriori'
+import BadgeMultiproducte from './BadgeMultiproducte'
+import { useMidesGrups } from '../hooks/useDisponibilitat'
+import { midaGrupDeFila } from '../lib/disponibilitat'
 import type { Excedente } from '../types'
 import CarregantSeccio from './CarregantSeccio'
 import BotoIcona from './BotoIcona'
@@ -391,6 +394,8 @@ export default function OffersList({ onOpen, accio }: Props) {
   // propia, la del producto o el icono de su familia. Firmada en lote para todas las pestañas.
   const ambHistoric = useMemo(() => [...vives, ...historic], [vives, historic])
   const foto = useFotosOfertes(ambHistoric)
+  // Multiproducto (fase 6a): cuántas ofertas tiene el grupo de cada fila, para su distintivo.
+  const mides = useMidesGrups(ambHistoric)
 
   function taula(files: FilaOferta[], buitKey: string, kgDe: (o: Excedente) => number, ambPas: boolean, ordenable: boolean) {
     if (files.length === 0) return <p className="text-sm text-muted-foreground">{t(buitKey)}</p>
@@ -440,6 +445,7 @@ export default function OffersList({ onOpen, accio }: Props) {
             const vencuda = ambPas && (ESTATS_ACTIUS as readonly string[]).includes(o.estado)
               && vencudaSenseResoldre(o, kgDe(o), ara)
             const espigolada = tipusOperacioDe(o) === 'espigolada'
+            const midaGrup = midaGrupDeFila(o, mides)
             // Los kilos con salida y los que faltan, en dos frases que sirven igual bajo el
             // producto (móvil) que bajo la barra (desde `md`). Un esborrany no tiene progreso.
             const textSortida = t('off.kg_sortida', { a: fmtKg(kgs.canalitzats), b: fmtKg(kgs.total) })
@@ -511,6 +517,12 @@ export default function OffersList({ onOpen, accio }: Props) {
                     {espigolada && (
                       <span data-testid="oferta-espigolada" className="max-w-full">
                         <BadgeEspigolada className="max-w-full whitespace-normal" />
+                      </span>
+                    )}
+                    {/* Fase 6a: publicada junto con otras del mismo productor (una por producto). */}
+                    {midaGrup > 0 && (
+                      <span data-testid="oferta-multiproducte" className="max-w-full">
+                        <BadgeMultiproducte n={midaGrup} className="max-w-full whitespace-normal" />
                       </span>
                     )}
                     {/* Proceso 3.7: registrada por el equipo después de hacerse. */}

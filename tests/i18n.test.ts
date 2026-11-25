@@ -153,6 +153,9 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
   const COMPUESTAS: { que: string; prefijo: string; valores: string[] }[] = [
     // El reparto por modalidad de «El meu impacte» (fase 10, `ImpacteBloc`).
     { que: 'modalidades del impacto', prefijo: 'imp.mod_', valores: ['donacio', 'venda', 'maquila'] },
+    // La recogida conjunta de una solicitud multiproducto (fase 6c): el `resultat` de cada línea de
+    // `registrar_recollida_multiple` (`DialegRecollidaMultiproducte`).
+    { que: 'registrar_recollida_multiple resultat', prefijo: 'smp.r_', valores: ['coincideix', 'inferior', 'superior', 'no_recollit'] },
     // El estado de la cuenta de una entitat (plan 1, 1D): `estat_acces_org()`.
     { que: 'estat_acces_org().estat', prefijo: 'acc.estat_', valores: ['sense', 'pendent', 'enviat', 'actiu', 'desactivat'] },
     // Las notas internas (plan 1, 1F): el CHECK de `notes_internes.canal`, en la ficha y en el listado.

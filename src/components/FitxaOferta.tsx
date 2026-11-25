@@ -12,10 +12,14 @@
 // `textOfertaPerCopiar` —con el enlace a la oferta en el Mercat o pidiendo que respondan—. Dos
 // botones: «Copia amb enllaç» (el mismo enlace para todas las entidades: cada una entra con su
 // cuenta) y «Copia sense enllaç» (para quien no tiene cuenta). «Comparteix» lleva el enlace.
+//
+// MULTIPRODUCTO (fase 6a): si la oferta se publicó junto con otras (`grup`), además del texto de
+// ESTA oferta se ofrece «Comparteix el grup»: el mensaje único con todos los productos y un solo
+// enlace al Mercat (lo compone `useDisponibilitat`; se ve entero en «Disponibilitat multiproducte»).
 
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ExternalLink, Pencil, Share2 } from 'lucide-react'
+import { ExternalLink, Layers, Pencil, Share2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
 import { supabase } from '../lib/supabase'
@@ -41,6 +45,11 @@ interface Props {
   onEdita?: () => void
   /** Vencida con kilos sin cubrir (lo calcula quien monta la ficha). */
   vencida?: boolean
+  /**
+   * Multiproducto (fase 6a): cuántas ofertas tiene el grupo y su mensaje único (null si no
+   * circulan al menos dos). Sin grupo, nada cambia.
+   */
+  grup?: { n: number; text: string | null } | null
 }
 
 /** Una fila «etiqueta: valor». Sin valor no se pinta (como en el texto: nada de etiquetas vacías). */
@@ -53,7 +62,7 @@ function Dada({ etiqueta, children, ample }: { etiqueta: string; children: React
   )
 }
 
-export default function FitxaOferta({ oferta, ambCost = false, onEdita, vencida = false }: Props) {
+export default function FitxaOferta({ oferta, ambCost = false, onEdita, vencida = false, grup = null }: Props) {
   const { t, lang } = useT()
   const [lloc, setLloc] = useState<Lloc | null>(null)
   const [cataleg, setCataleg] = useState<CausaAmbSubcauses[]>([])
@@ -95,6 +104,16 @@ export default function FitxaOferta({ oferta, ambCost = false, onEdita, vencida 
     ? textOfertaPerCopiar(oferta.texto_oferta, enllacInteresOferta(window.location.origin, oferta.id))
     : null
   const textSenseEnllac = oferta.texto_oferta ? textOfertaPerCopiar(oferta.texto_oferta, null) : ''
+
+  /** El mensaje único del grupo (fase 6a): sin foto, que sería de un solo producto. */
+  async function comparteixGrup() {
+    if (!grup?.text) return
+    setCompartint(true)
+    const r = await comparteixOferta(grup.text, null)
+    setCompartint(false)
+    if (r === 'copiat') toast.success(t('fo.comparteix_copiat'))
+    else if (r === 'error') toast.error(t('copia.err'))
+  }
 
   async function comparteix() {
     if (!textAmbEnllac) return
@@ -184,6 +203,21 @@ export default function FitxaOferta({ oferta, ambCost = false, onEdita, vencida 
             </div>
             {!compartible && oferta.estado === 'pendent_validacio' && (
               <p className="text-xs text-muted-foreground">{t('fo.comparteix_pendent')}</p>
+            )}
+            {/* Del grupo multiproducto: el mensaje único, con un solo enlace para todos. */}
+            {grup && grup.n > 1 && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border bg-muted/30 p-3" data-testid="fitxa-grup">
+                <p className="min-w-0 flex-1 text-sm">
+                  <Layers className="mr-1 inline size-4 align-text-bottom" aria-hidden />
+                  {t('mp.fitxa_grup', { n: grup.n })}
+                </p>
+                {grup.text && (
+                  <Button variant="outline" className="h-11 whitespace-normal md:h-8" data-testid="comparteix-grup"
+                    disabled={compartint} onClick={() => void comparteixGrup()}>
+                    <Share2 className="size-4" aria-hidden /> {t('mp.comparteix_grup')}
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         )}

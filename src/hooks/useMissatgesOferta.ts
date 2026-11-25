@@ -53,7 +53,7 @@ export function useMissatgesOferta(
         // Fuera del equipo solo se enseñan los avisos, y para componerlos basta la oferta.
         equip
           ? supabase.from('canalizaciones')
-            .select('id, entidad_id, kg_confirmados, data_hora_recollida, estado, comentarios, created_at')
+            .select('id, entidad_id, kg_confirmados, data_hora_recollida, estado, comentarios, created_at, sollicitud_id')
             .eq('excedente_id', excedenteId)
           : Promise.resolve({ data: [], error: null }),
         equip
@@ -75,6 +75,27 @@ export function useMissatgesOferta(
       }
 
       const canalitzacions = (cans.data ?? []) as NonNullable<FetsMissatges['canalitzacions']>
+      // Multiproducto (fase 6c): las entregas de una solicitud conjunta van en UN mensaje con
+      // todos sus productos, también los de las otras ofertas de la disponibilidad.
+      const sids = [...new Set(canalitzacions.map((c) => c.sollicitud_id).filter(Boolean))] as string[]
+      const germanes = sids.length > 0
+        ? await supabase.from('canalizaciones')
+          .select('id, entidad_id, kg_confirmados, data_hora_recollida, estado, comentarios, sollicitud_id, created_at, excedentes(producto)')
+          .in('sollicitud_id', sids)
+          .order('created_at', { ascending: true })
+        : { data: [], error: null }
+      if (!viu) return
+      const sollicituds: NonNullable<FetsMissatges['sollicituds']> = {}
+      for (const g of (germanes.data ?? []) as unknown as (NonNullable<FetsMissatges['canalitzacions']>[number] & {
+        excedentes: { producto: string | null } | null
+      })[]) {
+        if (!g.sollicitud_id) continue
+        const grup = (sollicituds[g.sollicitud_id] ??= { linies: [] })
+        grup.linies.push({
+          producte: g.excedentes?.producto ?? '', kg: g.kg_confirmados, estado: g.estado,
+          entidad_id: g.entidad_id, data_hora_recollida: g.data_hora_recollida, comentarios: g.comentarios ?? null,
+        })
+      }
       const respostes = (resps.data ?? []) as NonNullable<FetsMissatges['respostes']>
       const avisos = (avs.data ?? []) as AvisMissatge[]
       // Los nombres: lo que la RLS deje leer (al productor no le deja leer entidades, y no
@@ -93,7 +114,7 @@ export function useMissatgesOferta(
       const p = prod.data as { id: string; name: string | null; empresa: string | null } | null
 
       setMissatges(missatgesDeLOferta({
-        oferta, respostes, canalitzacions, avisos, entitats,
+        oferta, respostes, canalitzacions, avisos, entitats, sollicituds,
         productor: p ? { id: p.id, nom: p.empresa || p.name } : null,
       }, { idioma: lang, appUrl: window.location.origin, t }))
       setError(Boolean(ex.error || cans.error || resps.error || avs.error))

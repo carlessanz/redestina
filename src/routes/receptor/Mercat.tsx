@@ -18,6 +18,11 @@
 // mensajes («obre l’enllaç i indica els kg…»), y sobrevive al login (`lib/destiLogin.ts`). Si
 // la oferta ya no está en el Mercat de esta entidad —asignada, cerrada, la RLS no la deja ver—
 // se dice arriba, en vez de abrir un diálogo vacío.
+//
+// 🧺 OFERTAS MULTIPRODUCTO (fase 6b, 25-11-2026): `?disponibilitat=<id>` —el enlace del mensaje
+// único de una disponibilidad— abre `DialegSollicitudMultiproducte`: varios productos del grupo
+// con UNA fecha y un solo envío (`manifestar_interes_multiple`). Las tarjetas de un mismo grupo
+// llevan un distintivo y el botón «Demana diversos productes».
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -49,6 +54,7 @@ import { useDialegPerUrl } from '../../hooks/useDialegPerUrl'
 import { rutaPropostaCanvis } from '../../lib/enllacosDirectes'
 import { Link } from 'react-router'
 import CarregantSeccio from '../../components/CarregantSeccio'
+import DialegSollicitudMultiproducte from '../../components/DialegSollicitudMultiproducte'
 import DetallOfertaReceptor, { preuDe } from '../../components/DetallOfertaReceptor'
 import type { OfertaReceptor } from '../../components/DetallOfertaReceptor'
 import { Button } from '@/components/ui/button'
@@ -68,7 +74,10 @@ type RespostaMeva = Pick<OfertaRespuesta, 'id' | 'excedente_id' | 'estado' | 'ap
  * de recogida (fase 4: `CampsRecollida` deshabilita los que no son; la base los rechaza con
  * `dia_fora_dies`).
  */
-type OfertaMercat = OfertaReceptor & Pick<Excedente, 'dies_recollida'>
+type OfertaMercat = OfertaReceptor & Pick<Excedente, 'dies_recollida'> & {
+  /** Multiproducto (fase 6): el grupo de la oferta, o null si va sola. */
+  disponibilitat_id: string | null
+}
 
 function vencuda(o: Pick<OfertaReceptor, 'disponible_hasta'>, avui: string): boolean {
   return o.disponible_hasta != null && o.disponible_hasta.slice(0, 10) < avui
@@ -79,7 +88,11 @@ export default function Mercat() {
   const { bloqueja, tipusVigents, tallPassat, recarrega: recarregaConveni } = useConveni()
   const [dlgConveni, setDlgConveni] = useState(false)
   const organitzacio = useOrganitzacio('entidad')
-  const ctxUserId = useAppContext().ctx?.userId ?? null
+  const ctxSessio = useAppContext().ctx
+  const ctxUserId = ctxSessio?.userId ?? null
+  // Las fichas de entidad de la cuenta: con varias, la solicitud multiproducto pregunta con cuál.
+  const entitatsMeves = (ctxSessio?.organitzacions ?? [])
+    .filter((o) => o.tipo === 'entidad').map((o) => ({ id: o.id, nombre: o.nombre }))
   // `dies_recollida` (fase 4) solo lo usa el diálogo de interés: no es columna de `OfertaReceptor`.
   const [ofertes, setOfertes] = useState<OfertaMercat[]>([])
   const [meves, setMeves] = useState<Record<string, RespostaMeva>>({})
@@ -110,6 +123,9 @@ export default function Mercat() {
   const accioUrl = dialeg.valors.accio
   /** La oferta de la URL que ya se ha abierto: los refrescos de la lista no la reabren. */
   const aplicada = useRef<string | null>(null)
+  // La disponibilidad (multiproducto) en la URL, con su propio parámetro: no toca `oferta`/`accio`.
+  const dialegGrup = useDialegPerUrl(['disponibilitat'] as const)
+  const disponibilitatUrl = dialegGrup.valors.disponibilitat
 
   const entidadId = organitzacio?.id ?? null
 
@@ -140,7 +156,7 @@ export default function Mercat() {
     // porqué, en `OfertaReceptor`.
     const [exc, resp, exi] = await Promise.all([
       supabase.from('excedentes')
-        .select('id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, hora_recollida_inici, hora_recollida_fi, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte, created_at, validada_at, dies_recollida')
+        .select('id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, hora_recollida_inici, hora_recollida_fi, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte, created_at, validada_at, dies_recollida, disponibilitat_id')
         .in('estado', ['publicada', 'parcial'])
         .order('created_at', { ascending: false }),
       entidadId
@@ -348,6 +364,11 @@ export default function Mercat() {
   ]
   const rang = { data: (o: OfertaReceptor) => o.disponible_hasta, desDe: filtres.desDe, finsA: filtres.finsA }
   const visibles = filtraLlistat(ofertes, dims, filtres.valors, rang)
+  // Cuántas ofertas de cada disponibilidad ve esta entidad (el distintivo, solo si hay más de una).
+  const germanes: Record<string, number> = {}
+  for (const o of ofertes) if (o.disponibilitat_id) germanes[o.disponibilitat_id] = (germanes[o.disponibilitat_id] ?? 0) + 1
+  // Las que ya ha pedido (con interés propio que no es una oferta por contestar): no se repiten.
+  const jaDemanades = new Set(Object.values(meves).filter((r) => r.estado !== 'pendent').map((r) => r.excedente_id))
   const textDim = (clau: string) => (v: string): string => {
     if (clau === 'categoria') return t(v === 'altres' ? 'mk.f_other' : `pr.o_${v}`)
     if (clau === 'modalitat') return t(`od.mod_${v}`)
@@ -451,6 +472,13 @@ export default function Mercat() {
                   )}
                 </div>
                 <div className="text-xs text-muted-foreground">{detall}</div>
+                {/* Multiproducto: forma parte de una disponibilidad con otras ofertas que ve. */}
+                {o.disponibilitat_id && (germanes[o.disponibilitat_id] ?? 0) > 1 && (
+                  <span className="mt-1 inline-block rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground"
+                    data-testid="mk-badge-grup">
+                    {t('smp.badge', { n: germanes[o.disponibilitat_id] })}
+                  </span>
+                )}
                 {vencuda(o, avui) && (
                   <div className="text-xs font-medium text-error">{t('mk.expired')}</div>
                 )}
@@ -482,6 +510,14 @@ export default function Mercat() {
                   title={motiu ? t(motiu) : undefined}
                   onClick={() => obre(o, 'interes')}
                 >{t('mk.interested')}</Button>
+              )}
+              {/* Multiproducto: pedir varios productos del grupo con una sola fecha. */}
+              {o.disponibilitat_id && (germanes[o.disponibilitat_id] ?? 0) > 1 && !vencuda(o, avui) && (
+                <Button variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
+                  data-testid="mk-demana-grup"
+                  onClick={() => dialegGrup.obre({ disponibilitat: o.disponibilitat_id })}>
+                  {t('smp.demana')}
+                </Button>
               )}
               {/* El motivo, visible y no solo en el tooltip: en un móvil no hay hover. La
                   caducidad ya sale en la propia tarjeta. */}
@@ -582,6 +618,18 @@ export default function Mercat() {
           </DialogContent>
         )}
       </Dialog>
+
+      <DialegSollicitudMultiproducte
+        disponibilitatId={disponibilitatUrl}
+        entitats={entitatsMeves}
+        entitatInicial={entidadId}
+        potDemanar={tallPassat
+          ? (m) => convenisQueFalten(m, exigits[m] ?? [], tipusVigents, equivalents).length === 0
+          : undefined}
+        jaDemanades={jaDemanades}
+        onTanca={dialegGrup.tanca}
+        onFet={() => { dialegGrup.tanca(); void carrega() }}
+      />
     </Card>
   )
 }

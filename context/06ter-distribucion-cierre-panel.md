@@ -2942,3 +2942,56 @@ assistida» en `/equip/ofertes` y `/equip/canalitzacio`, solo con `ctx.potAprova
 - Pendiente conocido: la cabecera del detalle cuenta solo canalizaciones («90/100 kg · falten 10» aunque los 10 kg tienen
   destino final); el bloque «Què ha passat amb el producte» sí lo cuenta.
 - E2E `tests/e2e/operacio-realitzada.e2e.ts`.
+
+### Fase 6a (25-11-2026): alta multiproducto, bloque del grupo y mensaje único
+
+- **Alta**: en el bloque de cantidad de `FormulariNovaOferta`, «Afegir un altre producte» añade filas
+  (`components/oferta/AltresProductes.tsx`): producto, variedad, kg y, si el formulario los pide para el
+  primero, cajas y precio mínimo (vacío = el del primero). Lo común se contesta una vez. Con un solo
+  producto se manda exactamente lo de antes; con ≥2, `datos.productes` (el primero sale de los campos de
+  siempre; variedad, kg, familia, cajas y coste no se heredan). Solo en el alta y el esborrany: editar
+  una publicada es editar UNA oferta. Validación local (`errorsFiles`: producto, kg, cajas, precio,
+  repetidos sin acentos) y del servidor por `producte_index` (`filaDelIndex`). El esborrany —local y de
+  servidor— guarda y recupera `productes[]` (`cosAmbProductes` / `desDeCos`). Al crear el grupo, toast
+  con el `D-…` (solo equipo) y navegación a la primera.
+- **Listado**: `BadgeMultiproducte` («Multiproducte · N») en Ofertes del equipo y del productor, también
+  en esborranys con `productes[]` (`midaGrupDeFila`); los tamaños, por `useMidesGrups` (consulta ligera).
+- **Detalle**: `DisponibilitatMultiproducte` (equipo y productor) con las hermanas enlazadas, el `D-…`
+  solo al equipo, el texto único (`textDelGrup`, mismo `_shared/textOferta.ts` que el servidor) con
+  Copia/Comparteix y la prop `accions` (la asignación conjunta, 6b). `FitxaOferta` avisa de que forma
+  parte del grupo y comparte su texto.
+- **Envío** (`components/equip/EnviamentDisponibilitat.tsx`): `priorizar-entidades {disponibilitat_id}`
+  con `ofertes_encaixen` por entidad; un mensaje por entidad con lo que le encaja (si solo encaja una,
+  el grupo abierto entero). WhatsApp de texto si la ventana está abierta; si no, correo
+  (`correuDisponibilitat`). Respeta `motiuCanal()` y los interruptores. Deja una fila de
+  `oferta_respuestas` por oferta (`dialeg_dades.disponibilitat_id`; las de WhatsApp con
+  `dialeg_pas='fet'` para que el diálogo del bot no capture la respuesta). Sin envío «panel» de grupo
+  (crearía N avisos). Lógica pura en `lib/disponibilitat.ts`.
+- Los productos extra no llevan coste por kilo propio (referencia D2). WhatsApp de grupo, solo texto dentro
+  de la ventana (plantilla de Meta = checkpoint).
+- Pruebas: `tests/altaMultiproducte.test.ts`, `tests/disponibilitatPanell.test.ts`,
+  `tests/e2e/multiproducte-alta.e2e.ts`.
+
+### Fase 6b-6c (25-11-2026): solicitud, aprobación y recogida conjuntas
+
+- **Solicitud** (`DialegSollicitudMultiproducte`, Mercat `?disponibilitat=<id>`; botón «Demana diversos productes» y
+  distintivo en las tarjetas de un grupo): las ofertas que la entidad puede pedir (`ofertes_disponibilitat`, `kg_lliures` de
+  referencia, `modalitats_meves`), una fecha y franja comunes (`diesComuns`: intersección o, si no la hay, los de la
+  primera, explicado), entidad a elegir si la cuenta tiene varias; un solo `manifestar_interes_multiple`; el error de una
+  línea se marca en ella por `details.linia`/`excedente_id`.
+- **Aprobación conjunta** (`TargetaSollicitud` en Aprovacions): los intereses con `sollicitud_id` en una tarjeta; por
+  producto aprobar (kg, modalidad, precio y aceptación en venta) o rechazar (motivo opcional); fecha común precargada con
+  la pedida; «Confirma» → `resoldre_sollicitud` (un aviso `sollicitud_resolta` por destinatario).
+- **Asignación directa** (nivel 1): «Assigna diversos productes» en el bloque `DisponibilitatMultiproducte` de
+  `OfferDetail` (solo `potAprovar`) → `DialegAssignacioMultiproducte` → `assignar_directe_multiple`.
+- **Recogida conjunta** (`DialegRecollidaMultiproducte`, `?recollida=<sollicitud>` en «Els meus interessos» —la entidad
+  declara— y en Aprovacions —el equipo registra y valida—): por producto coincideix · inferior · superior · no_recollit
+  (o «Encara no»), kg reales y motivo → `registrar_recollida_multiple`. «Valida totes» (`DialegValidaTotes`, recogidas por
+  validar agrupadas por solicitud) → `validar_recollides_sollicitud`, con motivo común si alguna línea difiere.
+- **Mensaje**: `textRecollidaSollicitud` (`lib/missatgesOferta.ts`): un RECOLLIDA CONFIRMADA por solicitud con todos los
+  productos y un enlace `?recollida=<sollicitud>`; en «Missatges de l'oferta», `recollida_grup:<sid>` (uno por solicitud y
+  otro para las canalizaciones sueltas). Rutas en `lib/enllacosDirectes.ts` (`rutaDisponibilitat`,
+  `rutaRecollidaSollicitud[Equip]`), con test de paridad contra `enllacDisponibilitat` de `_shared`.
+- Lógica pura `lib/sollicitudMultiproducte.ts` y clientes que no lanzan `lib/sollicituds.ts`; claves `smp.*` (compuesta
+  `smp.r_` declarada en `tests/i18n.test.ts`). Pruebas: `tests/sollicitudMultiproducte.test.ts`,
+  `tests/e2e/multiproducte-circuit.e2e.ts` (nivel 2 y nivel 1 —este abre el diálogo desde la ficha—, 360 px).

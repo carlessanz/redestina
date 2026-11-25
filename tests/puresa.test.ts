@@ -45,6 +45,9 @@ const HOJA = [
   // Fase D2 del punto 3 (17-11-2026): cómo se escribe la fuente del valor por kilo, la misma en
   // el REC, en el certificado y en el panel del equipo.
   'fontValor',
+  // Fase 6a del plan DIC 26 (25-11-2026): el alta multiproducto (`productes[]`, el máximo y las
+  // claves de cada producto), la misma en `crear-oferta` y en el formulario del panel.
+  'disponibilitat',
 ]
 
 /** El código sin comentarios: «sin red ni Deno.» en un comentario no es un uso. */

@@ -37,6 +37,9 @@ import {
 import type { PuntProces } from '../../lib/procesOferta'
 import LlegendaEstats from '../../components/proces/LlegendaEstats'
 import BadgeEstat from '../../components/proces/BadgeEstat'
+import BadgeMultiproducte from '../../components/BadgeMultiproducte'
+import { useMidesGrups } from '../../hooks/useDisponibilitat'
+import { midaGrupDeFila } from '../../lib/disponibilitat'
 import { FotoOfertaResolta, useFotosOfertes } from '../../components/FotosOferta'
 import type { FotoResolta } from '../../components/FotosOferta'
 import type { EstadoAlbaran, Excedente } from '../../types'
@@ -252,16 +255,20 @@ function useMevesOfertes(productorId: string | null) {
     }, 'productor')
   }, [kg, externs, progres, recs, recsPendents, perValidar, conciliades])
 
-  return { ofertes, esborranys, kg, destins, sortides, puntDe, carregant, errorCarrega }
+  // Multiproducto (fase 6a): cuántas ofertas tiene el grupo de cada una, para su distintivo.
+  const mides = useMidesGrups(ofertes)
+  return { ofertes, esborranys, kg, destins, sortides, puntDe, carregant, errorCarrega, mides }
 }
 
 /** «1.320» y no «1320»: los kilos se leen de un vistazo, y ahí los miles importan. Sin decimales. */
 const fmtKg = (n: number) => nombre(n, 0)
 
 function FilaOferta({
-  o, canalitzats, punt, ambCodi, foto, sortides,
+  o, canalitzats, punt, ambCodi, foto, sortides, midaGrup = 0,
 }: {
   o: Excedente; canalitzats: number; punt: PuntProces; ambCodi?: boolean; foto?: FotoResolta
+  /** Fase 6a: cuántas ofertas tiene su grupo multiproducto (0 = no es de grupo). */
+  midaGrup?: number
   /** «Fundació X · 250 kg · Recollida 10/10 · 10:00», sin entrar al detalle (§3.2). */
   sortides?: Contrapart[]
 }) {
@@ -290,6 +297,11 @@ function FilaOferta({
             </div>
           )}
           {sortides && <LiniesSortida sortides={sortides} />}
+          {midaGrup > 0 && (
+            <span data-testid="oferta-multiproducte" className="mt-1 inline-flex max-w-full">
+              <BadgeMultiproducte n={midaGrup} className="max-w-full whitespace-normal" />
+            </span>
+          )}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-3">
@@ -332,6 +344,12 @@ function FilaEsborrany({ o, foto }: { o: Excedente; foto?: FotoResolta }) {
             {t('esb.desat_el', { data: dataCurta(o.created_at) })}
             {total > 0 ? ` · ${fmtKg(total)} kg` : ''}
           </div>
+          {/* Un esborrany de varios productos (fase 6a): una fila, y lo dice. */}
+          {midaGrupDeFila(o, {}) > 0 && (
+            <span data-testid="oferta-multiproducte" className="mt-1 inline-flex max-w-full">
+              <BadgeMultiproducte n={midaGrupDeFila(o, {})} className="max-w-full whitespace-normal" />
+            </span>
+          )}
         </div>
       </div>
       <BadgeEstat clase="bg-muted text-muted-foreground">{t('off.st_esborrany')}</BadgeEstat>
@@ -461,7 +479,7 @@ export function ProductorInici() {
   const navigate = useNavigate()
   const organitzacio = useOrganitzacio('productor')
   const productorId = organitzacio?.id ?? null
-  const { ofertes, esborranys, kg, destins, sortides, puntDe, carregant, errorCarrega } = useMevesOfertes(productorId)
+  const { ofertes, esborranys, kg, destins, sortides, puntDe, carregant, errorCarrega, mides } = useMevesOfertes(productorId)
   const foto = useFotosOfertes(ofertes)
 
   // Las dos secciones ya NO se solapan (revisión del 23-09-2026): arriba lo que está en
@@ -551,7 +569,8 @@ export function ProductorInici() {
               </CardHeader>
               <CardContent className="space-y-2">
                 {historic.slice(0, 5).map((o) => (
-                  <FilaOferta key={o.id} o={o} canalitzats={kg[o.id] ?? 0} punt={puntDe(o)} foto={foto(o)} />
+                  <FilaOferta key={o.id} o={o} canalitzats={kg[o.id] ?? 0} punt={puntDe(o)} foto={foto(o)}
+                    midaGrup={midaGrupDeFila(o, mides)} />
                 ))}
               </CardContent>
             </Card>
@@ -567,7 +586,7 @@ export function ProductorOfertes() {
   const navigate = useNavigate()
   const organitzacio = useOrganitzacio('productor')
   const productorId = organitzacio?.id ?? null
-  const { ofertes, esborranys, kg, sortides, puntDe, carregant, errorCarrega } = useMevesOfertes(productorId)
+  const { ofertes, esborranys, kg, sortides, puntDe, carregant, errorCarrega, mides } = useMevesOfertes(productorId)
   const foto = useFotosOfertes([...ofertes, ...esborranys])
   // La pestaña, de la URL (`?tab=esborranys` al guardar uno) y controlada: se puede llegar aquí
   // desde la misma pantalla.
@@ -645,7 +664,7 @@ export function ProductorOfertes() {
         )}
         {filtrades.map((o) => (
           <FilaOferta key={o.id} o={o} canalitzats={kg[o.id] ?? 0} punt={puntDe(o)} sortides={sortides[o.id]} ambCodi
-            foto={foto(o)} />
+            foto={foto(o)} midaGrup={midaGrupDeFila(o, mides)} />
         ))}
             </TabsContent>
           </Tabs>

@@ -18,6 +18,8 @@
 
 import DialegEdicioOferta from '../../components/DialegEdicioOferta'
 import FitxaOferta from '../../components/FitxaOferta'
+import DisponibilitatMultiproducte from '../../components/oferta/DisponibilitatMultiproducte'
+import { useDisponibilitat } from '../../hooks/useDisponibilitat'
 import NovaOferta from './NovaOferta'
 import { carregaContraparts, marcaLlegits, useAvisos } from '../../lib/avisos'
 import type { Contrapart } from '../../lib/avisos'
@@ -89,6 +91,9 @@ export default function ProductorOfertaDetall() {
   const [carregant, setCarregant] = useState(true)
   /** Fallo al leer la oferta: no es lo mismo que «no existe o no es tuya». */
   const [errorCarrega, setErrorCarrega] = useState(false)
+  // Multiproducto (fase 6a): las otras ofertas que se publicaron con esta y el mensaje único.
+  // Antes de los `return` tempranos: es un hook.
+  const { grup } = useDisponibilitat(oferta?.disponibilitat_id, `${oferta?.estado ?? ''}|${oferta?.texto_oferta ?? ''}`)
 
   const carrega = useCallback(async () => {
     if (!id) return
@@ -328,7 +333,11 @@ export default function ProductorOfertaDetall() {
       {/* Todo lo de la oferta, su texto y «Comparteix» (fase C, fila 3.7.2): el texto es suyo,
           lo puede pasar a su propio grupo o a quien quiera. */}
       <FitxaOferta oferta={oferta} ambCost vencida={vencuda}
-        onEdita={editable ? () => setEditant(true) : undefined} />
+        onEdita={editable ? () => setEditant(true) : undefined}
+        grup={grup ? { n: grup.ofertes.length, text: grup.text } : null} />
+
+      {/* Las otras ofertas de esta disponibilidad (fase 6a), sin códigos internos. */}
+      {grup && <DisponibilitatMultiproducte grup={grup} actual={oferta.id} panell="productor" />}
 
       <Card>
         <CardHeader>

@@ -364,10 +364,11 @@ Lo que manda hoy, en una línea cada uno:
 - **Productes** (D1-D2, `context/06ter`): Catàleg (precio vigente: último mes validado, si no el manual) · Preus de referència · Càrregues.
 - **Entrades i sortides** (6.7, `context/06ter`): una fila por salida; modalidad REAL y **tipus d'operació** aparte
   (filtro, `?per=` del «Resum», Excel; `lib/sortides.ts`); la fila abre `FitxaOperacio` (`?canalitzacio=`).
-- **Ofertes del equipo** (`context/06ter`): Disponibilitat (orden por defecto: vencidas sin resolver arriba) · Ofertant ·
-  Producte · Progrés · Estat, **sin referencia** (la encuentra el buscador) ni receptores; filtros tipus d'operació y
-  modalidad prevista (también Històric, servidor); Missatges: solo oferta y RECOLLIDA CONFIRMADA; pestañas Per validar ·
-  Actives · Esborranys · **Històric** (`?tab=`); paso bajo el badge (`lib/llistatOfertes.ts`). Canalització, sin cerradas.
+- **Ofertes del equipo** (`context/06ter`, `lib/llistatOfertes.ts`): orden por Disponibilitat (vencidas arriba), **sin
+  referencia**; filtros tipus d'operació y modalidad prevista; pestañas por `?tab=` (con Històric). Canalització, sin cerradas.
+- **Multiproducto** (fase 6, `context/06ter`): alta con «Afegir un altre producte» (`productes` solo con ≥2), bloque
+  `DisponibilitatMultiproducte` y envío por entidad; Mercat `?disponibilitat=`, tarjeta por solicitud en Aprovacions,
+  `?recollida=<sollicitud>` y «Valida totes» (lógica pura en `lib/altaMultiproducte.ts` y `lib/sollicitudMultiproducte.ts`).
 - **Registrar operació realitzada** (3.7): junto a «Nova oferta assistida» → `DialegOperacioRealitzada` → la RPC con la
   sesión; distintivo `BadgeRegistrePosteriori`.
 - **Días de recogida** (fase 4): con `dies_recollida`, `CampsRecollida` solo ofrece esos días (`lib/diesRecollida.ts`;
@@ -551,7 +552,7 @@ Decisiones de negocio pendientes (en `context/12`): **69**, **131**,
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.481 de Vitest (113 ficheros, 1 saltada) + 65 de Deno.**
+   **Referencia: 2.534 de Vitest (116 ficheros, 1 saltada) + 65 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
    **Referencia: clon 2.660/2.660 y 44 sin datos (25-11); producción 2.301/2.301 y 142 (20-11-2026).** `prueba-numeracion.ts` si toca la numeración; `scripts/sql/prova-signatura-institucional.sql` si toca roles o firmas.

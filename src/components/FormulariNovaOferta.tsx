@@ -97,6 +97,10 @@ import {
 import {
   aplicaPredeterminats, estatLlocHabitual, recalculaDelLloc, treuProposatsQueNoApliquen, ubicacioPerConfirmar,
 } from '../lib/predeterminatsOferta'
+import {
+  clauErrorProductes, cosAmbProductes, desDeCos, errorsFiles, filaDelIndex, filesUtils, type FilaProducte,
+} from '../lib/altaMultiproducte'
+import AltresProductes from './oferta/AltresProductes'
 
 type Datos = Record<string, unknown>
 
@@ -205,9 +209,14 @@ function idDe(clave: string): string {
 }
 
 export interface ResultatNovaOferta {
+  /** Con varios productos (fase 6a), la PRIMERA oferta del grupo. */
   id: string
   /** `enviat` cuando la confirmación por correo salió de verdad. */
   confirmacio_email?: string | null
+  /** Multiproducto (fase 6a): la disponibilidad creada, su `D-…` y sus ofertas. */
+  disponibilitat_id?: string
+  codi?: string
+  ofertes?: { id: string; id_excedente: string; estado: string; producto: string }[]
 }
 
 /** `crear` (alta), `esborrany` (reabrir uno guardado) o `editar` (una oferta publicada). */
@@ -309,6 +318,15 @@ export default function FormulariNovaOferta({
    * se vuelve a pisar aunque cambie de producto.
    */
   const [costTocat, setCostTocat] = useState(false)
+  /**
+   * MULTIPRODUCTO (fase 6a): los productos que se añaden al primero, uno por fila. El primero
+   * sigue en los campos de siempre; sin filas, el alta es exactamente la de un producto.
+   */
+  const [extres, setExtres] = useState<FilaProducte[]>([])
+  /** Lo que está mal en cada fila (clave i18n), por su `clau`. */
+  const [errorsExtres, setErrorsExtres] = useState<Record<string, string>>({})
+  /** Cambiar las filas quita sus marcas: igual que tocar un campo marcado (`set`). */
+  const canviaExtres = (files: FilaProducte[]) => { setExtres(files); setErrorsExtres({}) }
 
   useEffect(() => {
     if (!productorId) { setCarregant(false); return }
@@ -337,7 +355,11 @@ export default function FormulariNovaOferta({
           if (!recuperat.current) {
             const guardat = mode === 'esborrany' && oferta.dades_esborrany && typeof oferta.dades_esborrany === 'object'
               ? oferta.dades_esborrany : datosDeFila(oferta)
-            setDatos(ambData(guardat))
+            // Un esborrany multiproducto guarda `productes[]`: el primero vuelve a los campos de
+            // siempre y el resto a sus filas (fase 6a).
+            const { datos: d0, extres: e0 } = mode === 'esborrany' ? desDeCos(guardat) : { datos: guardat, extres: [] }
+            setDatos(ambData(d0))
+            setExtres(e0)
             setObertsFins(99)
             setCostTocat(true)
           }
@@ -349,7 +371,9 @@ export default function FormulariNovaOferta({
         // Solo la primera carga: si el efecto se repite (cambio de idioma), no se pisa lo escrito.
         const e = recuperat.current ? null : llegeixEsborrany(productorId)
         if (e) {
-          setDatos(ambData(e.datos))
+          const { datos: d0, extres: e0 } = desDeCos(e.datos)
+          setDatos(ambData(d0))
+          setExtres(e0)
           setObertsFins(e.pasMaxim)
           setCostTocat(e.costTocat)
           // P5: lo propuesto sigue siendo propuesto (hay que confirmarlo) y «Canvia» se recuerda.
@@ -385,11 +409,20 @@ export default function FormulariNovaOferta({
       }, mesActual(), lang)
     : null
 
+  /** La familia de un producto del catálogo (cada producto de un grupo lleva la suya). */
+  const familiaDe = (producte: string): string | null =>
+    (catalogos?.productos ?? []).find((p) => p.nombre === producte)?.familia ?? null
+
   useEffect(() => {
-    // La red local, solo en el alta: un esborrany o una edición ya están en el servidor.
+    // La red local, solo en el alta: un esborrany o una edición ya están en el servidor. Con
+    // varios productos se guarda con la forma del cuerpo (`productes[]`) y `desDeCos` la deshace.
     if (!productorId || !recuperat.current || mode !== 'crear') return
-    desaEsborrany(productorId, { datos, pas: 0, pasMaxim: obertsFins, costTocat, proposats: [...proposats], canviaLloc })
-  }, [productorId, datos, obertsFins, costTocat, proposats, canviaLloc, mode])
+    const familia = (producte: string) => (catalogos?.productos ?? []).find((p) => p.nombre === producte)?.familia ?? null
+    desaEsborrany(productorId, {
+      datos: cosAmbProductes(datos, extres, familia), pas: 0, pasMaxim: obertsFins, costTocat,
+      proposats: [...proposats], canviaLloc,
+    })
+  }, [productorId, datos, extres, catalogos, obertsFins, costTocat, proposats, canviaLloc, mode])
 
   /** El producto con un buscador; la familia va de detalle (y se rellena sola al elegir). */
   const opcionsProducte = useMemo(
@@ -595,21 +628,27 @@ export default function FormulariNovaOferta({
       return
     }
     setCampsFaltants(new Set())
+    // Los otros productos (fase 6a): cada fila con producto y kilos, sin repetir ninguno.
+    if (!editar && !validaExtres(true)) return
     setEnviant(true)
     setError(null)
     // Lo propuesto desde la ficha que no se ha tocado y ya no aplica no se manda: no lo ha
     // dicho nadie. La familia, siempre la del producto (no se pregunta aquí; el servidor la exige).
     const porClau = new Map(campos.map((c) => [c.clave, c]))
-    const aEnviar = preparaEnviament()
     if (editar && oferta) {
-      await desaEdicio(aEnviar)
+      await desaEdicio(preparaEnviament())
       return
     }
+    // Con un solo producto, el cuerpo de siempre (sin `productes`); con más, el del grupo.
+    const enviades = filesUtils(extres)
+    const aEnviar = cosAmbProductes(preparaEnviament(), extres, familiaDe)
     const r = mode === 'esborrany' && oferta
       ? await publicaEsborrany(oferta.id, aEnviar)
       : await creaOferta(productorId, aEnviar)
     setEnviant(false)
     if (!r.ok || !r.data) {
+      // Un rechazo que señala OTRO producto del grupo: se marca su fila, no los campos de dalt.
+      if (marcaErrorFila(r.producte_index, r.code, r.faltan, enviades)) return
       // El servidor puede saber de un campo que el cliente no vio a tiempo —el descriptor
       // cambia entre que se cargó el formulario y que se envió, porque la función se
       // despliega antes que este fichero (§11)—. Si trae `faltan`, se trata igual que la
@@ -628,10 +667,60 @@ export default function FormulariNovaOferta({
     if (mode === 'crear') esborraEsborrany(productorId)
     // Las fotos que se quitaron de un esborrany ya guardado: ahora que nada las cita, fuera.
     if (mode === 'esborrany') await esborraFotesTretes(aEnviar)
+    // Un grupo: cuántas ofertas han nacido y, al equipo, su código `D-…` (el ofertante no ve
+    // códigos internos: ni el `E-…` ni el `D-…`). El detalle de la primera enseña las hermanas.
+    if (r.data.disponibilitat_id) {
+      const n = r.data.ofertes?.length ?? enviades.length + 1
+      toast.success(esEquip && r.data.codi ? t('mp.creada_equip', { n, codi: r.data.codi }) : t('mp.creada', { n }))
+    }
     // Sin toast: lo que hay que decir —la referencia, qué pasa ahora y por dónde seguir—
     // no cabe en un aviso que se va solo. Lo cuenta `BlocPublicada` en el detalle. A dónde se
     // va después lo decide quien monta el formulario.
     onCreada?.(r.data)
+  }
+
+  /**
+   * Comprueba las filas de los otros productos (fase 6a). `publicar` exige kilos; para guardar un
+   * esborrany basta el producto. Marca las filas, dice cuántas fallan y lleva a la primera.
+   */
+  function validaExtres(publicar: boolean): boolean {
+    const errs = errorsFiles({ producte: datos.producte, varietat: datos.varietat }, extres, { publicar })
+    setErrorsExtres(errs)
+    const primera = extres.findIndex((f) => errs[f.clau])
+    if (primera < 0) return true
+    setError(t('mp.err_files'))
+    window.setTimeout(() => {
+      document.getElementById(`of-mp-${primera}-producte`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 50)
+    return false
+  }
+
+  /**
+   * Un rechazo del servidor con `producte_index` ≥ 1: la fila de ese producto, con su motivo.
+   * Devuelve si lo ha tratado (el 0 es el primer producto: lo tratan los campos de siempre).
+   */
+  function marcaErrorFila(
+    index: number | undefined, code: string | undefined, faltan: string[] | undefined, enviades: FilaProducte[],
+  ): boolean {
+    const fila = filaDelIndex(index, enviades)
+    const clauProductes = clauErrorProductes(code)
+    if (!fila) {
+      // Un error de la lista entera (`massa_productes`, `productes_invalid`): en la banda.
+      if (index === undefined && clauProductes && code !== 'kg_invalid' && code !== 'falta_producte') {
+        setError(t(clauProductes))
+        return true
+      }
+      return false
+    }
+    const motiu = clauProductes
+      ?? (faltan?.includes('kg') ? 'mp.err_kg' : faltan?.includes('preu_minim') ? 'mp.err_preu' : 'mp.err_fila_generic')
+    setErrorsExtres({ [fila.clau]: motiu })
+    setError(t('mp.err_fila', { num: (index ?? 0) + 1, motiu: t(motiu) }))
+    const pos = extres.findIndex((f) => f.clau === fila.clau)
+    window.setTimeout(() => {
+      document.getElementById(`of-mp-${pos}-producte`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 50)
+    return true
   }
 
   /** Lo que se manda: sin lo propuesto que ya no aplica, con la familia del producto. */
@@ -708,12 +797,19 @@ export default function FormulariNovaOferta({
       setError(t('po.invalid_fields', { camps: noms.join(', ') }))
       return
     }
+    if (!validaExtres(false)) return
     setError(null)
     setDesantEsb(true)
-    const aEnviar = preparaEnviament()
+    // Con otros productos, el esborrany guarda `productes[]` (fase 6a).
+    const enviades = filesUtils(extres)
+    const aEnviar = cosAmbProductes(preparaEnviament(), extres, familiaDe)
     const r = await desaEsborranyOferta(productorId, aEnviar, mode === 'esborrany' ? oferta?.id : null)
     setDesantEsb(false)
-    if (!r.ok || !r.data) { setError(textError(t, r.error)); return }
+    if (!r.ok || !r.data) {
+      if (marcaErrorFila(r.producte_index, r.code, undefined, enviades)) return
+      setError(textError(t, r.error))
+      return
+    }
     if (mode === 'crear') esborraEsborrany(productorId)
     else await esborraFotesTretes(aEnviar)
     toast.success(t('esb.desat'))
@@ -1230,6 +1326,15 @@ export default function FormulariNovaOferta({
                   {campo.tipo === 'producte' && familiaAssignada()}
                 </div>
               ))}
+              {/* Los OTROS productos (fase 6a), en el bloque de la cantidad: el primero ya tiene
+                  producto y kilos. Ni al editar (es UNA oferta) ni sin bloques (servidor viejo). */}
+              {!editar && (bloc.clau === 'quantitat' || blocs.length === 1) && (
+                <AltresProductes files={extres} onChange={canviaExtres} opcionsProducte={opcionsProducte}
+                  principal={esBuit(datos.producte) ? null : String(datos.producte)}
+                  ambCaixes={campos.some((c) => c.clave === 'caixes' && aplica(c))}
+                  ambPreu={campos.some((c) => c.clave === 'preu_minim' && aplica(c))}
+                  preuPrincipal={datos.preu_minim} errors={errorsExtres} />
+              )}
               {/* La FOTO va en el bloque del producto, que es donde se piensa en qué se ofrece.
                   No es un campo del descriptor porque el bot de WhatsApp todavía no recibe
                   imágenes (brecha 8): viaja en `datos.fotos` y `crear-oferta` la valida aparte. */}

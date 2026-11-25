@@ -303,6 +303,15 @@ export async function creaOferta(
     estado?: string
     /** Las modalidades marcadas para las que falta el convenio (no impiden publicar). */
     modalitats_sense_conveni?: string[]
+    /**
+     * Multiproducto (fase 6a): con dos o más productos, la disponibilidad creada. `id` e
+     * `id_excedente` son entonces los de la PRIMERA oferta del grupo.
+     */
+    disponibilitat_id?: string
+    /** `D-…`: solo lo enseña el equipo (el ofertante no ve códigos internos). */
+    codi?: string
+    ofertes?: { id: string; id_excedente: string; estado: string; producto: string }[]
+    texto_disponibilitat?: string | null
   }> & {
     /**
      * Las claves (`CampoOferta.clave`) que la RPC echa en falta, cuando el rechazo es
@@ -313,6 +322,10 @@ export async function creaOferta(
      * cliente no sabía todavía.
      */
     faltan?: string[]
+    /** El motivo del rechazo (`campos_faltantes`, `producte_repetit`, `kg_invalid`…). */
+    code?: string
+    /** Multiproducto: el producto que falla (0 = el primero), si es uno concreto. */
+    producte_index?: number
   }
 > {
   try {
@@ -324,13 +337,19 @@ export async function creaOferta(
       body: JSON.stringify({ productor_id: productorId, datos }),
     })
     const body = await res.json().catch(() => null)
-    if (!res.ok) {
-      const b = body as { error?: string; faltan?: string[] } | null
-      return { ok: false, error: b?.error ?? 'error', faltan: b?.faltan }
-    }
+    if (!res.ok) return rebuig(body)
     return { ok: true, data: body }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/** Un rechazo de `crear-oferta` (alta o publicar): el mensaje, lo que falta, el código y el producto. */
+function rebuig(body: unknown): { ok: false; error: string; faltan?: string[]; code?: string; producte_index?: number } {
+  const b = body as { error?: string; faltan?: string[]; code?: string; producte_index?: number } | null
+  return {
+    ok: false, error: b?.error ?? 'error', faltan: b?.faltan, code: b?.code,
+    producte_index: typeof b?.producte_index === 'number' ? b.producte_index : undefined,
   }
 }
 
@@ -380,7 +399,7 @@ export async function desaEsborranyOferta(
   productorId: string,
   datos: Record<string, unknown>,
   id?: string | null,
-): Promise<Resultat<{ id: string }> & { code?: string }> {
+): Promise<Resultat<{ id: string }> & { code?: string; producte_index?: number }> {
   try {
     const t = await token()
     if (!t) return { ok: false, error: 'unauthorized' }
@@ -390,7 +409,10 @@ export async function desaEsborranyOferta(
       body: JSON.stringify({ id: id ?? undefined, productor_id: productorId, datos }),
     })
     const body = await res.json().catch(() => null) as { error?: string; code?: string; id?: string } | null
-    if (!res.ok || !body?.id) return { ok: false, error: body?.error ?? 'error', code: body?.code }
+    if (!res.ok || !body?.id) {
+      const r = rebuig(body)
+      return { ok: false, error: r.error, code: r.code, producte_index: r.producte_index }
+    }
     return { ok: true, data: { id: body.id } }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
@@ -414,10 +436,7 @@ export async function publicaEsborrany(
       body: JSON.stringify({ id, datos }),
     })
     const body = await res.json().catch(() => null)
-    if (!res.ok) {
-      const b = body as { error?: string; faltan?: string[] } | null
-      return { ok: false, error: b?.error ?? 'error', faltan: b?.faltan }
-    }
+    if (!res.ok) return rebuig(body)
     return { ok: true, data: body }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }

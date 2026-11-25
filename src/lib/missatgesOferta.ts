@@ -23,7 +23,7 @@ import {
 } from '../../supabase/functions/_shared/textOfertaRegistrada.ts'
 import { TEXT_REBUIG, textGracies } from '../../supabase/functions/_shared/textRespostes.ts'
 import { textoRecollidaConfirmada } from './textos'
-import { enllacInteresOferta, enllacRegistreRecollida } from './enllacosDirectes'
+import { enllacInteresOferta, enllacRecollidaSollicitud, enllacRegistreRecollida } from './enllacosDirectes'
 
 /** Las fases del ciclo guiado (`FASES_EQUIP` de `procesOferta.ts`). */
 export type FaseMissatge = 'conveni' | 'entrada' | 'distribucio' | 'aprovacio' | 'lliurament' | 'tancament'
@@ -100,7 +100,15 @@ export interface FetsMissatges {
     estado: string | null
     comentarios?: string | null
     created_at?: string | null
+    /** Multiproducto (fase 6c): la solicitud conjunta a la que pertenece esta entrega. */
+    sollicitud_id?: string | null
   }[]
+  /**
+   * Multiproducto (fase 6c): de cada solicitud de las entregas de esta oferta, TODAS sus líneas
+   * (también las de las otras ofertas de la disponibilidad), para el mensaje único. Sin esto, el
+   * mensaje se compone con las entregas de esta oferta.
+   */
+  sollicituds?: Record<string, { linies: LiniaRecollidaGrup[] }>
   avisos?: AvisMissatge[]
   /** id de la entidad → nombre. */
   entitats?: Record<string, string>
@@ -197,6 +205,49 @@ export function textRecollidaGrup(
   })
 }
 
+/** Una línea (un producto) de una solicitud multiproducto. */
+export interface LiniaRecollidaGrup {
+  producte: string
+  kg: number | null
+  estado: string | null
+  entidad_id?: string | null
+  data_hora_recollida?: string | null
+  comentarios?: string | null
+}
+
+/**
+ * RECOLLIDA CONFIRMADA de una SOLICITUD multiproducto (fase 6c, 25-11-2026): UN mensaje con todos
+ * los productos confirmados de la solicitud (las líneas anuladas no cuentan), la fecha común y
+ * UN enlace (`/receptor/interessos?recollida=<sollicitud>`) para registrar la recogida de todos a
+ * la vez. En catalán, como todo lo que sale por WhatsApp (§7).
+ */
+export function textRecollidaSollicitud(a: {
+  sollicitudId: string
+  linies: readonly LiniaRecollidaGrup[]
+  entitat: string
+  idioma: 'ca' | 'es'
+  appUrl?: string | null
+}): string {
+  const vives = a.linies.filter((l) => l.estado !== 'anulada')
+  const kgTotal = Math.round(vives.reduce((s, l) => s + Number(l.kg ?? 0), 0) * 100) / 100
+  const dates = [...new Set(vives.map((l) => quan(l.data_hora_recollida ?? null, a.idioma)).filter(Boolean))]
+  const comentaris = [...new Set(vives.map((l) => l.comentarios?.trim()).filter(Boolean))]
+  const lineas = [
+    '🚚 *RECOLLIDA CONFIRMADA*',
+    '',
+    `🏛️ SDA / ENTITAT: ${a.entitat}`,
+    `📅 DATA i HORA: ${dates.join(' · ')}`,
+    '📦 PRODUCTES:',
+    ...vives.map((l) => `• ${l.producte}: ${Number(l.kg ?? 0)} kg`),
+    `⚖️ KG RECOLLITS: ${kgTotal}`,
+    `👥 Comentaris: ${comentaris.join(' · ')}`,
+  ]
+  if (a.appUrl && vives.length > 0) {
+    lineas.push('', `✅ Quan hagis fet la recollida, registra els kg reals de tots els productes aquí:\n${enllacRecollidaSollicitud(a.appUrl, a.sollicitudId)}`)
+  }
+  return lineas.join('\n')
+}
+
 /** Todos los mensajes de una oferta, ordenados por fase y, dentro de cada una, por momento. */
 export function missatgesDeLOferta(f: FetsMissatges, o: OpcionsMissatges): Missatge[] {
   const out: Missatge[] = []
@@ -265,16 +316,42 @@ export function missatgesDeLOferta(f: FetsMissatges, o: OpcionsMissatges): Missa
     if (m) out.push(m)
   }
 
-  // 5. RECOLLIDA CONFIRMADA, para el grupo, en cuanto hay alguna entrega asignada.
+  // 5. RECOLLIDA CONFIRMADA, para el grupo, en cuanto hay alguna entrega asignada. Las entregas
+  //    de una SOLICITUD multiproducto (fase 6c) van en su propio mensaje, uno por solicitud, con
+  //    todos sus productos y un solo enlace; las demás, en el de siempre.
   const vives = (f.canalitzacions ?? []).filter((c) => c.estado !== 'anulada')
-  if (vives.length > 0) {
+  const soltes = vives.filter((c) => !c.sollicitud_id)
+  if (soltes.length > 0) {
+    // Lo que falta se cuenta contra TODO lo asignado de la oferta, también lo de las solicitudes.
+    const kgSollicituds = vives.filter((c) => c.sollicitud_id).reduce((s, c) => s + Number(c.kg_confirmados ?? 0), 0)
     out.push({
       id: 'recollida_grup', clau: 'recollida_grup', fase: 'lliurament',
       destinatari: 'grup', destinatariNom: null,
-      whatsapp: textRecollidaGrup(vives, Number(oferta.kg_total ?? 0), nomEntitat, o.idioma, o.appUrl),
+      whatsapp: textRecollidaGrup(soltes, Math.max(0, Number(oferta.kg_total ?? 0) - kgSollicituds), nomEntitat, o.idioma, o.appUrl),
       correu: null,
       estat: 'compost', canalEnviat: null, enviatAt: null, motiuNoEnviat: null,
-      at: vives.map((c) => c.created_at ?? '').sort().at(-1) || null, origen: 'compost',
+      at: soltes.map((c) => c.created_at ?? '').sort().at(-1) || null, origen: 'compost',
+    })
+  }
+  const perSollicitud = new Map<string, typeof vives>()
+  for (const c of vives) {
+    if (!c.sollicitud_id) continue
+    perSollicitud.set(c.sollicitud_id, [...(perSollicitud.get(c.sollicitud_id) ?? []), c])
+  }
+  for (const [sid, cans] of perSollicitud) {
+    const linies: LiniaRecollidaGrup[] = f.sollicituds?.[sid]?.linies ?? cans.map((c) => ({
+      producte: oferta.producto ?? '', kg: c.kg_confirmados, estado: c.estado,
+      entidad_id: c.entidad_id, data_hora_recollida: c.data_hora_recollida, comentarios: c.comentarios ?? null,
+    }))
+    out.push({
+      id: `recollida_grup:${sid}`, clau: 'recollida_grup', fase: 'lliurament',
+      destinatari: 'grup', destinatariNom: null,
+      whatsapp: textRecollidaSollicitud({
+        sollicitudId: sid, linies, entitat: nomEntitat(cans[0].entidad_id), idioma: o.idioma, appUrl: o.appUrl,
+      }),
+      correu: null,
+      estat: 'compost', canalEnviat: null, enviatAt: null, motiuNoEnviat: null,
+      at: cans.map((c) => c.created_at ?? '').sort().at(-1) || null, origen: 'compost',
     })
   }
 
@@ -292,13 +369,16 @@ export function missatgesDeLOferta(f: FetsMissatges, o: OpcionsMissatges): Missa
  */
 export const CLAUS_MISSATGES_FITXA_OFERTA = ['oferta', 'recollida_grup'] as const
 
-/** Los mensajes de la ficha de la oferta: los de `CLAUS_MISSATGES_FITXA_OFERTA`, uno de cada. */
+/**
+ * Los mensajes de la ficha de la oferta: los de `CLAUS_MISSATGES_FITXA_OFERTA`, en ese orden y
+ * cada mensaje una vez. RECOLLIDA CONFIRMADA puede salir más de una vez desde la fase 6c: el de
+ * las entregas sueltas y uno por solicitud multiproducto (ids distintos).
+ */
 export function missatgesFitxaOferta(missatges: readonly Missatge[]): Missatge[] {
-  const vistes = new Set<string>()
-  return CLAUS_MISSATGES_FITXA_OFERTA.flatMap((clau) => {
-    const m = missatges.find((x) => x.clau === clau)
-    if (!m || vistes.has(clau)) return []
-    vistes.add(clau)
-    return [m]
-  })
+  const vistos = new Set<string>()
+  return CLAUS_MISSATGES_FITXA_OFERTA.flatMap((clau) => missatges.filter((m) => {
+    if (m.clau !== clau || vistos.has(m.id)) return false
+    vistos.add(m.id)
+    return true
+  }))
 }

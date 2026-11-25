@@ -69,6 +69,21 @@ export interface EntidadPuntuada {
    * la oferta y el fallo aparecía al final, al aprobar. Mismo patrón que la deuda 38.
    */
   sense_conveni: boolean
+  /**
+   * Solo en el ranking de una DISPONIBILIDAD (fase 6a): en qué ofertas del grupo encaja esta
+   * entidad (`uneixRankings()` de `_shared/priorizacion.ts`).
+   */
+  ofertes_encaixen?: EncaixOferta[]
+}
+
+/** Cómo encaja una entidad en una oferta concreta del grupo (espejo de `_shared/priorizacion.ts`). */
+export interface EncaixOferta {
+  excedente_id: string
+  id_excedente: string | null
+  producto: string | null
+  puntuacion: number
+  sense_conveni: boolean
+  modalitats_possibles: string[]
 }
 
 export interface PriorizacionResult {
@@ -82,6 +97,18 @@ export interface PriorizacionResult {
 }
 
 export async function priorizarEntidades(excedenteId: string): Promise<PriorizacionResult> {
+  return prioriza({ excedente_id: excedenteId })
+}
+
+/**
+ * El ranking de una DISPONIBILIDAD multiproducto (fase 6a): una entidad entra si encaja en
+ * alguna oferta del grupo y cada fila dice en cuáles (`ofertes_encaixen`). Nunca lanza.
+ */
+export async function priorizarDisponibilitat(disponibilitatId: string): Promise<PriorizacionResult> {
+  return prioriza({ disponibilitat_id: disponibilitatId })
+}
+
+async function prioriza(cos: { excedente_id: string } | { disponibilitat_id: string }): Promise<PriorizacionResult> {
   try {
     const { data } = await supabase.auth.getSession()
     const token = data.session?.access_token
@@ -94,7 +121,7 @@ export async function priorizarEntidades(excedenteId: string): Promise<Priorizac
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ excedente_id: excedenteId }),
+      body: JSON.stringify(cos),
     })
     const body = (await res.json().catch(() => null)) as
       | { ranking?: EntidadPuntuada[]; modo_test?: boolean; whatsapp_actiu?: boolean; error?: string }

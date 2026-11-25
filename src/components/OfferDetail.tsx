@@ -41,6 +41,10 @@ import CanvisOferta from './equip/CanvisOferta'
 import { carregaDestins } from '../lib/ofertes'
 import DialegEdicioOferta from './DialegEdicioOferta'
 import FitxaOferta from './FitxaOferta'
+import DisponibilitatMultiproducte from './oferta/DisponibilitatMultiproducte'
+import EnviamentDisponibilitat from './equip/EnviamentDisponibilitat'
+import DialegAssignacioMultiproducte from './equip/DialegAssignacioMultiproducte'
+import { useDisponibilitat } from '../hooks/useDisponibilitat'
 import FormulariInteresAssistit from './equip/FormulariInteresAssistit'
 import FormulariAprovacio from './equip/FormulariAprovacio'
 import { PropostaEsperant } from './equip/PropostaCanvis'
@@ -176,7 +180,11 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   const [noColocada, setNoColocada] = useState(false)
   // La entidad que se preselecciona en «Registra l'interès» (desde una fila «pendent»).
   const [entitatInteres, setEntitatInteres] = useState('')
-  // F3: el diálogo que convierte esta oferta en jornada de espigueo.
+  // Multiproducto (fase 6a): las hermanas de esta oferta y el mensaje único del grupo.
+  // Se relee al cambiar el estado o el texto de esta oferta (editarla cambia el mensaje del grupo).
+  const { grup } = useDisponibilitat(exc.disponibilitat_id, `${exc.estado}|${exc.texto_oferta ?? ''}`)
+  // Fase 6b: el diálogo de asignación conjunta del grupo (nivel 1).
+  const [assignaGrup, setAssignaGrup] = useState(false)
   // Productor y municipi para las variables de la plantilla oferta_excedent.
   const [datosOferta, setDatosOferta] = useState<{ productor: string | null; municipi: string | null }>(
     { productor: null, municipi: null },
@@ -897,7 +905,29 @@ export default function OfferDetail({ excedente, onBack }: Props) {
       {/* Todo lo de la oferta en lectura, su texto, «Copia» y «Comparteix» (fase C del punto
           3, fila 3.7.2). «Edita l'oferta» abre el mismo formulario del alta en modo editar. */}
       <FitxaOferta oferta={exc} ambCost vencida={vencida}
-        onEdita={editable ? () => setEditant(true) : undefined} />
+        onEdita={editable ? () => setEditant(true) : undefined}
+        grup={grup ? { n: grup.ofertes.length, text: grup.text } : null} />
+
+      {/* Multiproducto (fase 6a): las hermanas, el mensaje único y su envío a entidades (un
+          mensaje por entidad). Cada oferta sigue teniendo su propio ranking aquí debajo. */}
+      {grup && (
+        <DisponibilitatMultiproducte grup={grup} actual={exc.id} panell="equip"
+          accions={
+            // Asignación conjunta del grupo (nivel 1, `assignar_directe_multiple`): exige `pot_aprovar()`.
+            potAprovar && exc.disponibilitat_id ? (
+              <>
+                <Button size="sm" variant="outline" data-testid="od-assigna-grup" onClick={() => setAssignaGrup(true)}>
+                  {t('smp.asg_titol')}
+                </Button>
+                <DialegAssignacioMultiproducte disponibilitatId={exc.disponibilitat_id} abert={assignaGrup}
+                  onTanca={() => setAssignaGrup(false)}
+                  onFet={() => { setAssignaGrup(false); void trasAprovacio() }} />
+              </>
+            ) : null
+          }>
+          <EnviamentDisponibilitat grup={grup} onEnviat={() => void recargarRespuestas()} />
+        </DisponibilitatMultiproducte>
+      )}
 
       {/* Las entidades priorizadas, plegadas por defecto (mismo patrón que los mensajes): con la
           asignación arriba, el ranking es una consulta, no el primer paso. */}
